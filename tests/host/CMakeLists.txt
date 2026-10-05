@@ -13,6 +13,14 @@ set(LLAMA_BUILD_TOOLS    OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_SERVER   OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_COMMON   OFF CACHE BOOL "" FORCE)
 set(LLAMA_OPENSSL        OFF CACHE BOOL "" FORCE)
+# 앱과 같은 동적 백엔드 구성(CPU 변형 점수 선택 경로) 검증용: -DLING_HOST_BACKEND_DL=ON
+option(LING_HOST_BACKEND_DL "build ggml backends as dynamic modules like the app" OFF)
+if (LING_HOST_BACKEND_DL)
+    set(BUILD_SHARED_LIBS     ON CACHE BOOL "" FORCE)
+    set(GGML_BACKEND_DL       ON CACHE BOOL "" FORCE)
+    set(GGML_CPU_ALL_VARIANTS ON CACHE BOOL "" FORCE)
+    set(GGML_NATIVE           OFF CACHE BOOL "" FORCE)
+endif ()
 add_subdirectory(${ROOT}/third_party/llama.cpp build-llama)
 
 add_executable(ling_engine_test

@@ -146,6 +146,12 @@ class LingEngine private constructor(nativeLibDir: String) {
 
     fun systemInfo(): String = LingNative.nativeSystemInfo()
 
+    /**
+     * GPU("opencl") / NPU("hexagon") 백엔드를 필요할 때만 로드한다.
+     * Hexagon 은 등록 시 FastRPC 세션을 열므로 CPU 모드에서는 로드하지 않는다. 한 번 로드되면 프로세스 종료까지 유지.
+     */
+    fun loadBackend(name: String): Boolean = LingNative.nativeLoadBackend(name)
+
     companion object {
         @Volatile private var instance: LingEngine? = null
 

@@ -31,6 +31,8 @@ android {
     packaging {
         jniLibs {
             excludes += "**/libOpenCL.so"
+            // Hexagon DSP skel(QDSP6 ELF)은 호스트 strip 대상에서 제외(원본 그대로 FastRPC 가 로드)
+            keepDebugSymbols += "**/libggml-htp-*.so"
             useLegacyPackaging = true
         }
     }

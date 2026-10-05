@@ -11,3 +11,4 @@ build/
 engine/src/main/hexagonLibs/
 build-hexagon/
 build-host/
+build-phase0/

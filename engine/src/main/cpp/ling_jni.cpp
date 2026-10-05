@@ -111,6 +111,10 @@ JNIEXPORT void JNICALL JFN(nativeInit)(JNIEnv * env, jclass, jstring backend_dir
     Engine::global_init(to_std(env, backend_dir));
 }
 
+JNIEXPORT jboolean JNICALL JFN(nativeLoadBackend)(JNIEnv * env, jclass, jstring name) {
+    return Engine::load_backend(to_std(env, name)) ? JNI_TRUE : JNI_FALSE;
+}
+
 JNIEXPORT jstring JNICALL JFN(nativeSystemInfo)(JNIEnv * env, jclass) {
     return to_jstring(env, Engine::system_info());
 }

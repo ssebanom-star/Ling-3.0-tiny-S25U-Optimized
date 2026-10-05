@@ -7,6 +7,7 @@ internal object LingNative {
     }
 
     @JvmStatic external fun nativeInit(backendDir: String)
+    @JvmStatic external fun nativeLoadBackend(name: String): Boolean
     @JvmStatic external fun nativeSystemInfo(): String
     @JvmStatic external fun nativeDevices(): Array<String>
     @JvmStatic external fun nativeCreate(): Long

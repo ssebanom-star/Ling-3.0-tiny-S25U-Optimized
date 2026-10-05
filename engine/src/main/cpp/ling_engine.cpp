@@ -5,6 +5,8 @@
 #include "llama.h"
 
 #include <algorithm>
+#include <dirent.h>
+#include <dlfcn.h>
 #include <chrono>
 #include <cstring>
 #include <sstream>
@@ -74,18 +76,64 @@ Engine::~Engine() {
     unload();
 }
 
+namespace {
+std::string g_backend_dir;
+}
+
 void Engine::global_init(const std::string & backend_dir) {
     static bool done = false;
     if (done) {
         return;
     }
     done = true;
-    if (!backend_dir.empty()) {
-        ggml_backend_load_all_from_path(backend_dir.c_str());
-    } else {
+    g_backend_dir = backend_dir;
+    if (backend_dir.empty()) {
         ggml_backend_load_all();
+    } else {
+        // CPU 변형(libggml-cpu-*.so) 중 이 CPU 에서 지원되는 최고 점수 선택 (ggml load_best 와 같은 규칙)
+        std::string best;
+        int         best_score = 0;
+        if (DIR * d = opendir(backend_dir.c_str())) {
+            while (dirent * e = readdir(d)) {
+                const std::string n = e->d_name;
+                if (n.rfind("libggml-cpu", 0) != 0 || n.size() < 3 || n.substr(n.size() - 3) != ".so") {
+                    continue;
+                }
+                const std::string path = backend_dir + "/" + n;
+                void * h = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
+                if (!h) {
+                    continue;
+                }
+                auto score_fn = (int (*)()) dlsym(h, "ggml_backend_score");
+                const int score = score_fn ? score_fn() : 0;
+                dlclose(h);
+                if (score > best_score) {
+                    best_score = score;
+                    best       = path;
+                }
+            }
+            closedir(d);
+        }
+        if (best.empty() || !ggml_backend_load(best.c_str())) {
+            ggml_backend_load_all_from_path(backend_dir.c_str());  // 폴백
+        }
     }
     llama_backend_init();
+}
+
+bool Engine::load_backend(const std::string & name) {
+    for (size_t i = 0; i < ggml_backend_reg_count(); ++i) {
+        std::string rn = ggml_backend_reg_name(ggml_backend_reg_get(i));
+        std::transform(rn.begin(), rn.end(), rn.begin(), ::tolower);
+        if (rn.find(name) != std::string::npos || (name == "hexagon" && rn.find("htp") != std::string::npos)) {
+            return true;
+        }
+    }
+    if (g_backend_dir.empty()) {
+        return false;
+    }
+    const std::string path = g_backend_dir + "/libggml-" + name + ".so";
+    return ggml_backend_load(path.c_str()) != nullptr;
 }
 
 std::string Engine::system_info() {

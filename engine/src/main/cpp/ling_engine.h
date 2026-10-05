@@ -112,8 +112,12 @@ public:
     Engine(const Engine &)             = delete;
     Engine & operator=(const Engine &) = delete;
 
-    // 프로세스당 1회. backend_dir: 동적 백엔드(.so) 탐색 경로 (빈 문자열이면 기본)
+    // 프로세스당 1회. backend_dir: 동적 백엔드(.so) 경로.
+    // 지정 시 CPU 변형 중 최고 점수 하나만 로드한다(GPU/NPU 는 load_backend 로 필요할 때만 —
+    // Hexagon 은 등록 시점에 FastRPC 세션을 열기 때문). 빈 문자열이면 ggml 기본 탐색으로 전부 로드
     static void global_init(const std::string & backend_dir);
+    // 추가 백엔드 지연 로드 (name: "opencl" | "hexagon"). 이미 로드됐거나 성공 시 true
+    static bool load_backend(const std::string & name);
     static std::string system_info();
     static std::vector<std::string> list_devices();
 

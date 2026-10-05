@@ -15,8 +15,13 @@ public class JniSmoke {
     public static void main(String[] args) {
         String model = args[0];
         LingNative n = LingNative.INSTANCE;
-        LingNative.nativeInit("");
-        System.out.println("devices: " + Arrays.toString(LingNative.nativeDevices()));
+        // args[1]: 동적 백엔드 디렉터리(앱의 nativeLibraryDir 역할). 없으면 정적 링크 빌드
+        String backendDir = args.length > 1 ? args[1] : "";
+        LingNative.nativeInit(backendDir);
+        String[] devs = LingNative.nativeDevices();
+        System.out.println("devices: " + Arrays.toString(devs));
+        check(devs.length >= 1 && devs[0].startsWith("CPU"), "CPU backend registered");
+        if (!backendDir.isEmpty()) check(!LingNative.nativeLoadBackend("opencl"), "absent backend load returns false");
         long h = LingNative.nativeCreate();
         final float[] lastProgress = {0};
         String err = LingNative.nativeLoad(h, model,

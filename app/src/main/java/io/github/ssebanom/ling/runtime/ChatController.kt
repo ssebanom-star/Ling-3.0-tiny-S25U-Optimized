@@ -133,7 +133,8 @@ class ChatController(
             try {
                 inference.lock.withLock { turnLoop(initial) }
             } catch (e: EngineException) {
-                _state.update { it.copy(error = e.message) }
+                // 사용자가 prefill 중 정지한 경우는 오류로 표시하지 않는다
+                if (!stopRequested) _state.update { it.copy(error = e.message) }
             } catch (e: Exception) {
                 _state.update { it.copy(error = e.toString()) }
             } finally {

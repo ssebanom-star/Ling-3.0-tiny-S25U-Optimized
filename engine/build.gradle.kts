@@ -56,6 +56,8 @@ android {
         jniLibs {
             // 링크용으로만 빌드한 OpenCL ICD 로더는 넣지 않는다(런타임은 /vendor 의 libOpenCL.so)
             excludes += "**/libOpenCL.so"
+            // Hexagon DSP skel(QDSP6 ELF)은 호스트 strip 대상에서 제외(원본 그대로 FastRPC 가 로드)
+            keepDebugSymbols += "**/libggml-htp-*.so"
             // 백엔드 동적 로딩이 nativeLibraryDir 를 스캔하므로 .so 를 APK에서 추출해야 한다
             useLegacyPackaging = true
         }

@@ -71,8 +71,14 @@ class InferenceManager(
         val mask = if (s.threads == 0 && s.tunedCpuMask.isNotEmpty()) s.tunedCpuMask else ""
         val devices = when (backend) {
             Backend.CPU -> ""
-            Backend.NPU -> engine.devices().filter { it.name.startsWith("HTP") }.joinToString(",") { it.name }
-            Backend.GPU -> engine.devices().firstOrNull { it.type == "GPU" || it.name.contains("OpenCL", true) }?.name ?: ""
+            Backend.NPU -> {
+                engine.loadBackend("hexagon")
+                engine.devices().filter { it.name.startsWith("HTP") }.joinToString(",") { it.name }
+            }
+            Backend.GPU -> {
+                engine.loadBackend("opencl")
+                engine.devices().firstOrNull { it.type == "GPU" || it.name.contains("OpenCL", true) }?.name ?: ""
+            }
         }
         return EngineConfig(
             modelPath = path.absolutePath,
