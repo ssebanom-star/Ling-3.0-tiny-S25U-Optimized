@@ -190,10 +190,9 @@ bool Engine::load(const EngineParams & p, std::string & err, const std::function
 
 void Engine::make_threadpools() {
     free_threadpools();
+    // 지속 스레드풀을 항상 만든다: 미부착 시 ggml 이 매 compute 마다 임시 스레드를 생성하므로
+    // 토큰당 수십~수백 µs 오버헤드가 생긴다(디코드는 토큰마다 compute 1회)
     const auto cpus = split_csv(params_.cpumask);
-    if (cpus.empty() && params_.poll == 50) {
-        return;  // ggml 기본 스레드풀 사용
-    }
     auto * reg = ggml_backend_reg_by_name("CPU");
     if (!reg) {
         return;
@@ -236,16 +235,15 @@ void Engine::free_threadpools() {
     tp_ = tp_batch_ = nullptr;
 }
 
-void Engine::set_threads(int n_threads, int n_threads_batch) {
+void Engine::set_threads(int n_threads, int n_threads_batch, const std::string & cpumask) {
     if (!ctx_) {
         return;
     }
     params_.n_threads       = n_threads;
     params_.n_threads_batch = n_threads_batch;
+    params_.cpumask         = cpumask;
     llama_set_n_threads(ctx_, n_threads, n_threads_batch);
-    if (tp_ || !params_.cpumask.empty()) {
-        make_threadpools();
-    }
+    make_threadpools();
 }
 
 void Engine::unload() {

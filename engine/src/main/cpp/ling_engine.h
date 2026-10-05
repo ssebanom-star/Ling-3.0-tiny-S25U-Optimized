@@ -121,8 +121,8 @@ public:
     void unload();
     bool loaded() const { return ctx_ != nullptr; }
 
-    // 스레드 수만 변경(열 관리용). 스레드풀 재생성 포함
-    void set_threads(int n_threads, int n_threads_batch);
+    // 스레드 수/코어 배치 변경(자동 튜닝·열 관리용). 스레드풀 재생성 포함, 재로드 불필요
+    void set_threads(int n_threads, int n_threads_batch, const std::string & cpumask);
 
     std::vector<token> tokenize(const std::string & text, bool parse_special = true) const;
     std::string        detokenize(const std::vector<token> & toks) const;

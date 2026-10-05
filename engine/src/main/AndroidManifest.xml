@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Adreno GPU(OpenCL) / Hexagon NPU(FastRPC) 벤더 라이브러리. 없으면 CPU 로 폴백 -->
+        <uses-native-library android:name="libOpenCL.so" android:required="false" />
+        <uses-native-library android:name="libcdsprpc.so" android:required="false" />
+    </application>
+</manifest>

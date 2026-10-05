@@ -1,0 +1,390 @@
+[
+ {
+  "name": "single_user_think_default",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "안녕?"
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<role>SYSTEM</role>detailed thinking on<|role_end|><role>HUMAN</role>안녕?<|role_end|><role>ASSISTANT</role>\n<think>"
+ },
+ {
+  "name": "single_user_think_off",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "Hi"
+    }
+   ],
+   "enable_thinking": false,
+   "add_generation_prompt": true
+  },
+  "expected": "<role>SYSTEM</role>detailed thinking off<|role_end|><role>HUMAN</role>Hi<|role_end|><role>ASSISTANT</role>\n<think></think>"
+ },
+ {
+  "name": "system_think_on",
+  "input": {
+   "messages": [
+    {
+     "role": "system",
+     "content": "You are helpful."
+    },
+    {
+     "role": "user",
+     "content": "Q"
+    }
+   ],
+   "enable_thinking": true,
+   "add_generation_prompt": true
+  },
+  "expected": "<role>SYSTEM</role>You are helpful.\ndetailed thinking on<|role_end|><role>HUMAN</role>Q<|role_end|><role>ASSISTANT</role>\n<think>"
+ },
+ {
+  "name": "system_with_flag",
+  "input": {
+   "messages": [
+    {
+     "role": "system",
+     "content": "Be brief.\ndetailed thinking off"
+    },
+    {
+     "role": "user",
+     "content": "Q"
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<role>SYSTEM</role>Be brief.\ndetailed thinking off<|role_end|><role>HUMAN</role>Q<|role_end|><role>ASSISTANT</role>\n<think>"
+ },
+ {
+  "name": "multi_turn_reasoning",
+  "input": {
+   "messages": [
+    {
+     "role": "system",
+     "content": "S"
+    },
+    {
+     "role": "user",
+     "content": "1+1?"
+    },
+    {
+     "role": "assistant",
+     "content": "2",
+     "reasoning_content": "\nadd\n"
+    },
+    {
+     "role": "user",
+     "content": "times 3?"
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<role>SYSTEM</role>S\ndetailed thinking on<|role_end|><role>HUMAN</role>1+1?<|role_end|><role>ASSISTANT</role>\n<think>add</think>2<|role_end|><role>HUMAN</role>times 3?<|role_end|><role>ASSISTANT</role>\n<think>"
+ },
+ {
+  "name": "multi_turn_inline_think",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "a"
+    },
+    {
+     "role": "assistant",
+     "content": "<think>\nr1\n</think>\n\nans1"
+    },
+    {
+     "role": "user",
+     "content": "b"
+    }
+   ],
+   "enable_thinking": false,
+   "add_generation_prompt": true
+  },
+  "expected": "<role>SYSTEM</role>detailed thinking off<|role_end|><role>HUMAN</role>a<|role_end|><role>ASSISTANT</role>\n<think>r1</think>ans1<|role_end|><role>HUMAN</role>b<|role_end|><role>ASSISTANT</role>\n<think></think>"
+ },
+ {
+  "name": "assistant_no_reasoning",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "a"
+    },
+    {
+     "role": "assistant",
+     "content": "plain"
+    },
+    {
+     "role": "user",
+     "content": "b"
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<role>SYSTEM</role>detailed thinking on<|role_end|><role>HUMAN</role>a<|role_end|><role>ASSISTANT</role>\n<think></think>plain<|role_end|><role>HUMAN</role>b<|role_end|><role>ASSISTANT</role>\n<think>"
+ },
+ {
+  "name": "mid_system",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "a"
+    },
+    {
+     "role": "assistant",
+     "content": "x"
+    },
+    {
+     "role": "system",
+     "content": "new rule"
+    },
+    {
+     "role": "user",
+     "content": "b"
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<role>SYSTEM</role>detailed thinking on<|role_end|><role>HUMAN</role>a<|role_end|><role>ASSISTANT</role>\n<think></think>x<|role_end|><role>SYSTEM</role>new rule<|role_end|><role>HUMAN</role>b<|role_end|><role>ASSISTANT</role>\n<think>"
+ },
+ {
+  "name": "tools_basic",
+  "input": {
+   "messages": [
+    {
+     "role": "system",
+     "content": "Sys"
+    },
+    {
+     "role": "user",
+     "content": "서울 날씨?"
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "get_weather",
+      "description": "현재 날씨 조회",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "city": {
+         "type": "string"
+        },
+        "days": {
+         "type": "integer"
+        }
+       },
+       "required": [
+        "city"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "calc",
+      "description": "Evaluate",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "expr": {
+         "type": "string"
+        }
+       }
+      }
+     }
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<role>SYSTEM</role>Sys\n# Tools\n\nYou may call one or more functions to assist with the user query.\n\nYou are provided with function signatures within <tools></tools> XML tags:\n<tools>\n{\"type\": \"function\", \"function\": {\"name\": \"get_weather\", \"description\": \"현재 날씨 조회\", \"parameters\": {\"type\": \"object\", \"properties\": {\"city\": {\"type\": \"string\"}, \"days\": {\"type\": \"integer\"}}, \"required\": [\"city\"]}}}\n{\"type\": \"function\", \"function\": {\"name\": \"calc\", \"description\": \"Evaluate\", \"parameters\": {\"type\": \"object\", \"properties\": {\"expr\": {\"type\": \"string\"}}}}}\n</tools>\n\nIf none of the functions can be used, point it out. If the given question lacks the parameters required by the function, also point it out.\nIf you need to use a function, for each function call, output the function name and arguments within the following XML format:\n<tool_call>{function-name}\n<arg_key>{arg-key-1}</arg_key>\n<arg_value>{arg-value-1}</arg_value>\n<arg_key>{arg-key-2}</arg_key>\n<arg_value>{arg-value-2}</arg_value>\n...\n</tool_call>\ndetailed thinking on<|role_end|><role>HUMAN</role>서울 날씨?<|role_end|><role>ASSISTANT</role>\n<think>"
+ },
+ {
+  "name": "tools_no_system_off",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "x"
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "calc",
+      "description": "Evaluate",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "expr": {
+         "type": "string"
+        }
+       }
+      }
+     }
+    }
+   ],
+   "enable_thinking": false,
+   "add_generation_prompt": true
+  },
+  "expected": "<role>SYSTEM</role># Tools\n\nYou may call one or more functions to assist with the user query.\n\nYou are provided with function signatures within <tools></tools> XML tags:\n<tools>\n{\"type\": \"function\", \"function\": {\"name\": \"calc\", \"description\": \"Evaluate\", \"parameters\": {\"type\": \"object\", \"properties\": {\"expr\": {\"type\": \"string\"}}}}}\n</tools>\n\nIf none of the functions can be used, point it out. If the given question lacks the parameters required by the function, also point it out.\nIf you need to use a function, for each function call, output the function name and arguments within the following XML format:\n<tool_call>{function-name}\n<arg_key>{arg-key-1}</arg_key>\n<arg_value>{arg-value-1}</arg_value>\n<arg_key>{arg-key-2}</arg_key>\n<arg_value>{arg-value-2}</arg_value>\n...\n</tool_call>\ndetailed thinking off<|role_end|><role>HUMAN</role>x<|role_end|><role>ASSISTANT</role>\n<think></think>"
+ },
+ {
+  "name": "tool_call_roundtrip",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "서울 날씨?"
+    },
+    {
+     "role": "assistant",
+     "content": "",
+     "reasoning_content": "need tool",
+     "tool_calls": [
+      {
+       "type": "function",
+       "function": {
+        "name": "get_weather",
+        "arguments": {
+         "city": "서울",
+         "days": 2
+        }
+       }
+      }
+     ]
+    },
+    {
+     "role": "tool",
+     "content": "{\"temp\": 21}"
+    },
+    {
+     "role": "user",
+     "content": "thanks"
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "get_weather",
+      "description": "현재 날씨 조회",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "city": {
+         "type": "string"
+        },
+        "days": {
+         "type": "integer"
+        }
+       },
+       "required": [
+        "city"
+       ]
+      }
+     }
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<role>SYSTEM</role># Tools\n\nYou may call one or more functions to assist with the user query.\n\nYou are provided with function signatures within <tools></tools> XML tags:\n<tools>\n{\"type\": \"function\", \"function\": {\"name\": \"get_weather\", \"description\": \"현재 날씨 조회\", \"parameters\": {\"type\": \"object\", \"properties\": {\"city\": {\"type\": \"string\"}, \"days\": {\"type\": \"integer\"}}, \"required\": [\"city\"]}}}\n</tools>\n\nIf none of the functions can be used, point it out. If the given question lacks the parameters required by the function, also point it out.\nIf you need to use a function, for each function call, output the function name and arguments within the following XML format:\n<tool_call>{function-name}\n<arg_key>{arg-key-1}</arg_key>\n<arg_value>{arg-value-1}</arg_value>\n<arg_key>{arg-key-2}</arg_key>\n<arg_value>{arg-value-2}</arg_value>\n...\n</tool_call>\ndetailed thinking on<|role_end|><role>HUMAN</role>서울 날씨?<|role_end|><role>ASSISTANT</role>\n<think>need tool</think><tool_call>get_weather\n<arg_key>city</arg_key>\n<arg_value>서울</arg_value><arg_key>days</arg_key>\n<arg_value>2</arg_value>\n</tool_call><|role_end|><role>OBSERVATION</role>\n<tool_response>\n{\"temp\": 21}\n</tool_response><|role_end|><role>HUMAN</role>thanks<|role_end|><role>ASSISTANT</role>\n<think>"
+ },
+ {
+  "name": "tool_call_with_content_two_calls",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "q"
+    },
+    {
+     "role": "assistant",
+     "content": "Let me check.",
+     "tool_calls": [
+      {
+       "type": "function",
+       "function": {
+        "name": "calc",
+        "arguments": {
+         "expr": "1+2"
+        }
+       }
+      },
+      {
+       "type": "function",
+       "function": {
+        "name": "calc",
+        "arguments": {
+         "expr": "3*4",
+         "obj": {
+          "a": [
+           1,
+           "b"
+          ]
+         }
+        }
+       }
+      }
+     ]
+    },
+    {
+     "role": "tool",
+     "content": "3"
+    },
+    {
+     "role": "tool",
+     "content": "12"
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "calc",
+      "description": "Evaluate",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "expr": {
+         "type": "string"
+        }
+       }
+      }
+     }
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<role>SYSTEM</role># Tools\n\nYou may call one or more functions to assist with the user query.\n\nYou are provided with function signatures within <tools></tools> XML tags:\n<tools>\n{\"type\": \"function\", \"function\": {\"name\": \"calc\", \"description\": \"Evaluate\", \"parameters\": {\"type\": \"object\", \"properties\": {\"expr\": {\"type\": \"string\"}}}}}\n</tools>\n\nIf none of the functions can be used, point it out. If the given question lacks the parameters required by the function, also point it out.\nIf you need to use a function, for each function call, output the function name and arguments within the following XML format:\n<tool_call>{function-name}\n<arg_key>{arg-key-1}</arg_key>\n<arg_value>{arg-value-1}</arg_value>\n<arg_key>{arg-key-2}</arg_key>\n<arg_value>{arg-value-2}</arg_value>\n...\n</tool_call>\ndetailed thinking on<|role_end|><role>HUMAN</role>q<|role_end|><role>ASSISTANT</role>\n<think></think>Let me check.\n<tool_call>calc\n<arg_key>expr</arg_key>\n<arg_value>1+2</arg_value>\n</tool_call>\n<tool_call>calc\n<arg_key>expr</arg_key>\n<arg_value>3*4</arg_value><arg_key>obj</arg_key>\n<arg_value>{\"a\": [1, \"b\"]}</arg_value>\n</tool_call><|role_end|><role>OBSERVATION</role>\n<tool_response>\n3\n</tool_response>\n<tool_response>\n12\n</tool_response><|role_end|><role>ASSISTANT</role>\n<think>"
+ },
+ {
+  "name": "no_generation_prompt",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "a"
+    },
+    {
+     "role": "assistant",
+     "content": "b"
+    }
+   ],
+   "add_generation_prompt": false
+  },
+  "expected": "<role>SYSTEM</role>detailed thinking on<|role_end|><role>HUMAN</role>a<|role_end|><role>ASSISTANT</role>\n<think></think>b<|role_end|>"
+ }
+]
