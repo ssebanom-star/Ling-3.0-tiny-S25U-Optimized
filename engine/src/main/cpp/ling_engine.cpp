@@ -185,6 +185,16 @@ bool Engine::load(const EngineParams & p, std::string & err, const std::function
     tokens_.clear();
     ckpts_.clear();
     logits_ready_ = false;
+
+    // 워밍업: mmap 된(재배열되지 않은) 텐서의 첫 페이지 폴트와 그래프 할당을 로드 단계에서 끝낸다.
+    // 호스트 실측: 콜드 상태 첫 prefill 31토큰 22s → 워밍업 후 0.5s
+    {
+        std::vector<token> warm = { eos(), eos() };
+        decode_range(warm, 0, (int) warm.size(), true, {}, 0, (int) warm.size());
+        llama_synchronize(ctx_);
+        reset();
+        llama_perf_context_reset(ctx_);
+    }
     return true;
 }
 

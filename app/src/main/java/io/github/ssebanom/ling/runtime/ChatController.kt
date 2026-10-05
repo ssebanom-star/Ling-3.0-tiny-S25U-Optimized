@@ -71,11 +71,13 @@ class ChatController(
     val busyFlow = MutableStateFlow(false)
 
     fun openConversation(id: Long) = scope.launch {
+        if (_state.value.busy) return@launch // 생성 중 전환 금지(진행 중 턴이 상태를 덮어씀)
         val c = store.getConversation(id) ?: return@launch
         _state.value = ChatState(conversation = c, messages = store.messages(id))
     }
 
     fun newConversation(thinking: Boolean? = null) = scope.launch {
+        if (_state.value.busy) return@launch
         val s = settings.current()
         _state.value = ChatState(
             conversation = Conversation(0, "새 대화", thinking ?: s.defaultThinking, s.systemPrompt, 0, 0),
@@ -121,10 +123,13 @@ class ChatController(
 
     fun clearError() = _state.update { it.copy(error = null) }
 
+    @Synchronized
     private fun runTurn(initial: List<Pair<ChatMessage, MessageStats?>>) {
+        if (busyFlow.value) return // 연타/중복 호출 방지(상태 반영 전 구간 포함)
+        busyFlow.value = true
         stopRequested = false
+        _state.update { it.copy(error = null, streaming = it.streaming.copy(phase = Phase.LOADING)) }
         job = scope.launch {
-            busyFlow.value = true
             try {
                 inference.lock.withLock { turnLoop(initial) }
             } catch (e: EngineException) {

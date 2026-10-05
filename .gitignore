@@ -9,3 +9,5 @@ build/
 .idea/
 .kotlin/
 engine/src/main/hexagonLibs/
+build-hexagon/
+build-host/

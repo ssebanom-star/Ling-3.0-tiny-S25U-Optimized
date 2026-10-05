@@ -20,3 +20,13 @@ add_executable(ling_engine_test
     ${ROOT}/engine/src/main/cpp/ling_engine.cpp)
 target_include_directories(ling_engine_test PRIVATE ${ROOT}/engine/src/main/cpp)
 target_link_libraries(ling_engine_test PRIVATE llama ggml)
+
+# ---- JNI 시그니처 검증용 호스트 공유 라이브러리 (tests/host/jni/JniSmoke.java 에서 로드) ----
+find_package(JNI)
+if (JNI_FOUND)
+    add_library(ling_jni SHARED
+        ${ROOT}/engine/src/main/cpp/ling_jni.cpp
+        ${ROOT}/engine/src/main/cpp/ling_engine.cpp)
+    target_include_directories(ling_jni PRIVATE ${ROOT}/engine/src/main/cpp ${CMAKE_CURRENT_LIST_DIR}/jni/stub ${JNI_INCLUDE_DIRS})
+    target_link_libraries(ling_jni PRIVATE llama ggml)
+endif ()

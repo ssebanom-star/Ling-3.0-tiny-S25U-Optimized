@@ -30,7 +30,9 @@ import io.github.ssebanom.ling.data.AppSettings
 import io.github.ssebanom.ling.data.Backend
 import io.github.ssebanom.ling.engine.EngineState
 import io.github.ssebanom.ling.runtime.EngineStatus
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -46,11 +48,20 @@ fun PerfScreen(c: AppContainer, modifier: Modifier = Modifier) {
     var running by remember { mutableStateOf(false) }
     var engineState by remember { mutableStateOf<EngineState?>(null) }
     var thermal by remember { mutableStateOf(c.thermal.snapshot()) }
+    // 네이티브 초기화(백엔드 .so 로드, GPU/NPU 탐색)는 메인 스레드 밖에서
+    var devicesText by remember { mutableStateOf("…") }
+    var sysInfo by remember { mutableStateOf("…") }
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.Default) {
+            devicesText = c.engine.devices().joinToString { "${it.name}(${it.type})" }.ifEmpty { "CPU만" }
+            sysInfo = c.engine.systemInfo()
+        }
+    }
 
     LaunchedEffect(Unit) {
         while (true) {
             thermal = c.thermal.snapshot()
-            if (c.engine.isLoaded && !chat.busy && !running) engineState = runCatching { c.engine.state() }.getOrNull()
+            if (c.inference.status.value is EngineStatus.Ready && !chat.busy && !running) engineState = runCatching { c.engine.state() }.getOrNull()
             delay(2000)
         }
     }
@@ -134,7 +145,7 @@ fun PerfScreen(c: AppContainer, modifier: Modifier = Modifier) {
                         "현재: ${settings.backend.label}${if (settings.acceleratorValidated.isNotEmpty()) " · 검증됨 ${settings.acceleratorValidated}" else ""}",
                     style = MaterialTheme.typography.bodySmall,
                 )
-                Mono("백엔드: " + c.engine.devices().joinToString { "${it.name}(${it.type})" }.ifEmpty { "CPU만" })
+                Mono("백엔드: $devicesText")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     for (b in listOf(Backend.NPU, Backend.GPU)) {
                         OutlinedButton(onClick = {
@@ -154,7 +165,7 @@ fun PerfScreen(c: AppContainer, modifier: Modifier = Modifier) {
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp)) {
                 Text("llama.cpp 시스템 정보", style = MaterialTheme.typography.titleMedium)
-                Mono(remember { c.engine.systemInfo() })
+                Mono(sysInfo)
             }
         }
     }

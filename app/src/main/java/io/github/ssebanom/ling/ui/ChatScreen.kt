@@ -100,7 +100,7 @@ fun ChatScreen(c: AppContainer, modifier: Modifier = Modifier) {
                 NavigationDrawerItem(
                     label = { Text("새 대화") }, selected = false,
                     icon = { Icon(Icons.Outlined.Add, null) },
-                    onClick = { c.chat.newConversation(); scope.launch { drawer.close() } },
+                    onClick = { if (!st.busy) c.chat.newConversation(); scope.launch { drawer.close() } },
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
                 HorizontalDivider()
@@ -109,7 +109,7 @@ fun ChatScreen(c: AppContainer, modifier: Modifier = Modifier) {
                         NavigationDrawerItem(
                             label = { Text(conv.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             selected = conv.id == st.conversation?.id,
-                            onClick = { c.chat.openConversation(conv.id); scope.launch { drawer.close() } },
+                            onClick = { if (!st.busy) c.chat.openConversation(conv.id); scope.launch { drawer.close() } },
                             badge = {
                                 IconButton(onClick = {
                                     scope.launch {

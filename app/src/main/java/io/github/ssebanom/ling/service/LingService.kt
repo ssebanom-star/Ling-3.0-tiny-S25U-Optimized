@@ -18,13 +18,16 @@ import io.github.ssebanom.ling.R
 import io.github.ssebanom.ling.data.ModelStore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
 
 /**
  * 포그라운드 서비스: 생성/다운로드 중 프로세스가 LMK 로 죽지 않게 하고(4.6GB 재로드 방지),
  * 화면이 꺼져도 생성이 이어지도록 partial wake lock 을 잡는다. 유휴가 길면 모델을 언로드한다.
  */
+@OptIn(FlowPreview::class)
 class LingService : LifecycleService() {
     private var wakeLock: PowerManager.WakeLock? = null
     private var idleJob: Job? = null
@@ -38,7 +41,9 @@ class LingService : LifecycleService() {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC or ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
         )
         lifecycleScope.launch {
+            // 알림 갱신은 1초 간격으로 표본화(시스템 rate-limit 회피)
             combine(c.chat.busyFlow, c.chat.state, c.models.download) { busy, st, dl -> Triple(busy, st, dl) }
+                .sample(1_000)
                 .collect { (busy, st, dl) ->
                     val downloading = dl is ModelStore.DownloadState.Running || dl is ModelStore.DownloadState.Verifying
                     if (busy) acquire() else release()
