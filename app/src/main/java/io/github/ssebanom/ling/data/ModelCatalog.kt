@@ -1,7 +1,11 @@
 package io.github.ssebanom.ling.data
 
+import io.github.ssebanom.ling.domain.ModelFamily
+
 /**
- * 배포 GGUF 목록 (bartowski/Ling-3.0-tiny-GGUF, llama.cpp b10472 imatrix 양자화).
+ * 배포 GGUF 목록.
+ * - Ling-3.0-tiny: bartowski/Ling-3.0-tiny-GGUF (llama.cpp b10472 imatrix 양자화), MIT
+ * - LFM2.5-8B-A1B: LiquidAI/LFM2.5-8B-A1B-GGUF (공식), LFM Open License v1.0
  * 크기/SHA-256 은 HF API(LFS oid) 기준. 토큰당 읽기량은 tools/gguf_budget.py 계산값.
  */
 data class ModelVariant(
@@ -12,13 +16,15 @@ data class ModelVariant(
     val decodeBytesPerToken: Long,
     val note: String,
     val recommended: Boolean = false,
+    val family: ModelFamily = ModelFamily.LING,
+    val repo: String = ModelCatalog.REPO,
 ) {
-    val url: String get() = "${ModelCatalog.BASE_URL}/$fileName"
+    val url: String get() = "https://huggingface.co/$repo/resolve/main/$fileName"
 }
 
 object ModelCatalog {
     const val REPO = "bartowski/Ling-3.0-tiny-GGUF"
-    const val BASE_URL = "https://huggingface.co/$REPO/resolve/main"
+    const val LFM_REPO = "LiquidAI/LFM2.5-8B-A1B-GGUF"
 
     val variants = listOf(
         ModelVariant(
@@ -45,6 +51,23 @@ object ModelCatalog {
             "Q5_K_M", "Ling-3.0-tiny-Q5_K_M.gguf", 5_716_431_040L,
             "7625ce18c72b29e616fffa9fdc49e1bc73f2f2ad1784704171cdba7c5c9a149c", 930_000_000L,
             "고품질. 16GB 모델 권장(12GB 는 LMK 위험)",
+        ),
+        // LFM2.5-8B-A1B: 8.3B 총 / 1.5B 활성, conv+GQA 하이브리드. 출력층이 임베딩과 묶여 토큰당 읽기량이 Ling 보다 큼
+        ModelVariant(
+            "LFM-Q4_0", "LFM2.5-8B-A1B-Q4_0.gguf", 4_844_678_368L,
+            "48ed1465d761311b2fd57b7fb46cf969a20b3a8281945b04e10f52bd1609e715", 1_021_000_000L,
+            "LFM2.5 기본. 툴 호출·지시 수행 특화, 항상 추론", recommended = true,
+            family = ModelFamily.LFM2, repo = LFM_REPO,
+        ),
+        ModelVariant(
+            "LFM-Q4_K_M", "LFM2.5-8B-A1B-Q4_K_M.gguf", 5_155_564_768L,
+            "4923ec14f06b968b74d663e5949867d2d9c3bf13a20b8be1a9f9af39989b2bb0", 1_080_000_000L,
+            "LFM2.5 품질 우선(CPU)", family = ModelFamily.LFM2, repo = LFM_REPO,
+        ),
+        ModelVariant(
+            "LFM-Q5_K_M", "LFM2.5-8B-A1B-Q5_K_M.gguf", 6_030_339_296L,
+            "eb8bd10148ea21e195502d6d6a205983ba40815302068ce72eb160684df92b3e", 1_250_000_000L,
+            "LFM2.5 고품질. 12GB 는 LMK 위험", family = ModelFamily.LFM2, repo = LFM_REPO,
         ),
     )
 

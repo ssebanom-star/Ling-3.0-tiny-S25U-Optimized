@@ -38,6 +38,7 @@ import io.github.ssebanom.ling.data.AppSettings
 import io.github.ssebanom.ling.data.ModelCatalog
 import io.github.ssebanom.ling.data.ModelStore
 import io.github.ssebanom.ling.data.ModelVariant
+import io.github.ssebanom.ling.domain.ModelFamily
 import io.github.ssebanom.ling.runtime.DeviceProfiler
 import io.github.ssebanom.ling.service.LingService
 import kotlinx.coroutines.launch
@@ -72,15 +73,28 @@ fun ModelsScreen(c: AppContainer, modifier: Modifier = Modifier) {
     LazyColumn(modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
-            Text("Ling-3.0-tiny GGUF", style = MaterialTheme.typography.titleLarge)
+            Text("모델", style = MaterialTheme.typography.titleLarge)
             Text(
                 "RAM ${profile.totalRamBytes shr 30}GB · 가용 ${profile.availRamBytes shr 20}MiB · 저장공간 여유 ${c.models.dir.usableSpace shr 30}GB",
                 style = MaterialTheme.typography.bodySmall,
             )
-            Text("출처: ${ModelCatalog.REPO} (MIT)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
         }
-        items(ModelCatalog.variants, key = { it.id }) { v ->
-            VariantCard(v, c, settings, dl, onChanged = { refresh++ })
+        for ((family, vs) in ModelCatalog.variants.groupBy { it.family }) {
+            item(key = "h-${family.name}") {
+                Column {
+                    Text(family.label, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        when (family) {
+                            ModelFamily.LING -> "7.9B 총 / 1.3B 활성 · KDA+MLA · 출처 ${ModelCatalog.REPO} (MIT)"
+                            ModelFamily.LFM2 -> "8.3B 총 / 1.5B 활성 · conv+GQA · 툴 호출 특화, 항상 추론 · 출처 ${ModelCatalog.LFM_REPO} (LFM Open License v1.0)"
+                        },
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline,
+                    )
+                }
+            }
+            items(vs, key = { it.id }) { v ->
+                VariantCard(v, c, settings, dl, onChanged = { refresh++ })
+            }
         }
         item {
             Card(Modifier.fillMaxWidth()) {

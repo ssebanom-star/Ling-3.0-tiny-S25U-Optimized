@@ -17,7 +17,7 @@ class ExprEvalTest {
         assertEquals(Math.PI, ev("pi"), 0.0)
     }
 
-    @Test fun calculatorFormatsIntegers() {
+    @Test fun calculatorFormatsIntegers() = kotlinx.coroutines.runBlocking {
         assertEquals("391", CalculatorTool().execute(mapOf("expression" to "17*23")))
         assertEquals(true, CalculatorTool().execute(mapOf("expression" to "1+")).startsWith("error"))
     }

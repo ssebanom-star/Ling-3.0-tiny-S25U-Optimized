@@ -4,7 +4,9 @@ import android.content.Context
 import android.util.Log
 import io.github.ssebanom.ling.data.AppSettings
 import io.github.ssebanom.ling.data.Backend
+import io.github.ssebanom.ling.data.ModelCatalog
 import io.github.ssebanom.ling.data.ModelStore
+import io.github.ssebanom.ling.domain.ModelFamily
 import io.github.ssebanom.ling.data.SettingsRepository
 import io.github.ssebanom.ling.engine.BenchStats
 import io.github.ssebanom.ling.engine.EngineConfig
@@ -55,7 +57,14 @@ class InferenceManager(
         return models.listModels().firstOrNull { !it.name.endsWith(".part") }
     }
 
-    /** 설정 + 기기 프로파일 → 엔진 구성 */
+    /** 모델 파일의 계열(템플릿·툴 포맷·권장 샘플링) */
+    fun familyFor(path: File): ModelFamily = ModelCatalog.byFile(path.name)?.family ?: ModelFamily.detect(path.name)
+
+    /** 현재 로드된(없으면 설정상) 모델의 계열 */
+    val family: ModelFamily
+        get() = engine.config?.modelPath?.let { familyFor(File(it)) } ?: ModelFamily.LING
+
+        /** 설정 + 기기 프로파일 → 엔진 구성 */
     fun configFor(
         s: AppSettings,
         path: File,
@@ -242,18 +251,25 @@ class InferenceManager(
     private data class Verdict(val passed: Boolean, val top1: Boolean, val overlap: Int, val mad: Double, val detail: String)
 
     private suspend fun runProbe(): Probe {
-        val toks = engine.tokenize(PROBE)
+        val toks = engine.tokenize(family.probePrompt())
         return Probe(engine.evalTopK(toks, 20), engine.evalTopK(toks, 20, PROBE_SINGLE))
     }
 
+    /**
+     * 비교는 기준 분포에서 의미 있는 토큰(log-prob > [TAIL_LP])만 본다 — 극단적 꼬리 확률은 정상 구현끼리도
+     * 수치 오차가 커서 오판을 만든다. 의미 있는 토큰이 top-1 하나뿐이면 top-1 과 그 log-prob 만 비교.
+     */
     private fun compare(got: List<Pair<Int, Float>>, ref: List<Pair<Int, Float>>): Verdict {
         val top1 = got.firstOrNull()?.first == ref.firstOrNull()?.first
-        val overlap = got.take(10).map { it.first }.intersect(ref.take(10).map { it.first }.toSet()).size
-        val refMap = ref.toMap()
-        val diffs = got.take(5).mapNotNull { (id, lp) -> refMap[id]?.let { kotlin.math.abs(it - lp).toDouble() } }
-        val mad = if (diffs.isEmpty()) 99.0 else diffs.average()
-        return Verdict(top1 && overlap >= 7 && mad < 0.5, top1, overlap, mad,
-            "top1=${if (top1) "O" else "X"} ov10=$overlap |Δ|=${"%.2f".format(mad)}")
+        val refSig = ref.take(10).filter { it.second > TAIL_LP }.ifEmpty { ref.take(1) }
+        val gotIds = got.take(10).map { it.first }.toSet()
+        val overlap = refSig.count { it.first in gotIds }
+        val gotMap = got.toMap()
+        val diffs = refSig.take(5).map { (id, lp) -> gotMap[id]?.let { kotlin.math.abs(it - lp).toDouble() } ?: 99.0 }
+        val mad = diffs.average()
+        val passed = top1 && overlap >= kotlin.math.ceil(refSig.size * 0.7) && mad < 0.5
+        return Verdict(passed, top1, overlap, mad,
+            "top1=${if (top1) "O" else "X"} ov=$overlap/${refSig.size} |Δ|=${"%.2f".format(mad)}")
     }
 
     private fun compare(got: Probe, ref: Probe): Verdict {
@@ -355,9 +371,7 @@ class InferenceManager(
         const val ACCEL_TG = 5
         /** 정확성 검사에서 1개씩 디코드할 마지막 토큰 수 */
         const val PROBE_SINGLE = 8
-        /** 정확성 검사용 고정 프롬프트(한국어/영어/수식 혼합) */
-        const val PROBE = "<role>SYSTEM</role>detailed thinking off<|role_end|><role>HUMAN</role>" +
-            "대한민국의 수도는 어디인가요? Then compute 17*23 and explain briefly.<|role_end|>" +
-            "<role>ASSISTANT</role>\n<think></think>"
+        /** 정확성 비교에서 무시할 꼬리 확률 경계(log-prob) */
+        const val TAIL_LP = -8f
     }
 }

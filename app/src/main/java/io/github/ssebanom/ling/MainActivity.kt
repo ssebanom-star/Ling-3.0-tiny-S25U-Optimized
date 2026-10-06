@@ -27,4 +27,15 @@ class MainActivity : ComponentActivity() {
         }
         setContent { LingTheme { LingRoot(container) } }
     }
+
+    // 툴 승인: 앱이 보이면 다이얼로그, 아니면 접근성 오버레이
+    override fun onStart() {
+        super.onStart()
+        (application as LingApp).container.approvals.uiVisible = true
+    }
+
+    override fun onStop() {
+        (application as LingApp).container.approvals.uiVisible = false
+        super.onStop()
+    }
 }

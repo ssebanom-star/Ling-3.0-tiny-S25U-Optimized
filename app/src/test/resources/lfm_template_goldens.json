@@ -1,0 +1,348 @@
+[
+ {
+  "name": "single_user",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "안녕?"
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|startoftext|><|im_start|>user\n안녕?<|im_end|>\n<|im_start|>assistant\n"
+ },
+ {
+  "name": "system_user",
+  "input": {
+   "messages": [
+    {
+     "role": "system",
+     "content": "You are helpful."
+    },
+    {
+     "role": "user",
+     "content": "Q"
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|startoftext|><|im_start|>system\nYou are helpful.<|im_end|>\n<|im_start|>user\nQ<|im_end|>\n<|im_start|>assistant\n"
+ },
+ {
+  "name": "empty_system",
+  "input": {
+   "messages": [
+    {
+     "role": "system",
+     "content": ""
+    },
+    {
+     "role": "user",
+     "content": "Q"
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|startoftext|><|im_start|>user\nQ<|im_end|>\n<|im_start|>assistant\n"
+ },
+ {
+  "name": "multi_turn_preserve",
+  "input": {
+   "messages": [
+    {
+     "role": "system",
+     "content": "S"
+    },
+    {
+     "role": "user",
+     "content": "1+1?"
+    },
+    {
+     "role": "assistant",
+     "content": "2",
+     "reasoning_content": "\nadd\n"
+    },
+    {
+     "role": "user",
+     "content": "times 3?"
+    }
+   ],
+   "preserve_thinking": true,
+   "add_generation_prompt": true
+  },
+  "expected": "<|startoftext|><|im_start|>system\nS<|im_end|>\n<|im_start|>user\n1+1?<|im_end|>\n<|im_start|>assistant\n<think>\nadd\n</think>2<|im_end|>\n<|im_start|>user\ntimes 3?<|im_end|>\n<|im_start|>assistant\n"
+ },
+ {
+  "name": "multi_turn_drop_old_thinking",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "1+1?"
+    },
+    {
+     "role": "assistant",
+     "content": "2",
+     "reasoning_content": "add"
+    },
+    {
+     "role": "user",
+     "content": "times 3?"
+    },
+    {
+     "role": "assistant",
+     "content": "6",
+     "reasoning_content": "mul"
+    }
+   ],
+   "add_generation_prompt": false
+  },
+  "expected": "<|startoftext|><|im_start|>user\n1+1?<|im_end|>\n<|im_start|>assistant\n2<|im_end|>\n<|im_start|>user\ntimes 3?<|im_end|>\n<|im_start|>assistant\n<think>mul</think>6<|im_end|>\n"
+ },
+ {
+  "name": "inline_think_dropped",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "a"
+    },
+    {
+     "role": "assistant",
+     "content": "<think>r1</think>\n\nans1"
+    },
+    {
+     "role": "user",
+     "content": "b"
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|startoftext|><|im_start|>user\na<|im_end|>\n<|im_start|>assistant\nans1<|im_end|>\n<|im_start|>user\nb<|im_end|>\n<|im_start|>assistant\n"
+ },
+ {
+  "name": "tools_basic",
+  "input": {
+   "messages": [
+    {
+     "role": "system",
+     "content": "Sys"
+    },
+    {
+     "role": "user",
+     "content": "서울 날씨?"
+    }
+   ],
+   "tools": [
+    {
+     "name": "get_weather",
+     "description": "현재 날씨 조회",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       },
+       "days": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    },
+    {
+     "name": "calc",
+     "description": "Evaluate",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "expr": {
+        "type": "string"
+       }
+      }
+     }
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|startoftext|><|im_start|>system\nSys\nList of tools: [{\"name\": \"get_weather\", \"description\": \"현재 날씨 조회\", \"parameters\": {\"type\": \"object\", \"properties\": {\"city\": {\"type\": \"string\"}, \"days\": {\"type\": \"integer\"}}, \"required\": [\"city\"]}}, {\"name\": \"calc\", \"description\": \"Evaluate\", \"parameters\": {\"type\": \"object\", \"properties\": {\"expr\": {\"type\": \"string\"}}}}]<|im_end|>\n<|im_start|>user\n서울 날씨?<|im_end|>\n<|im_start|>assistant\n"
+ },
+ {
+  "name": "tools_no_system",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "x"
+    }
+   ],
+   "tools": [
+    {
+     "name": "calc",
+     "description": "Evaluate",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "expr": {
+        "type": "string"
+       }
+      }
+     }
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|startoftext|><|im_start|>system\nList of tools: [{\"name\": \"calc\", \"description\": \"Evaluate\", \"parameters\": {\"type\": \"object\", \"properties\": {\"expr\": {\"type\": \"string\"}}}}]<|im_end|>\n<|im_start|>user\nx<|im_end|>\n<|im_start|>assistant\n"
+ },
+ {
+  "name": "tool_call_roundtrip",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "서울 날씨?"
+    },
+    {
+     "role": "assistant",
+     "content": "",
+     "reasoning_content": "need tool",
+     "tool_calls": [
+      {
+       "type": "function",
+       "function": {
+        "name": "get_weather",
+        "arguments": {
+         "city": "서울",
+         "days": 2
+        }
+       }
+      }
+     ]
+    },
+    {
+     "role": "tool",
+     "content": "{\"temp\": 21}"
+    },
+    {
+     "role": "assistant",
+     "content": "21도입니다.",
+     "reasoning_content": "answer"
+    },
+    {
+     "role": "user",
+     "content": "thanks"
+    }
+   ],
+   "tools": [
+    {
+     "name": "get_weather",
+     "description": "현재 날씨 조회",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       },
+       "days": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   ],
+   "preserve_thinking": true,
+   "add_generation_prompt": true
+  },
+  "expected": "<|startoftext|><|im_start|>system\nList of tools: [{\"name\": \"get_weather\", \"description\": \"현재 날씨 조회\", \"parameters\": {\"type\": \"object\", \"properties\": {\"city\": {\"type\": \"string\"}, \"days\": {\"type\": \"integer\"}}, \"required\": [\"city\"]}}]<|im_end|>\n<|im_start|>user\n서울 날씨?<|im_end|>\n<|im_start|>assistant\n<think>need tool</think><|tool_call_start|>[get_weather(city='서울', days=2)]<|tool_call_end|><|im_end|>\n<|im_start|>tool\n{\"temp\": 21}<|im_end|>\n<|im_start|>assistant\n<think>answer</think>21도입니다.<|im_end|>\n<|im_start|>user\nthanks<|im_end|>\n<|im_start|>assistant\n"
+ },
+ {
+  "name": "tool_call_content_two_calls",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "q"
+    },
+    {
+     "role": "assistant",
+     "content": "Let me check.",
+     "tool_calls": [
+      {
+       "type": "function",
+       "function": {
+        "name": "calc",
+        "arguments": {
+         "expr": "1+2"
+        }
+       }
+      },
+      {
+       "type": "function",
+       "function": {
+        "name": "calc",
+        "arguments": {
+         "expr": "3*4",
+         "flag": true,
+         "obj": {
+          "a": [
+           1,
+           "b"
+          ]
+         },
+         "x": 1.5
+        }
+       }
+      }
+     ]
+    },
+    {
+     "role": "tool",
+     "content": "3"
+    },
+    {
+     "role": "tool",
+     "content": "12"
+    }
+   ],
+   "tools": [
+    {
+     "name": "calc",
+     "description": "Evaluate",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "expr": {
+        "type": "string"
+       }
+      }
+     }
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|startoftext|><|im_start|>system\nList of tools: [{\"name\": \"calc\", \"description\": \"Evaluate\", \"parameters\": {\"type\": \"object\", \"properties\": {\"expr\": {\"type\": \"string\"}}}}]<|im_end|>\n<|im_start|>user\nq<|im_end|>\n<|im_start|>assistant\nLet me check.<|tool_call_start|>[calc(expr='1+2'), calc(expr='3*4', flag=True, obj={\"a\": [1, \"b\"]}, x=1.5)]<|tool_call_end|><|im_end|>\n<|im_start|>tool\n3<|im_end|>\n<|im_start|>tool\n12<|im_end|>\n<|im_start|>assistant\n"
+ },
+ {
+  "name": "no_generation_prompt",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "a"
+    },
+    {
+     "role": "assistant",
+     "content": "b"
+    }
+   ],
+   "add_generation_prompt": false
+  },
+  "expected": "<|startoftext|><|im_start|>user\na<|im_end|>\n<|im_start|>assistant\nb<|im_end|>\n"
+ }
+]

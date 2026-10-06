@@ -1,12 +1,17 @@
 package io.github.ssebanom.ling.ui
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -20,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import io.github.ssebanom.ling.AppContainer
+import io.github.ssebanom.ling.tools.ToolApprovals
 
 private enum class Tab(val label: String, val icon: ImageVector) {
     CHAT("대화", Icons.AutoMirrored.Outlined.Chat),
@@ -52,6 +58,7 @@ fun LingRoot(c: AppContainer) {
             }
         },
     ) { pad ->
+        ToolApprovalDialog(c)
         val m = Modifier.padding(pad)
         when (tab) {
             Tab.CHAT -> ChatScreen(c, m)
@@ -60,4 +67,27 @@ fun LingRoot(c: AppContainer) {
             Tab.SETTINGS -> SettingsScreen(c, m)
         }
     }
+}
+
+@Composable
+private fun ToolApprovalDialog(c: AppContainer) {
+    val req by c.approvals.pending.collectAsState()
+    val r = req ?: return
+    AlertDialog(
+        onDismissRequest = { c.approvals.respond(r, ToolApprovals.Decision.DENY) },
+        title = { Text("이 동작을 실행할까요?") },
+        text = {
+            Column {
+                Text(r.summary)
+                Text("툴: ${r.tool}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+            }
+        },
+        confirmButton = {
+            Row {
+                TextButton(onClick = { c.approvals.respond(r, ToolApprovals.Decision.ALWAYS) }) { Text("항상 허용") }
+                TextButton(onClick = { c.approvals.respond(r, ToolApprovals.Decision.ALLOW) }) { Text("허용") }
+            }
+        },
+        dismissButton = { TextButton(onClick = { c.approvals.respond(r, ToolApprovals.Decision.DENY) }) { Text("거부") } },
+    )
 }

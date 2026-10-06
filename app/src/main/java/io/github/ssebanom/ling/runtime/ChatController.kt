@@ -8,10 +8,9 @@ import io.github.ssebanom.ling.data.MessageStats
 import io.github.ssebanom.ling.data.SettingsRepository
 import io.github.ssebanom.ling.data.StoredMessage
 import io.github.ssebanom.ling.domain.ChatMessage
-import io.github.ssebanom.ling.domain.LingPromptBuilder
+import io.github.ssebanom.ling.domain.ModelFamily
 import io.github.ssebanom.ling.domain.Role
 import io.github.ssebanom.ling.domain.ThinkParser
-import io.github.ssebanom.ling.domain.ToolCallParser
 import io.github.ssebanom.ling.engine.EngineException
 import io.github.ssebanom.ling.engine.SamplerConfig
 import io.github.ssebanom.ling.engine.StopReason
@@ -35,6 +34,8 @@ data class Streaming(
     val tokens: Int = 0,
     val tps: Double = 0.0,
     val thermal: ThermalGovernor.Level = ThermalGovernor.Level.NORMAL,
+    /** TOOL 단계에서 실행 중인 툴 */
+    val toolName: String = "",
 )
 
 data class ChatState(
@@ -49,7 +50,7 @@ data class ChatState(
 
 /**
  * 대화 1턴 실행기.
- * 메시지 → LingPromptBuilder.segments(rawTokens 재사용) → engine.sync(증분 prefill/체크포인트)
+ * 메시지 → ModelFamily.segments(모델별 템플릿, rawTokens 재사용) → engine.sync(증분 prefill/체크포인트)
  * → engine.generate(스트리밍, ThinkParser, 열 관리, ADPF) → 저장 → (툴 호출 시) 실행 후 반복.
  */
 class ChatController(
@@ -157,7 +158,13 @@ class ChatController(
         }
         val engine = inference.engine
         val s = settings.current()
-        val toolSpecs = if (s.toolsEnabled) tools.specs else emptyList()
+        val family = inference.family
+        val modelName = java.io.File(engine.config!!.modelPath).name
+        val toolSpecs = tools.specs(s, family)
+        val systemText = listOf(conv.systemPrompt, if (toolSpecs.isEmpty()) "" else tools.guide(s))
+            .filter { it.isNotBlank() }.joinToString("\n\n")
+        // 다른 토크나이저(다른 계열 모델)로 만든 생성 토큰은 재사용하지 않는다(텍스트로 다시 렌더)
+        fun rawOk(m: ChatMessage) = m.rawModel?.let { inference.familyFor(java.io.File(it)) == family } ?: (family == ModelFamily.LING)
 
         // 열 상태에 따라 이번 턴 디코드 스레드 조정
         val cfg = engine.config!!
@@ -167,12 +174,12 @@ class ChatController(
             if (want != cfg.nThreads) engine.setThreads(want, cfg.nThreadsBatch, cfg.cpuMask)
         }
 
-        repeat(MAX_TOOL_ROUNDS) {
+        repeat(s.maxToolRounds.coerceIn(1, 20)) {
             val withSystem = buildList {
-                if (conv.systemPrompt.isNotBlank()) add(ChatMessage(Role.SYSTEM, conv.systemPrompt))
-                addAll(msgs.map { it.first })
+                if (systemText.isNotBlank()) add(ChatMessage(Role.SYSTEM, systemText))
+                addAll(msgs.map { (m, _) -> if (m.rawTokens != null && !rawOk(m)) m.copy(rawTokens = null) else m })
             }
-            val segments = LingPromptBuilder.segments(withSystem, toolSpecs, conv.thinking)
+            val segments = family.segments(withSystem, toolSpecs, conv.thinking)
 
             setPhase(Phase.PREFILL)
             val sync = engine.sync(segments) { done, total ->
@@ -184,16 +191,20 @@ class ChatController(
             // ADPF: 추론 스레드 + ggml 워커, 목표 25ms/토큰(40 tok/s)
             if (s.perfHints) hints.start(DeviceProfiler.inferenceThreadIds(), 1_000_000_000L / 40)
 
-            val parser = ThinkParser(startInThink = conv.thinking)
+            val parser = ThinkParser(startInThink = family.startInThink(conv.thinking))
             var nTok = 0
             val t0 = SystemClock.elapsedRealtimeNanos()
             var lastTokNs = t0
             var lastUi = 0L
             var lastThermalCheck = 0L
             var level = thermal.snapshot().level
-            setPhase(if (conv.thinking) Phase.THINKING else Phase.ANSWERING)
+            setPhase(if (family.startInThink(conv.thinking)) Phase.THINKING else Phase.ANSWERING)
 
-            val sampler = SamplerConfig(
+            val rec = family.sampling
+            val sampler = if (s.useRecommendedSampling) SamplerConfig(
+                temperature = rec.temperature, topP = rec.topP, topK = rec.topK, minP = rec.minP,
+                repeatPenalty = rec.repeatPenalty, maxTokens = s.maxTokens,
+            ) else SamplerConfig(
                 temperature = s.temperature, topP = s.topP, topK = s.topK, minP = s.minP,
                 repeatPenalty = s.repeatPenalty, maxTokens = s.maxTokens,
             )
@@ -218,7 +229,7 @@ class ChatController(
                         st.copy(streaming = st.streaming.copy(
                             phase = if (parser.isThinking) Phase.THINKING else Phase.ANSWERING,
                             reasoning = parser.reasoning,
-                            content = ToolCallParser.visiblePrefix(parser.content),
+                            content = family.visibleContent(parser.content),
                             tokens = nTok, tps = tps, thermal = level,
                         ))
                     }
@@ -228,7 +239,7 @@ class ChatController(
             parser.finish()
             hints.stop()
 
-            val parsed = ToolCallParser.parse(parser.content.trim())
+            val parsed = family.parseToolCalls(parser.content.trim())
             val reasoning = parser.reasoning.trim('\n').ifEmpty { null }
             val assistant = ChatMessage(
                 role = Role.ASSISTANT,
@@ -237,6 +248,7 @@ class ChatController(
                 toolCalls = parsed.calls,
                 rawTokens = gen.tokens,
                 thinkingAtGeneration = conv.thinking,
+                rawModel = modelName,
             )
             val stats = MessageStats(
                 prefillTokens = sync.nPrefilled, reusedTokens = sync.nReused, prefillMs = sync.prefillMs,
@@ -251,12 +263,13 @@ class ChatController(
                 _state.update { it.copy(error = "컨텍스트가 가득 찼습니다. 새 대화를 시작하거나 설정에서 컨텍스트를 늘리세요.") }
                 return
             }
-            if (stopRequested || parsed.calls.isEmpty() || !s.toolsEnabled) return
+            if (stopRequested || parsed.calls.isEmpty() || toolSpecs.isEmpty()) return
 
-            // 툴 실행 → OBSERVATION 추가 후 다음 라운드
-            setPhase(Phase.TOOL)
+            // 툴 실행 → 결과(tool 역할) 추가 후 다음 라운드
             for (call in parsed.calls) {
-                msgs += ChatMessage(Role.TOOL, tools.execute(call.name, call.arguments)) to null
+                if (stopRequested) return
+                _state.update { st -> st.copy(streaming = st.streaming.copy(phase = Phase.TOOL, toolName = call.name)) }
+                msgs += ChatMessage(Role.TOOL, tools.execute(call.name, call.arguments, s)) to null
             }
             persist(conv, msgs)
         }
@@ -279,7 +292,4 @@ class ChatController(
 
     private fun setPhase(p: Phase) = _state.update { it.copy(streaming = it.streaming.copy(phase = p)) }
 
-    companion object {
-        const val MAX_TOOL_ROUNDS = 4
-    }
 }

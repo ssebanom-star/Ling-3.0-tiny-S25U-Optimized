@@ -19,4 +19,4 @@ OUT="$BUILD/jni-classes"
 mkdir -p "$OUT"
 javac -cp "$CP" -d "$OUT" "$ROOT/tests/host/jni/JniSmoke.java"
 LIBDIR=$(dirname "$(find "$BUILD" -name 'libling_jni.so' | head -1)")
-java -Djava.library.path="$LIBDIR:$BUILD/bin" -cp "$OUT:$CP" JniSmoke "$MODEL"
+java ${JNI_JAVA_OPTS:-} -Djava.library.path="$LIBDIR:$BUILD/bin" -cp "$OUT:$CP" JniSmoke "$MODEL"

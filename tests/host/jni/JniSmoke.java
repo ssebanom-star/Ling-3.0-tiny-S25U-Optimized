@@ -36,16 +36,23 @@ public class JniSmoke {
         String ko = "안녕하세요 😀 Ling";
         check(ko.equals(LingNative.nativeDetokenize(h, LingNative.nativeTokenize(h, ko))), "UTF-8 round trip incl. emoji");
 
-        String sys = "<role>SYSTEM</role>detailed thinking off<|role_end|>";
-        String user = "<role>HUMAN</role>한국의 수도는? 한 단어로.<|role_end|>";
-        String gp = "<role>ASSISTANT</role>\n<think></think>";
+        // -Dling.fmt=lfm : LFM2.5 채팅 포맷(항상 추론 → 생성 길이 늘림)
+        boolean lfm = "lfm".equals(System.getProperty("ling.fmt"));
+        String sys = lfm ? "<|startoftext|><|im_start|>system\nAnswer in one word.<|im_end|>\n"
+                         : "<role>SYSTEM</role>detailed thinking off<|role_end|>";
+        String user = lfm ? "<|im_start|>user\n한국의 수도는? 한 단어로.<|im_end|>\n"
+                          : "<role>HUMAN</role>한국의 수도는? 한 단어로.<|role_end|>";
+        String gp = lfm ? "<|im_start|>assistant\n" : "<role>ASSISTANT</role>\n<think></think>";
+        String end = lfm ? "<|im_end|>\n" : "<|role_end|>";
+        String user2 = lfm ? "<|im_start|>user\n일본은?<|im_end|>\n" : "<role>HUMAN</role>일본은?<|role_end|>";
+        int maxGen = lfm ? 400 : 32;
         final int[] prog = {0, 0};
         double[] s = LingNative.nativeSync(h, new String[]{sys, user, gp}, new int[][]{null, null, null},
             new boolean[]{true, false, false}, (d, t) -> { prog[0] = d; prog[1] = t; });
         check(s[0] == 1.0 && prog[0] == prog[1] && prog[1] > 0, "nativeSync + prefill progress " + Arrays.toString(s));
 
         StringBuilder sb = new StringBuilder();
-        int[] toks = LingNative.nativeGenerate(h, new float[]{0f, 1f, 0f, 1f}, new int[]{32, 20, 64, 1},
+        int[] toks = LingNative.nativeGenerate(h, new float[]{0f, 1f, 0f, 1f}, new int[]{maxGen, 20, 64, 1},
             (piece, t) -> { sb.append(piece); return true; });
         double[] g = LingNative.nativeLastGenerate(h);
         System.out.println("answer: " + sb + "  stats=" + Arrays.toString(g));
@@ -54,7 +61,7 @@ public class JniSmoke {
 
         // 다음 턴: 생성 토큰을 그대로 넣어 캐시 재사용
         double[] s2 = LingNative.nativeSync(h,
-            new String[]{sys, user, gp, null, "<|role_end|>", "<role>HUMAN</role>일본은?<|role_end|>", gp},
+            new String[]{sys, user, gp, null, end, user2, gp},
             new int[][]{null, null, null, toks, null, null, null},
             new boolean[]{true, false, false, false, true, false, false}, null);
         check(s2[0] == 1.0 && s2[2] >= s[1] + toks.length, "second turn reuses previous prompt + generated tokens " + Arrays.toString(s2));

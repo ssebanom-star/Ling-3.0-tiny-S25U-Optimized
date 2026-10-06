@@ -18,10 +18,12 @@ data class ChatMessage(
     val rawTokens: IntArray? = null,
     /** 이 응답을 생성할 때 thinking 모드였는지(생성 프롬프트 접미사 재현용) */
     val thinkingAtGeneration: Boolean? = null,
+    /** rawTokens 를 만든 모델 파일(토크나이저가 다른 모델로 바꾸면 재사용하면 안 됨). null = 0.4 이전(Ling) */
+    val rawModel: String? = null,
 ) {
     override fun equals(other: Any?): Boolean =
         other is ChatMessage && role == other.role && content == other.content && reasoning == other.reasoning &&
-            toolCalls == other.toolCalls && thinkingAtGeneration == other.thinkingAtGeneration &&
+            toolCalls == other.toolCalls && thinkingAtGeneration == other.thinkingAtGeneration && rawModel == other.rawModel &&
             (rawTokens?.contentEquals(other.rawTokens) ?: (other.rawTokens == null))
 
     override fun hashCode(): Int =

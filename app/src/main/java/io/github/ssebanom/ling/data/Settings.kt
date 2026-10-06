@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -52,6 +53,18 @@ data class AppSettings(
     val setupDone: Boolean = false,
     /** 모바일 데이터(종량제)로 모델 다운로드 허용 */
     val allowMeteredDownload: Boolean = false,
+    /** 모델 계열 권장 샘플링 사용(끄면 아래 사용자 값) */
+    val useRecommendedSampling: Boolean = true,
+    /** 켜진 툴 묶음(ToolGroup.name). 파일·화면 제어는 권한 허용 후 사용자가 켬 */
+    val toolGroups: Set<String> = setOf("BASIC", "WEB", "DEVICE"),
+    /** 부수효과 있는 툴(탭·입력·파일 쓰기·앱 열기 등)을 확인 없이 실행 */
+    val autoApproveTools: Boolean = false,
+    /** 웹 검색: 비우면 DuckDuckGo, 값이 있으면 SearXNG 인스턴스 주소(JSON API) */
+    val searxngUrl: String = "",
+    /** Brave Search API 키(있으면 우선 사용) */
+    val braveApiKey: String = "",
+    /** 한 번의 사용자 요청에서 툴 호출 최대 라운드 */
+    val maxToolRounds: Int = 8,
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -84,6 +97,12 @@ class SettingsRepository(private val context: Context) {
         val gpuQuirks = stringPreferencesKey("gpu_quirks")
         val setupDone = booleanPreferencesKey("setup_done")
         val allowMeteredDownload = booleanPreferencesKey("allow_metered_download")
+        val useRecommendedSampling = booleanPreferencesKey("use_recommended_sampling")
+        val toolGroups = stringSetPreferencesKey("tool_groups")
+        val autoApproveTools = booleanPreferencesKey("auto_approve_tools")
+        val searxngUrl = stringPreferencesKey("searxng_url")
+        val braveApiKey = stringPreferencesKey("brave_api_key")
+        val maxToolRounds = intPreferencesKey("max_tool_rounds")
     }
 
     val flow: Flow<AppSettings> = context.dataStore.data.map { flowValue(it, AppSettings()) }
@@ -119,6 +138,12 @@ class SettingsRepository(private val context: Context) {
             p[K.gpuQuirks] = n.gpuQuirks
             p[K.setupDone] = n.setupDone
             p[K.allowMeteredDownload] = n.allowMeteredDownload
+            p[K.useRecommendedSampling] = n.useRecommendedSampling
+            p[K.toolGroups] = n.toolGroups
+            p[K.autoApproveTools] = n.autoApproveTools
+            p[K.searxngUrl] = n.searxngUrl
+            p[K.braveApiKey] = n.braveApiKey
+            p[K.maxToolRounds] = n.maxToolRounds
         }
     }
 
@@ -149,5 +174,11 @@ class SettingsRepository(private val context: Context) {
         gpuQuirks = p[K.gpuQuirks] ?: d.gpuQuirks,
         setupDone = p[K.setupDone] ?: d.setupDone,
         allowMeteredDownload = p[K.allowMeteredDownload] ?: d.allowMeteredDownload,
+        useRecommendedSampling = p[K.useRecommendedSampling] ?: d.useRecommendedSampling,
+        toolGroups = p[K.toolGroups] ?: d.toolGroups,
+        autoApproveTools = p[K.autoApproveTools] ?: d.autoApproveTools,
+        searxngUrl = p[K.searxngUrl] ?: d.searxngUrl,
+        braveApiKey = p[K.braveApiKey] ?: d.braveApiKey,
+        maxToolRounds = p[K.maxToolRounds] ?: d.maxToolRounds,
     )
 }

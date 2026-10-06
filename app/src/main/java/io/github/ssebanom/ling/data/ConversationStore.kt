@@ -39,7 +39,7 @@ data class MessageStats(
 data class StoredMessage(val id: Long, val message: ChatMessage, val stats: MessageStats?)
 
 /** SQLite 대화 저장소. rawTokens 는 BLOB(int32 LE)로 저장해 재시작 후에도 캐시 정합성 유지 */
-class ConversationStore(context: Context) : SQLiteOpenHelper(context, "ling.db", null, 1) {
+class ConversationStore(context: Context) : SQLiteOpenHelper(context, "ling.db", null, 2) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -51,13 +51,15 @@ class ConversationStore(context: Context) : SQLiteOpenHelper(context, "ling.db",
             """CREATE TABLE messages(
                 id INTEGER PRIMARY KEY AUTOINCREMENT, conv_id INTEGER NOT NULL, idx INTEGER NOT NULL,
                 role TEXT NOT NULL, content TEXT NOT NULL, reasoning TEXT, tool_calls TEXT,
-                raw_tokens BLOB, thinking_at_gen INTEGER, stats TEXT,
+                raw_tokens BLOB, thinking_at_gen INTEGER, stats TEXT, raw_model TEXT,
                 FOREIGN KEY(conv_id) REFERENCES conversations(id) ON DELETE CASCADE)""",
         )
         db.execSQL("CREATE INDEX idx_messages_conv ON messages(conv_id, idx)")
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) db.execSQL("ALTER TABLE messages ADD COLUMN raw_model TEXT")
+    }
 
     override fun onConfigure(db: SQLiteDatabase) {
         db.setForeignKeyConstraintsEnabled(true)
@@ -110,6 +112,7 @@ class ConversationStore(context: Context) : SQLiteOpenHelper(context, "ling.db",
                         toolCalls = decodeToolCalls(c.getString(c.getColumnIndexOrThrow("tool_calls"))),
                         rawTokens = if (c.isNull(rawIdx)) null else decodeTokens(c.getBlob(rawIdx)),
                         thinkingAtGeneration = if (c.isNull(tagIdx)) null else c.getInt(tagIdx) != 0,
+                        rawModel = c.getString(c.getColumnIndexOrThrow("raw_model")),
                     )
                     val statsJson = c.getString(c.getColumnIndexOrThrow("stats"))
                     add(StoredMessage(c.getLong(c.getColumnIndexOrThrow("id")), msg, statsJson?.let(::decodeStats)))
@@ -131,6 +134,7 @@ class ConversationStore(context: Context) : SQLiteOpenHelper(context, "ling.db",
                     put("tool_calls", if (m.toolCalls.isEmpty()) null else encodeToolCalls(m.toolCalls))
                     put("raw_tokens", m.rawTokens?.let(::encodeTokens))
                     m.thinkingAtGeneration?.let { put("thinking_at_gen", if (it) 1 else 0) }
+                    put("raw_model", m.rawModel)
                     put("stats", s?.let(::encodeStats))
                 })
             }

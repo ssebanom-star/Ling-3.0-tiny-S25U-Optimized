@@ -85,6 +85,7 @@ fun ChatScreen(c: AppContainer, modifier: Modifier = Modifier) {
     val convs = remember { mutableStateListOf<Conversation>() }
     var editing by remember { mutableStateOf<Int?>(null) }
     var confirmThinking by remember { mutableStateOf<Boolean?>(null) }
+    val appSettings by c.settings.flow.collectAsState(initial = null)
 
     LaunchedEffect(drawer.isOpen, st.conversation?.id) {
         convs.clear(); convs.addAll(c.conversations.listConversations())
@@ -129,14 +130,15 @@ fun ChatScreen(c: AppContainer, modifier: Modifier = Modifier) {
         Column(Modifier.fillMaxSize().imePadding()) {
             TopAppBar(
                 title = {
-                    Text(st.conversation?.title ?: "Ling-3.0-tiny", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(st.conversation?.title ?: c.inference.familyFor(java.io.File(appSettings?.modelFile.orEmpty())).label, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 },
                 navigationIcon = {
                     IconButton(onClick = { scope.launch { drawer.open() } }) { Icon(Icons.Outlined.Menu, "목록") }
                 },
                 actions = {
                     val thinking = st.conversation?.thinking ?: true
-                    FilterChip(
+                    // LFM2.5 처럼 항상 추론하는 모델은 토글을 숨긴다
+                    if (c.inference.familyFor(java.io.File(appSettings?.modelFile.orEmpty())).thinkingToggle) FilterChip(
                         selected = thinking,
                         onClick = {
                             val conv = st.conversation
@@ -255,10 +257,15 @@ private fun MessageItem(m: StoredMessage, isLastAssistant: Boolean, busy: Boolea
                 }
             }
         }
-        Role.TOOL -> Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text("툴 결과: ${msg.content}", Modifier.padding(8.dp), fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+        Role.TOOL -> {
+            var open by remember { mutableStateOf(false) }
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth().clickable { open = !open },
+            ) {
+                val body = if (open || msg.content.length <= 240) msg.content else msg.content.take(240) + " … (탭하여 펼치기)"
+                Text("툴 결과: $body", Modifier.padding(8.dp), fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+            }
         }
         Role.SYSTEM -> Unit
     }
@@ -304,7 +311,7 @@ private fun StreamingItem(s: Streaming) {
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            Phase.TOOL -> Text("툴 실행 중…", style = MaterialTheme.typography.labelMedium)
+            Phase.TOOL -> Text("툴 실행 중: ${s.toolName}", style = MaterialTheme.typography.labelMedium)
             else -> Unit
         }
         if (s.reasoning.isNotEmpty()) {

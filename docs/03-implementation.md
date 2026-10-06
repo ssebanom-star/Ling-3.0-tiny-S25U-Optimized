@@ -30,6 +30,24 @@ Phase 0 도구(`tools/phase0/build_bench_tools.sh`): llama-bench/llama-completio
 | `SetupPlannerTest` | S25U → Q4_0/16K, 기존 파일 재사용, 받다 만 파일 이어받기, 공간 부족 시 하향, 저RAM → IQ4_XS — 6/6 [검증] |
 | 앱 내 전체 흐름(4.6 GB) | [미검증 — 실기기] |
 
+### 0.5.0: LFM2.5-8B-A1B · 툴 확장 (2026-10-06)
+
+| 항목 | 내용 | 검증 |
+|---|---|---|
+| 모델 계열 추상화 | `ModelFamily`(LING/LFM2): 템플릿·툴 포맷·추론 태그·권장 샘플링·정확성 프로브 | — |
+| LFM2.5 템플릿 | `LfmPromptBuilder` (preserve_thinking=true 로 생성 토큰 재사용) | jinja 골든 11케이스 바이트 일치 [검증] |
+| Pythonic 툴 호출 | `<|tool_call_start|>[f(a='x')]<|tool_call_end|>` 파서(+JSON 형식) | 단위 6 [검증] |
+| 엔진(lfm2moe) | 로드·한국어 답·2턴 캐시 재사용 104/118·체크포인트(3개 0.9MB)·단계 디코드=배치 | 실모델 JNI [검증] |
+| 제어 토큰 출력 | `token_to_piece(special=false)` 가 LFM 툴 경계 토큰을 지워 호출 파싱 불가 → `true` | 실모델로 발견·수정, Ling 회귀 통과 [검증] |
+| 실모델 툴 호출 | 실제 툴 목록·지침으로 날씨→web_search→(결과 후)fetch_url, 알람→set_alarm(7,30) — Ling·LFM 모두 파싱 가능 형식 | 호스트 greedy [검증] |
+| 웹 툴 | DDG lite/html·Bing 파서, Brave/SearXNG JSON, 본문 추출 | fixture 단위 7 [검증], 기기 네트워크에서 차단 여부 [미검증] |
+| 파일 툴 | 저장소 루트 샌드박스(경로 탈출 거부), 목록·검색·읽기(페이지)·쓰기 | 단위 5 [검증] |
+| 화면 제어 | AccessibilityService: 읽기·탭(노드→제스처 폴백)·입력·스크롤·전역 키, 승인 오버레이 | [빌드만] |
+| 승인 | 앱 표시 중 다이얼로그(항상 허용), 백그라운드는 접근성 오버레이, 2분 무응답 거부 | [빌드만] |
+
+이 서버 IP 에서는 DuckDuckGo 가 봇 챌린지(HTTP 202), Bing 이 무관한 결과를 돌려줘 실검색 품질은 확인 불가.
+기기(가정/모바일 IP)에서 다를 수 있음. 안정적으로 쓰려면 Brave Search API 키 또는 SearXNG 주소 설정.
+
 ---
 
 ## 2. 호스트 검증 결과 (x86-64, 4 vCPU, 15 GB, 실모델 Q4_0)

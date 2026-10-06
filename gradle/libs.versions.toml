@@ -9,6 +9,7 @@ datastore = "1.2.0"
 coroutines = "1.10.2"
 junit = "4.13.2"
 json = "20250517"
+jsoup = "1.23.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -28,6 +29,8 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 # JVM 단위 테스트에서 android.jar의 org.json 스텁 대신 실제 구현 사용
 org-json = { group = "org.json", name = "json", version.ref = "json" }
+# 웹 툴: 검색 결과/페이지 본문 추출
+jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

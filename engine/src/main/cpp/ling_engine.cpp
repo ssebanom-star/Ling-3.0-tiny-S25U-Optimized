@@ -336,12 +336,14 @@ std::vector<token> Engine::tokenize(const std::string & text, bool parse_special
     return out;
 }
 
+// special=true: 제어 토큰도 문자열로 낸다. LFM2.5 의 <|tool_call_start|>/<|tool_call_end|> 같은 툴 호출 경계가
+// 제어 토큰이라, 끄면 앱 파서가 호출을 찾지 못한다. EOG 는 생성 루프에서 piece 변환 전에 걸러진다.
 std::string Engine::piece(token t) const {
     char buf[256];
-    int  n = llama_token_to_piece(vocab_, t, buf, sizeof(buf), 0, false);
+    int  n = llama_token_to_piece(vocab_, t, buf, sizeof(buf), 0, true);
     if (n < 0) {
         std::string big(-n, '\0');
-        llama_token_to_piece(vocab_, t, big.data(), (int32_t) big.size(), 0, false);
+        llama_token_to_piece(vocab_, t, big.data(), (int32_t) big.size(), 0, true);
         return big;
     }
     return std::string(buf, n);

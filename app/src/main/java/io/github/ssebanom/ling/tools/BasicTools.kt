@@ -8,40 +8,16 @@ import android.os.PowerManager
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
-/**
- * 온디바이스 툴(네트워크 불필요). Ling-3.0 의 네이티브 툴 호출 포맷으로 노출된다.
- * spec 은 OpenAI 스타일 function 스키마(LinkedHashMap 으로 키 순서 고정 → 프롬프트 바이트 안정).
- */
-interface LocalTool {
-    val name: String
-    val spec: Map<String, Any?>
-    fun execute(args: Map<String, Any?>): String
-}
-
-private fun fn(name: String, description: String, properties: Map<String, Any?>, required: List<String>) =
-    linkedMapOf<String, Any?>(
-        "type" to "function",
-        "function" to linkedMapOf<String, Any?>(
-            "name" to name,
-            "description" to description,
-            "parameters" to linkedMapOf<String, Any?>(
-                "type" to "object",
-                "properties" to properties,
-                "required" to required,
-            ),
-        ),
-    )
-
 class CalculatorTool : LocalTool {
     override val name = "calculator"
-    override val spec = fn(
-        name, "Evaluate an arithmetic expression. Supports + - * / % ^, parentheses, sqrt, sin, cos, tan, log, ln, exp, abs, pi, e.",
-        linkedMapOf("expression" to linkedMapOf("type" to "string", "description" to "e.g. (17*23)+sqrt(2)")),
-        listOf("expression"),
-    )
+    override val group = ToolGroup.BASIC
+    override val description =
+        "Evaluate an arithmetic expression. Supports + - * / % ^, parentheses, sqrt, sin, cos, tan, log, ln, exp, abs, pi, e."
+    override val properties = linkedMapOf<String, Any?>("expression" to linkedMapOf("type" to "string", "description" to "e.g. (17*23)+sqrt(2)"))
+    override val required = listOf("expression")
 
-    override fun execute(args: Map<String, Any?>): String {
-        val expr = args["expression"]?.toString() ?: return "error: missing expression"
+    override suspend fun execute(args: Map<String, Any?>): String {
+        val expr = args.str("expression")
         return runCatching { ExprEval(expr).eval() }.fold(
             { v -> if (v == Math.rint(v) && kotlin.math.abs(v) < 1e15) v.toLong().toString() else v.toString() },
             { "error: ${it.message}" },
@@ -51,15 +27,17 @@ class CalculatorTool : LocalTool {
 
 class TimeTool : LocalTool {
     override val name = "current_time"
-    override val spec = fn(name, "Get the current local date, time and timezone of the device.", linkedMapOf(), emptyList())
-    override fun execute(args: Map<String, Any?>): String =
+    override val group = ToolGroup.BASIC
+    override val description = "Get the current local date, time and timezone of the device."
+    override suspend fun execute(args: Map<String, Any?>): String =
         ZonedDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss EEEE VV (xxx)"))
 }
 
 class DeviceStatusTool(private val context: Context) : LocalTool {
     override val name = "device_status"
-    override val spec = fn(name, "Get battery level, charging state and thermal status of this phone.", linkedMapOf(), emptyList())
-    override fun execute(args: Map<String, Any?>): String {
+    override val group = ToolGroup.BASIC
+    override val description = "Get battery level, charging state and thermal status of this phone."
+    override suspend fun execute(args: Map<String, Any?>): String {
         val bi = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         val level = bi?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
         val scale = bi?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100
@@ -77,14 +55,6 @@ class DeviceStatusTool(private val context: Context) : LocalTool {
         return "{\"battery_percent\": ${if (level >= 0) level * 100 / scale else -1}, \"charging\": $plugged, " +
             "\"battery_temp_c\": $temp, \"thermal_status\": \"$thermal\", \"power_save\": ${pm.isPowerSaveMode}}"
     }
-}
-
-class ToolRegistry(context: Context) {
-    val tools: List<LocalTool> = listOf(CalculatorTool(), TimeTool(), DeviceStatusTool(context))
-    val specs: List<Map<String, Any?>> get() = tools.map { it.spec }
-    fun execute(name: String, args: Map<String, Any?>): String =
-        tools.firstOrNull { it.name == name }?.let { runCatching { it.execute(args) }.getOrElse { e -> "error: ${e.message}" } }
-            ?: "error: unknown tool '$name'"
 }
 
 /** 재귀 하강 수식 평가기 (eval/스크립트 엔진 미사용) */

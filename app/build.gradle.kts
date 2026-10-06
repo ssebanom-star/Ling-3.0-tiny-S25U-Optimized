@@ -14,8 +14,8 @@ android {
         applicationId = "io.github.ssebanom.ling"
         minSdk = 33
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.4.0"
+        versionCode = 9
+        versionName = "0.5.0"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
 
@@ -68,6 +68,7 @@ dependencies {
     implementation(libs.androidx.compose.material.icons)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.jsoup)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)

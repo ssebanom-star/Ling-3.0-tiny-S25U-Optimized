@@ -115,7 +115,9 @@ def main():
             groups["other"] += sz
 
     total = sum(groups.values())
-    active = groups["output"] + groups["other"] + groups["experts"] * n_used / n_expert
+    # 출력층이 임베딩과 묶인(tied) 모델은 lm_head 로 token_embd 전체를 매 토큰 읽는다
+    lm_head = groups["output"] if groups["output"] > 0 else groups["embd"]
+    active = lm_head + groups["other"] + groups["experts"] * n_used / n_expert
     GB = 1e9
     print(f"arch={arch} tensors={len(tensors)} experts={n_used}/{n_expert}")
     for k, v in groups.items():
@@ -141,6 +143,8 @@ def main():
         print(f"MLA layers={n_mla} KDA layers={n_kda}")
         print(f"MLA latent cache f16 = {per_tok} B/token -> "
               + ", ".join(f"{c // 1024}K:{per_tok * c / 2**20:.0f}MiB" for c in (8192, 32768, 131072)))
+    if not arch.startswith("bailingmoe"):
+        return  # 이하 KDA 재귀 상태 계산은 Ling(bailingmoe3) 전용
     hd = g("kda.head_dim") or 128
     d_conv = g("ssm.conv_kernel") or 4
     if isinstance(n_head, list):
