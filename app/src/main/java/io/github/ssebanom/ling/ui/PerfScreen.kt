@@ -103,6 +103,7 @@ fun PerfScreen(c: AppContainer, modifier: Modifier = Modifier) {
                     EngineStatus.NoModel -> Mono("모델 없음")
                     EngineStatus.Unloaded -> Mono("언로드됨")
                 }
+                c.inference.lastFallback?.let { Mono("⚠ $it") }
                 chat.lastStats?.let {
                     Mono("최근 응답: ${"%.1f".format(it.decodeTps)} tok/s, TTFT ${"%.0f".format(it.ttftMs)}ms, prefill ${it.prefillTokens} (재사용 ${it.reusedTokens})")
                 }

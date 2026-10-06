@@ -110,8 +110,15 @@ class InferenceManager(
             _status.value = EngineStatus.Ready(engine.modelInfo!!, engine.config!!, backend)
             return true
         }
+        if (backend == Backend.CPU) return load(want, backend)
+        // 가속기는 이 모델로 정확성 검사를 통과한 적이 없으면 먼저 검사(실패 시 CPU 복귀)
+        if (s.acceleratorValidated != "${backend.name}:${path.name}") {
+            val r = validateAcceleratorLocked(backend) { Log.i(TAG, "auto-validate: $it") }
+            if (!r.passed) lastFallback = "${backend.label} 정확성 검사 실패 → CPU: ${r.detail}"
+            return status.value is EngineStatus.Ready
+        }
         if (load(want, backend)) return true
-        return if (backend != Backend.CPU) fallbackToCpu(s, path, "${backend.label} 로드 실패: ${(status.value as? EngineStatus.Error)?.message}") else false
+        return fallbackToCpu(s, path, "${backend.label} 로드 실패: ${(status.value as? EngineStatus.Error)?.message}")
     }
 
     /** 가속기 사용 불가 시 설정을 CPU 로 바꾸고 CPU 로 로드 */
@@ -214,13 +221,16 @@ class InferenceManager(
      * 기준값은 CPU 로 1회 계산해 파일로 보관(두 모델을 동시에 올리지 않기 위해).
      * 통과 기준: top-1 일치, top-10 중 7개 이상 겹침, 공통 top-5 평균 |Δlogp| < 0.5
      */
-    suspend fun validateAccelerator(backend: Backend, onProgress: (String) -> Unit): AccelCheck = lock.withLock {
+    suspend fun validateAccelerator(backend: Backend, onProgress: (String) -> Unit): AccelCheck =
+        lock.withLock { validateAcceleratorLocked(backend, onProgress) }
+
+    private suspend fun validateAcceleratorLocked(backend: Backend, onProgress: (String) -> Unit): AccelCheck {
         val s = settings.current()
         val path = modelPath(s) ?: return AccelCheck(backend, false, false, 0, 0.0, "모델 없음")
         val refFile = File(context.filesDir, "accel_ref_${path.name}.txt")
         if (!refFile.exists()) {
             onProgress("CPU 기준값 계산")
-            load(configFor(s, path, Backend.CPU), Backend.CPU)
+            if (!load(configFor(s, path, Backend.CPU), Backend.CPU)) return AccelCheck(backend, false, false, 0, 0.0, "CPU 기준 로드 실패")
             val ref = engine.evalTopK(engine.tokenize(PROBE), 20)
             refFile.writeText(ref.joinToString("\n") { "${it.first} ${it.second}" })
         }
@@ -245,7 +255,7 @@ class InferenceManager(
             onProgress("${backend.label} 속도 측정 (tg$ACCEL_TG)")
             runCatching { engine.bench(0, ACCEL_TG, 1) }.onSuccess { detail += ", tg$ACCEL_TG=${"%.1f".format(it.tgTps)} tok/s" }
         }
-        if (passed) {
+        return if (passed) {
             settings.update { it.copy(backend = backend, acceleratorValidated = "${backend.name}:${path.name}") }
             AccelCheck(backend, true, top1, overlap, mad, detail)
         } else {
