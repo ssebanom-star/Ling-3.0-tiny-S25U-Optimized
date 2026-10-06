@@ -101,10 +101,7 @@ class InferenceManager(
         val path = modelPath(s) ?: run { _status.value = EngineStatus.NoModel; return false }
         val backend = s.backend
         val want = configFor(s, path, backend)
-        if (backend != Backend.CPU && want.devices.isEmpty()) {
-            _status.value = EngineStatus.Error("${backend.label}: 디바이스를 찾지 못함 → CPU 로 전환하세요")
-            return false
-        }
+        if (backend != Backend.CPU && want.devices.isEmpty()) return fallbackToCpu(s, path, "${backend.label}: 디바이스 없음")
         val cur = engine.config
         if (cur != null && sameLoad(cur, want)) {
             if (cur.nThreads != want.nThreads || cur.nThreadsBatch != want.nThreadsBatch || cur.cpuMask != want.cpuMask) {
@@ -113,8 +110,21 @@ class InferenceManager(
             _status.value = EngineStatus.Ready(engine.modelInfo!!, engine.config!!, backend)
             return true
         }
-        return load(want, backend)
+        if (load(want, backend)) return true
+        return if (backend != Backend.CPU) fallbackToCpu(s, path, "${backend.label} 로드 실패: ${(status.value as? EngineStatus.Error)?.message}") else false
     }
+
+    /** 가속기 사용 불가 시 설정을 CPU 로 바꾸고 CPU 로 로드 */
+    private suspend fun fallbackToCpu(s: AppSettings, path: File, why: String): Boolean {
+        Log.w(TAG, "$why → CPU 복귀")
+        lastFallback = why
+        settings.update { it.copy(backend = Backend.CPU) }
+        return load(configFor(s, path, Backend.CPU), Backend.CPU)
+    }
+
+    /** 마지막 CPU 자동 복귀 사유(UI 표시용) */
+    @Volatile var lastFallback: String? = null
+        private set
 
     private fun sameLoad(a: EngineConfig, b: EngineConfig) =
         a.modelPath == b.modelPath && a.nCtx == b.nCtx && a.kvQ8 == b.kvQ8 && a.devices == b.devices &&
@@ -145,10 +155,15 @@ class InferenceManager(
     /**
      * 스레드/코어 배치 자동 튜닝 (CPU 백엔드). 디코드 tg32, prefill pp128 실측으로 최고값 선택.
      * NPU/GPU 백엔드에서는 스레드 스윕 없이 [ACCEL_TG] 토큰 생성 속도만 측정한다.
+     * [target] 을 주면 그 백엔드로 전환(설정 저장) 후 측정한다. 전환 실패 시 CPU 로 복귀해 CPU 를 측정.
      */
-    suspend fun autoTune(onProgress: (String) -> Unit): TuneResult? = lock.withLock {
+    suspend fun autoTune(target: Backend? = null, onProgress: (String) -> Unit): TuneResult? = lock.withLock {
+        if (target != null && target != settings.current().backend) {
+            onProgress("${target.label} 로 전환")
+            settings.update { it.copy(backend = target) }
+        }
         if (!ensureLoaded()) return null
-        val backend = settings.current().backend
+        val backend = (status.value as? EngineStatus.Ready)?.backend ?: settings.current().backend
         if (backend != Backend.CPU) {
             val c = engine.config!!
             val label = "${backend.label} tg$ACCEL_TG"

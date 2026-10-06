@@ -1,6 +1,7 @@
 package io.github.ssebanom.ling.runtime
 
 import android.util.Log
+import io.github.ssebanom.ling.data.Backend
 import io.github.ssebanom.ling.data.ModelCatalog
 import io.github.ssebanom.ling.data.ModelStore
 import io.github.ssebanom.ling.data.SettingsRepository
@@ -147,6 +148,8 @@ class SetupManager(
             it.copy(
                 modelFile = variant.fileName,
                 nCtx = if (it.setupDone) it.nCtx else SetupPlanner.defaultContext(profile.totalRamBytes),
+                // 첫 설치 기본 백엔드 GPU (실패 시 ensureLoaded 가 CPU 로 복귀)
+                backend = if (it.setupDone) it.backend else Backend.GPU,
             )
         }
 
@@ -165,7 +168,7 @@ class SetupManager(
         }
 
         // ---- 자동 튜닝 (실패해도 기본값으로 진행) ----
-        update { it.copy(step = Step.TUNE, progress = null, message = "스레드·코어 배치 측정 중 (약 20~40초)") }
+        update { it.copy(step = Step.TUNE, progress = null, message = "성능 측정 중") }
         runCatching { inference.autoTune { label -> update { it.copy(message = "측정: $label") } } }
             .onFailure { Log.w(TAG, "autotune failed: ${it.message}") }
 

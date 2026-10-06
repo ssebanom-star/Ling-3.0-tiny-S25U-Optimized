@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -46,6 +47,7 @@ fun PerfScreen(c: AppContainer, modifier: Modifier = Modifier) {
     val settings by c.settings.flow.collectAsState(initial = AppSettings())
     val chat by c.chat.state.collectAsState()
     var log by remember { mutableStateOf("") }
+    var tuneTarget by remember { mutableStateOf<Backend?>(null) } // null = 현재 백엔드
     var running by remember { mutableStateOf(false) }
     var engineState by remember { mutableStateOf<EngineState?>(null) }
     var thermal by remember { mutableStateOf(c.thermal.snapshot()) }
@@ -113,17 +115,26 @@ fun PerfScreen(c: AppContainer, modifier: Modifier = Modifier) {
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp)) {
                 Text("튜닝 · 벤치마크", style = MaterialTheme.typography.titleMedium)
-                Text("자동 튜닝: CPU 는 디코드 스레드 수 × 코어 배치(OS/빠른 코어 우선), prefill 스레드를 실측해 저장합니다. NPU/GPU 는 토큰 ${InferenceManager.ACCEL_TG}개 생성 속도만 측정합니다.", style = MaterialTheme.typography.bodySmall)
+                Text("자동 튜닝: CPU 는 디코드 스레드 수 × 코어 배치(OS/빠른 코어 우선), prefill 스레드를 실측해 저장합니다. NPU/GPU 는 토큰 ${InferenceManager.ACCEL_TG}개 생성 속도만 측정합니다. " +
+                    "다른 백엔드를 고르면 그 백엔드로 전환 후 측정합니다(사용 불가 시 CPU 복귀).", style = MaterialTheme.typography.bodySmall)
+                val target = tuneTarget ?: settings.backend
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (b in listOf(Backend.GPU, Backend.CPU, Backend.NPU)) {
+                        FilterChip(selected = target == b, onClick = { tuneTarget = b }, label = { Text(b.name) }, enabled = !running && !chat.busy)
+                    }
+                }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = {
                         task("자동 튜닝") {
-                            val r = c.inference.autoTune { log = "튜닝: $it" } ?: return@task "모델 로드 실패"
+                            val r = c.inference.autoTune(target) { log = "튜닝: $it" } ?: return@task "모델 로드 실패"
+                            tuneTarget = null
                             buildString {
+                                c.inference.lastFallback?.takeIf { c.settings.current().backend != target }?.let { append("$target 사용 불가 → CPU: $it\n") }
                                 append("선택: decode ${r.decodeThreads} / batch ${r.batchThreads} / cpu[${r.cpuMask.ifEmpty { "OS" }}]\n")
                                 r.table.forEach { (l, pp, tg) -> append("%-28s %s\n".format(l, if (pp > 0) "pp %.1f".format(pp) else "tg %.1f".format(tg))) }
                             }.also { saveReport(c, "tune", it) }
                         }
-                    }, enabled = !running && !chat.busy) { Text("자동 튜닝") }
+                    }, enabled = !running && !chat.busy) { Text("${target.name} 튜닝") }
                     OutlinedButton(onClick = {
                         task("벤치") {
                             val sb = StringBuilder()

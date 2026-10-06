@@ -13,17 +13,17 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
-/** 실행 백엔드. NPU/GPU 는 실험 기능(정확성 검사 통과 시에만 유지) */
+/** 실행 백엔드. 기본 GPU, 디바이스 없음/로드 실패 시 CPU 로 자동 복귀 */
 enum class Backend(val label: String) {
-    CPU("CPU (기본)"),
+    CPU("CPU"),
     NPU("Hexagon NPU (실험)"),
-    GPU("Adreno GPU OpenCL (실험)"),
+    GPU("Adreno GPU OpenCL"),
 }
 
 data class AppSettings(
     val modelFile: String = "",
     val nCtx: Int = 16384,
-    val backend: Backend = Backend.CPU,
+    val backend: Backend = Backend.GPU,
     /** 0 = 자동(튜닝 결과 사용) */
     val threads: Int = 0,
     val threadsBatch: Int = 0,
@@ -121,7 +121,7 @@ class SettingsRepository(private val context: Context) {
     private fun flowValue(p: Preferences, d: AppSettings) = AppSettings(
         modelFile = p[K.modelFile] ?: d.modelFile,
         nCtx = p[K.nCtx] ?: d.nCtx,
-        backend = runCatching { Backend.valueOf(p[K.backend] ?: d.backend.name) }.getOrDefault(Backend.CPU),
+        backend = runCatching { Backend.valueOf(p[K.backend] ?: d.backend.name) }.getOrDefault(Backend.GPU),
         threads = p[K.threads] ?: d.threads,
         threadsBatch = p[K.threadsBatch] ?: d.threadsBatch,
         tunedThreads = p[K.tunedThreads] ?: d.tunedThreads,
