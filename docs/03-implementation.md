@@ -18,6 +18,18 @@
 APK: `app-release.apk` ≈ 10.8 MB (arm64-v8a, CPU 변형 7종 + OpenCL + Hexagon v73~v81 skel).
 Phase 0 도구(`tools/phase0/build_bench_tools.sh`): llama-bench/llama-completion + CPU·OpenCL·Hexagon 백엔드 빌드 [빌드만].
 
+### 첫 실행 자동 설치 (2026-10-06 추가)
+
+`SetupManager`: 기기 확인 → `SetupPlanner`(양자화 선택) → `ResumableDownloader`(이어받기·재시도·네트워크 대기)
+→ SHA-256 → 설정 저장 → 로드 → 자동 튜닝 → `setupDone`. 앱/서비스 재시작 시 같은 지점부터 재개(멱등).
+
+| 검증 | 결과 |
+|---|---|
+| `ResumableDownloaderTest` (로컬 HTTP 서버) | 302 리다이렉트 추적, 1 MiB 에서 끊김 → `Range: bytes=1048576-` 재개, 기존 `.part` 재개, 서버가 Range 무시 시 처음부터, SHA 불일치 시 삭제, 재시도 한도, 완성된 `.part` 는 검증만 — 7/7 [검증] |
+| 실제 HF CDN | imatrix(44 MB, LFS): 10 MB `.part` → 서명 CDN 302 → 206 재개 → SHA-256 일치 [검증] |
+| `SetupPlannerTest` | S25U → Q4_0/16K, 기존 파일 재사용, 받다 만 파일 이어받기, 공간 부족 시 하향, 저RAM → IQ4_XS — 6/6 [검증] |
+| 앱 내 전체 흐름(4.6 GB) | [미검증 — 실기기] |
+
 ---
 
 ## 2. 호스트 검증 결과 (x86-64, 4 vCPU, 15 GB, 실모델 Q4_0)

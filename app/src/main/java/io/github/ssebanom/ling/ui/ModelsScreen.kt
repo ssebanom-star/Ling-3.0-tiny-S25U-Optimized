@@ -142,6 +142,13 @@ private fun VariantCard(
                 dl is ModelStore.DownloadState.Verifying && dl.variant == v.id -> {
                     Text("SHA-256 검증 중 ${dl.done * 100 / dl.total}%", style = MaterialTheme.typography.bodySmall)
                 }
+                dl is ModelStore.DownloadState.WaitingNetwork && dl.variant == v.id -> Row {
+                    Text(dl.reason, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { c.models.cancelDownload() }) { Text("일시정지") }
+                }
+                dl is ModelStore.DownloadState.Retrying && dl.variant == v.id -> {
+                    Text("재시도 ${dl.attempt}: ${dl.reason}", style = MaterialTheme.typography.bodySmall)
+                }
                 else -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (complete) {
                         Button(onClick = { scope.launch { c.settings.update { it.copy(modelFile = v.fileName) } } }, enabled = !active) {
@@ -157,7 +164,9 @@ private fun VariantCard(
                                 }
                                 onChanged()
                             }
-                        }) { Text(if (partFile.exists()) "이어받기 (${partFile.length() shr 20} MiB)" else "다운로드") }
+                        }, enabled = !c.models.isDownloading) {
+                            Text(if (partFile.exists()) "이어받기 (${partFile.length() shr 20} MiB)" else "다운로드")
+                        }
                     }
                     Spacer(Modifier.width(4.dp))
                 }

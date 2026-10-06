@@ -12,6 +12,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -30,6 +31,13 @@ private enum class Tab(val label: String, val icon: ImageVector) {
 @Composable
 fun LingRoot(c: AppContainer) {
     var tab by rememberSaveable { mutableStateOf(Tab.CHAT) }
+    val settings by c.settings.flow.collectAsState(initial = null)
+    var skipSetup by rememberSaveable { mutableStateOf(false) }
+    val s = settings ?: return  // DataStore 첫 로드 전
+    if (!s.setupDone && !skipSetup) {
+        SetupScreen(c, onSkip = { skipSetup = true })
+        return
+    }
     Scaffold(
         bottomBar = {
             NavigationBar {

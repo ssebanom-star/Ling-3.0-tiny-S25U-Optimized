@@ -40,17 +40,31 @@ class LingService : LifecycleService() {
             this, NOTIF_ID, build("대기 중", ""),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC or ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
         )
+        // 시스템이 서비스를 재시작한 경우에도 미완료 설치를 이어서 진행
+        lifecycleScope.launch {
+            if (!c.settings.current().setupDone) c.setup.start()
+        }
         lifecycleScope.launch {
             // 알림 갱신은 1초 간격으로 표본화(시스템 rate-limit 회피)
-            combine(c.chat.busyFlow, c.chat.state, c.models.download) { busy, st, dl -> Triple(busy, st, dl) }
+            combine(c.chat.busyFlow, c.chat.state, c.models.download, c.setup.state) { busy, st, dl, su ->
+                arrayOf(busy, st, dl, su)
+            }
                 .sample(1_000)
-                .collect { (busy, st, dl) ->
-                    val downloading = dl is ModelStore.DownloadState.Running || dl is ModelStore.DownloadState.Verifying
-                    if (busy) acquire() else release()
+                .collect { arr ->
+                    val busy = arr[0] as Boolean
+                    val st = arr[1] as io.github.ssebanom.ling.runtime.ChatState
+                    val dl = arr[2] as ModelStore.DownloadState
+                    val su = arr[3] as io.github.ssebanom.ling.runtime.SetupManager.State
+                    val downloading = c.models.isDownloading || su.running
+                    // 생성·다운로드·설치 중에는 화면이 꺼져도 CPU 유지
+                    if (busy || downloading) acquire() else release()
                     val text = when {
                         busy -> "생성 중 · ${st.streaming.tokens} tok · ${"%.1f".format(st.streaming.tps)} tok/s"
-                        dl is ModelStore.DownloadState.Running -> "다운로드 ${dl.done * 100 / dl.total}%"
+                        dl is ModelStore.DownloadState.Running -> "다운로드 ${dl.done * 100 / dl.total}% · ${"%.1f".format(dl.bytesPerSec / 1e6)} MB/s"
+                        dl is ModelStore.DownloadState.WaitingNetwork -> dl.reason
+                        dl is ModelStore.DownloadState.Retrying -> "연결 재시도 ${dl.attempt}"
                         dl is ModelStore.DownloadState.Verifying -> "검증 중 ${dl.done * 100 / dl.total}%"
+                        su.running -> "설정 중: ${su.step.label}"
                         else -> "모델 대기 중"
                     }
                     notify(build("Ling-3.0-tiny", text))
@@ -74,7 +88,7 @@ class LingService : LifecycleService() {
     private fun acquire() {
         if (wakeLock?.isHeld == true) return
         wakeLock = getSystemService(PowerManager::class.java)
-            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ling:generate").apply { acquire(30 * 60_000L) }
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ling:work").apply { acquire(3 * 60 * 60_000L) }
     }
 
     private fun release() {

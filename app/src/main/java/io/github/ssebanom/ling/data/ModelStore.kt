@@ -1,6 +1,8 @@
 package io.github.ssebanom.ling.data
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,9 +12,6 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.InputStream
-import java.net.HttpURLConnection
-import java.net.URL
-import java.security.MessageDigest
 
 /** 모델 파일 저장/다운로드(이어받기 + SHA-256 검증)/가져오기. 위치: 앱 전용 외부 저장소(권한 불필요) */
 class ModelStore(private val context: Context) {
@@ -21,6 +20,9 @@ class ModelStore(private val context: Context) {
         data object Idle : DownloadState
         data class Running(val variant: String, val done: Long, val total: Long, val bytesPerSec: Double) : DownloadState
         data class Verifying(val variant: String, val done: Long, val total: Long) : DownloadState
+        /** 네트워크 없음 또는 데이터(종량제) 네트워크라 Wi-Fi 대기 */
+        data class WaitingNetwork(val variant: String, val done: Long, val total: Long, val reason: String) : DownloadState
+        data class Retrying(val variant: String, val attempt: Int, val reason: String) : DownloadState
         data class Done(val variant: String) : DownloadState
         data class Failed(val variant: String, val error: String) : DownloadState
     }
@@ -28,7 +30,25 @@ class ModelStore(private val context: Context) {
     private val _download = MutableStateFlow<DownloadState>(DownloadState.Idle)
     val download: StateFlow<DownloadState> = _download
 
-    @Volatile private var cancelRequested = false
+    @Volatile private var active: ResumableDownloader? = null
+
+    /** 종량제(모바일 데이터) 네트워크에서도 받을지. 기본 false → Wi-Fi 등 비종량제 대기 */
+    @Volatile var allowMetered: Boolean = false
+
+    enum class NetState { NONE, METERED, UNMETERED }
+
+    fun networkState(): NetState {
+        val cm = context.getSystemService(ConnectivityManager::class.java)
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return NetState.NONE
+        if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return NetState.NONE
+        return if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)) NetState.UNMETERED else NetState.METERED
+    }
+
+    private fun networkOk(): Boolean = when (networkState()) {
+        NetState.UNMETERED -> true
+        NetState.METERED -> allowMetered
+        NetState.NONE -> false
+    }
 
     val dir: File get() = (context.getExternalFilesDir("models") ?: File(context.filesDir, "models")).apply { mkdirs() }
 
@@ -44,80 +64,64 @@ class ModelStore(private val context: Context) {
     }
 
     fun cancelDownload() {
-        cancelRequested = true
+        active?.cancel()
     }
 
-    /** 이어받기 지원 다운로드. 완료 후 SHA-256 검증, 불일치 시 파일 삭제. */
+    /**
+     * 이어받기 다운로드 + SHA-256 검증. 네트워크가 없거나(또는 허용 안 된 종량제) 끊기면 복구될 때까지 대기 후 재개.
+     * 앱/프로세스가 죽어도 `.part` 가 남아 다음 호출에서 이어 받는다.
+     */
+    val isDownloading: Boolean get() = active != null
+
     suspend fun downloadModel(v: ModelVariant): Boolean = withContext(Dispatchers.IO) {
-        cancelRequested = false
+        if (active != null) return@withContext false // 동시 다운로드 금지(설치 흐름과 수동 다운로드 충돌 방지)
         val target = fileFor(v)
         val part = File(target.path + ".part")
         try {
+            if (isComplete(v)) {
+                _download.value = DownloadState.Done(v.id)
+                return@withContext true
+            }
             val free = dir.usableSpace
             val need = v.sizeBytes - (if (part.exists()) part.length() else 0L)
-            if (free < need + 200L * 1024 * 1024) {
-                throw IllegalStateException("저장 공간 부족: 필요 ${need / 1_000_000}MB, 여유 ${free / 1_000_000}MB")
+            if (free < need + 300L * 1024 * 1024) {
+                throw IllegalStateException("저장 공간 부족: ${need / 1_000_000}MB 필요, 여유 ${free / 1_000_000}MB")
             }
-            var url = URL(v.url)
-            var conn: HttpURLConnection
-            var redirects = 0
-            while (true) {
-                conn = (url.openConnection() as HttpURLConnection).apply {
-                    instanceFollowRedirects = false
-                    connectTimeout = 20_000
-                    readTimeout = 60_000
-                    setRequestProperty("User-Agent", "LingS25U/0.1")
-                    if (part.exists() && part.length() > 0) setRequestProperty("Range", "bytes=${part.length()}-")
-                }
-                val code = conn.responseCode
-                if (code in 300..399 && redirects++ < 8) {
-                    url = URL(url, conn.getHeaderField("Location"))
-                    conn.disconnect()
-                    continue
-                }
-                break
-            }
-            val code = conn.responseCode
-            val append = code == HttpURLConnection.HTTP_PARTIAL
-            if (code != HttpURLConnection.HTTP_OK && !append) throw IllegalStateException("HTTP $code")
-            if (!append) part.delete()
-
-            var done = if (append) part.length() else 0L
-            val buf = ByteArray(1 shl 20)
-            var lastT = System.nanoTime()
-            var lastDone = done
-            conn.inputStream.use { input ->
-                FileOutputStream(part, append).use { out ->
-                    while (true) {
-                        if (cancelRequested) throw InterruptedException("취소됨")
-                        val n = input.read(buf)
-                        if (n < 0) break
-                        out.write(buf, 0, n)
-                        done += n
-                        val now = System.nanoTime()
-                        if (now - lastT > 500_000_000L) {
-                            val bps = (done - lastDone) * 1e9 / (now - lastT)
-                            _download.value = DownloadState.Running(v.id, done, v.sizeBytes, bps)
-                            lastT = now; lastDone = done
-                        }
-                    }
+            val dl = ResumableDownloader(
+                maxRetries = 20,
+                waitForNetwork = { waitForNetwork(v, part) },
+            )
+            active = dl
+            if (!waitForNetwork(v, part)) throw ResumableDownloader.CancelledException()
+            dl.download(v.url, target, v.sizeBytes, v.sha256) { ev ->
+                _download.value = when (ev) {
+                    is ResumableDownloader.Event.Progress -> DownloadState.Running(v.id, ev.done, ev.total, ev.bytesPerSec)
+                    is ResumableDownloader.Event.Retrying -> DownloadState.Retrying(v.id, ev.attempt, ev.reason)
+                    is ResumableDownloader.Event.Verifying -> DownloadState.Verifying(v.id, ev.done, ev.total)
                 }
             }
-            conn.disconnect()
-            if (part.length() != v.sizeBytes) throw IllegalStateException("크기 불일치: ${part.length()} != ${v.sizeBytes}")
-
-            val digest = sha256(part) { d -> _download.value = DownloadState.Verifying(v.id, d, v.sizeBytes) }
-            if (!digest.equals(v.sha256, ignoreCase = true)) {
-                part.delete()
-                throw IllegalStateException("SHA-256 불일치 (파일 삭제됨)")
-            }
-            if (!part.renameTo(target)) throw IllegalStateException("이름 변경 실패")
             _download.value = DownloadState.Done(v.id)
             true
+        } catch (e: ResumableDownloader.CancelledException) {
+            _download.value = DownloadState.Failed(v.id, "일시정지됨")
+            false
         } catch (e: Exception) {
             _download.value = DownloadState.Failed(v.id, e.message ?: e.toString())
             false
+        } finally {
+            active = null
         }
+    }
+
+    /** 네트워크 조건이 맞을 때까지 블록. 취소되면 false */
+    private fun waitForNetwork(v: ModelVariant, part: File): Boolean {
+        while (!networkOk()) {
+            if (active?.isCancelled != false) return false
+            val reason = if (networkState() == NetState.METERED) "Wi-Fi 연결 대기 중 (모바일 데이터 사용 안 함)" else "네트워크 연결 대기 중"
+            _download.value = DownloadState.WaitingNetwork(v.id, if (part.exists()) part.length() else 0, v.sizeBytes, reason)
+            Thread.sleep(3_000)
+        }
+        return true
     }
 
     /** SAF 로 고른 GGUF 를 모델 폴더로 복사 */
@@ -143,21 +147,7 @@ class ModelStore(private val context: Context) {
     }
 
     companion object {
-        fun sha256(file: File, onProgress: (Long) -> Unit = {}): String {
-            val md = MessageDigest.getInstance("SHA-256")
-            val buf = ByteArray(4 shl 20)
-            var done = 0L
-            FileInputStream(file).use { input ->
-                while (true) {
-                    val n = input.read(buf)
-                    if (n < 0) break
-                    md.update(buf, 0, n)
-                    done += n
-                    if (done % (256L shl 20) < n) onProgress(done)
-                }
-            }
-            return md.digest().joinToString("") { "%02x".format(it) }
-        }
+        fun sha256(file: File, onProgress: (Long) -> Unit = {}): String = ResumableDownloader.sha256(file, onProgress)
 
         /** GGUF 매직 확인 */
         fun isGguf(file: File): Boolean = runCatching {
