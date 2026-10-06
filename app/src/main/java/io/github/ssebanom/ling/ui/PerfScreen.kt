@@ -38,6 +38,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -47,6 +48,7 @@ fun PerfScreen(c: AppContainer, modifier: Modifier = Modifier) {
     val settings by c.settings.flow.collectAsState(initial = AppSettings())
     val chat by c.chat.state.collectAsState()
     var log by remember { mutableStateOf("") }
+    var loadTarget by remember { mutableStateOf<Backend?>(null) } // null = 현재 설정
     var tuneTarget by remember { mutableStateOf<Backend?>(null) } // null = 현재 백엔드
     var running by remember { mutableStateOf(false) }
     var engineState by remember { mutableStateOf<EngineState?>(null) }
@@ -108,7 +110,25 @@ fun PerfScreen(c: AppContainer, modifier: Modifier = Modifier) {
                     Mono("최근 응답: ${"%.1f".format(it.decodeTps)} tok/s, TTFT ${"%.0f".format(it.ttftMs)}ms, prefill ${it.prefillTokens} (재사용 ${it.reusedTokens})")
                 }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { task("로드") { if (c.inference.ensureLoaded()) "로드 완료" else "로드 실패" } }, enabled = !running && !chat.busy) { Text("로드") }
+                    val lt = loadTarget ?: settings.backend
+                    OutlinedButton(onClick = {
+                        task("로드") {
+                            c.inference.lock.withLock {
+                                if (c.settings.current().backend != lt) c.settings.update { it.copy(backend = lt) }
+                                loadTarget = null
+                                val ok = c.inference.ensureLoaded()
+                                val now = (c.inference.status.value as? EngineStatus.Ready)?.backend
+                                when {
+                                    !ok -> "로드 실패"
+                                    now != lt -> "${lt.name} 사용 불가 → ${now?.name} 로 로드\n${c.inference.lastFallback.orEmpty()}"
+                                    else -> "${lt.name} 로드 완료"
+                                }
+                            }
+                        }
+                    }, enabled = !running && !chat.busy) { Text("로드") }
+                    for (b in listOf(Backend.GPU, Backend.CPU, Backend.NPU)) {
+                        FilterChip(selected = lt == b, onClick = { loadTarget = b }, label = { Text(b.name) }, enabled = !running && !chat.busy)
+                    }
                     OutlinedButton(onClick = { task("언로드") { c.inference.unload(); "언로드됨" } }, enabled = !running && !chat.busy) { Text("언로드") }
                 }
             }
