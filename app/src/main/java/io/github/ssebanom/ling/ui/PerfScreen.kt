@@ -30,6 +30,7 @@ import io.github.ssebanom.ling.data.AppSettings
 import io.github.ssebanom.ling.data.Backend
 import io.github.ssebanom.ling.engine.EngineState
 import io.github.ssebanom.ling.runtime.EngineStatus
+import io.github.ssebanom.ling.runtime.InferenceManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -112,7 +113,7 @@ fun PerfScreen(c: AppContainer, modifier: Modifier = Modifier) {
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp)) {
                 Text("튜닝 · 벤치마크", style = MaterialTheme.typography.titleMedium)
-                Text("자동 튜닝: 디코드 스레드 수 × 코어 배치(OS/빠른 코어 우선), prefill 스레드를 실측해 저장합니다.", style = MaterialTheme.typography.bodySmall)
+                Text("자동 튜닝: CPU 는 디코드 스레드 수 × 코어 배치(OS/빠른 코어 우선), prefill 스레드를 실측해 저장합니다. NPU/GPU 는 토큰 ${InferenceManager.ACCEL_TG}개 생성 속도만 측정합니다.", style = MaterialTheme.typography.bodySmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = {
                         task("자동 튜닝") {
@@ -126,14 +127,18 @@ fun PerfScreen(c: AppContainer, modifier: Modifier = Modifier) {
                     OutlinedButton(onClick = {
                         task("벤치") {
                             val sb = StringBuilder()
-                            for ((pp, tg) in listOf(128 to 0, 512 to 0, 0 to 128)) {
+                            val runs = if (settings.backend == Backend.CPU) listOf(128 to 0, 512 to 0, 0 to 128)
+                                else listOf(0 to InferenceManager.ACCEL_TG)
+                            for ((pp, tg) in runs) {
                                 log = "벤치 pp$pp tg$tg"
                                 val b = c.inference.bench(pp, tg, 2) ?: return@task "모델 로드 실패"
                                 sb.append(if (pp > 0) "pp$pp: %.1f tok/s\n".format(b.ppTps) else "tg$tg: %.1f tok/s\n".format(b.tgTps))
                             }
                             sb.toString().also { saveReport(c, "bench", it) }
                         }
-                    }, enabled = !running && !chat.busy) { Text("벤치 (pp128/pp512/tg128)") }
+                    }, enabled = !running && !chat.busy) {
+                        Text(if (settings.backend == Backend.CPU) "벤치 (pp128/pp512/tg128)" else "벤치 (tg${InferenceManager.ACCEL_TG})")
+                    }
                 }
             }
         }

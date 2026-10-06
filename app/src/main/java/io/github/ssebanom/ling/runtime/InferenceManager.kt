@@ -144,9 +144,18 @@ class InferenceManager(
 
     /**
      * 스레드/코어 배치 자동 튜닝 (CPU 백엔드). 디코드 tg32, prefill pp128 실측으로 최고값 선택.
+     * NPU/GPU 백엔드에서는 스레드 스윕 없이 [ACCEL_TG] 토큰 생성 속도만 측정한다.
      */
     suspend fun autoTune(onProgress: (String) -> Unit): TuneResult? = lock.withLock {
         if (!ensureLoaded()) return null
+        val backend = settings.current().backend
+        if (backend != Backend.CPU) {
+            val c = engine.config!!
+            val label = "${backend.label} tg$ACCEL_TG"
+            onProgress(label)
+            val b = engine.bench(0, ACCEL_TG, 1)
+            return TuneResult(c.nThreads, c.nThreadsBatch, c.cpuMask, listOf(Triple(label, 0.0, b.tgTps)))
+        }
         val p = profile
         val n = p.nCpus
         val decodeCands = listOf(2, 3, 4, 5, 6, 8).filter { it <= n }.distinct()
@@ -216,7 +225,11 @@ class InferenceManager(
         val diffs = got.take(5).mapNotNull { (id, lp) -> refMap[id]?.let { kotlin.math.abs(it - lp).toDouble() } }
         val mad = if (diffs.isEmpty()) 99.0 else diffs.average()
         val passed = top1 && overlap >= 7 && mad < 0.5
-        val detail = "top1=${top1}, overlap10=$overlap, mean|Δlogp|=${"%.3f".format(mad)}"
+        var detail = "top1=${top1}, overlap10=$overlap, mean|Δlogp|=${"%.3f".format(mad)}"
+        if (passed) {
+            onProgress("${backend.label} 속도 측정 (tg$ACCEL_TG)")
+            runCatching { engine.bench(0, ACCEL_TG, 1) }.onSuccess { detail += ", tg$ACCEL_TG=${"%.1f".format(it.tgTps)} tok/s" }
+        }
         if (passed) {
             settings.update { it.copy(backend = backend, acceleratorValidated = "${backend.name}:${path.name}") }
             AccelCheck(backend, true, top1, overlap, mad, detail)
@@ -233,6 +246,8 @@ class InferenceManager(
 
     companion object {
         private const val TAG = "InferenceManager"
+        /** NPU/GPU 속도 측정 시 생성 토큰 수 (가속기는 느릴 수 있어 짧게) */
+        const val ACCEL_TG = 5
         /** 정확성 검사용 고정 프롬프트(한국어/영어/수식 혼합) */
         const val PROBE = "<role>SYSTEM</role>detailed thinking off<|role_end|><role>HUMAN</role>" +
             "대한민국의 수도는 어디인가요? Then compute 17*23 and explain briefly.<|role_end|>" +
