@@ -88,7 +88,7 @@ top-k log-prob, 벤치, cpumask 포함 스레드 변경 → **전 항목 통과*
 | 7 | AGP 가 Hexagon DSP skel(QDSP6 ELF)까지 strip | `keepDebugSymbols` 로 제외, APK 내 파일이 빌드 산출물과 바이트 동일함을 확인 |
 | 8 | Phase 0 도구 실행 시 백엔드 미탐색 | ggml 은 실행 파일 디렉터리·cwd 만 탐색 → 스크립트에서 cwd 를 lib/ 로 |
 | 9 | 실기기 첫 실행: `ACCESS_NETWORK_STATE` 미선언 → ConnectivityManager SecurityException 으로 다운로드 실패 | 권한 추가 + 상태 조회 실패 시 진행(0.2.1) |
-| 10 | 실기기: GPU 기본값에서 입력을 무시하고 엉뚱한 내용 생성(첫 턴) | GPU(OpenCL) 수치 오류 의심 [미확정]. 가속기는 모델별 정확성 검사 통과 전엔 사용 안 함 — 미검증이면 로드 시 자동 검사, 실패 시 CPU 복귀(0.3.1) |
+| 10 | 실기기: GPU 에서 입력을 무시하고 무관한 내용 생성(CPU·NPU 정상) | 원인 확인: OpenCL Q4_0 mat-vec 커널이 비연속 src1 stride 를 무시 → MLA `q_nope×attn_k_b` 오계산. `ggml_cont` 패치 + 백엔드 가드, 정확성 검사에 1토큰 디코드 경로 추가, 실패 시 우회 구성 자동 탐색(`patches/README.md`). 기기 재확인 필요 |
 
 ---
 

@@ -1,0 +1,24 @@
+diff --git a/src/models/bailingmoe3.cpp b/src/models/bailingmoe3.cpp
+index 907b25c67..3505e2f7b 100644
+--- a/src/models/bailingmoe3.cpp
++++ b/src/models/bailingmoe3.cpp
+@@ -344,7 +344,8 @@ llama_model_bailingmoe3::graph::graph(const llama_model & model, const llm_graph
+             }
+             kv = build_norm(kv, layer.attn_kv_a_norm, nullptr, LLM_NORM_RMS, il);
+ 
+-            q_nope = ggml_permute(ctx0, q_nope, 0, 2, 1, 3);
++            // [ling] contiguous copy: some backends' quantized mat-vec kernels (OpenCL Q4_0) ignore src1 strides
++            q_nope = ggml_cont(ctx0, ggml_permute(ctx0, q_nope, 0, 2, 1, 3));
+             q_nope = ggml_mul_mat(ctx0, layer.wk_b, q_nope);
+             q_nope = ggml_permute(ctx0, q_nope, 0, 2, 1, 3);
+ 
+@@ -511,7 +512,8 @@ llama_model_bailingmoe3::graph_mtp::graph_mtp(const llama_model & model, const l
+     }
+     kv = build_norm(kv, layer.attn_kv_a_norm, nullptr, LLM_NORM_RMS, il);
+ 
+-    q_nope = ggml_permute(ctx0, q_nope, 0, 2, 1, 3);
++    // [ling] see above
++    q_nope = ggml_cont(ctx0, ggml_permute(ctx0, q_nope, 0, 2, 1, 3));
+     q_nope = ggml_mul_mat(ctx0, layer.wk_b, q_nope);
+     q_nope = ggml_permute(ctx0, q_nope, 0, 2, 1, 3);
+ 

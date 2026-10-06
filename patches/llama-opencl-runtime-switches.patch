@@ -1,5 +1,5 @@
 diff --git a/ggml/src/ggml-opencl/ggml-opencl.cpp b/ggml/src/ggml-opencl/ggml-opencl.cpp
-index 4f1f937bb..f4c88f822 100644
+index 4f1f937bb..8e4eb0902 100644
 --- a/ggml/src/ggml-opencl/ggml-opencl.cpp
 +++ b/ggml/src/ggml-opencl/ggml-opencl.cpp
 @@ -8417,6 +8417,8 @@ static void ggml_opencl_op_rms_norm_mul_add_fused(ggml_backend_t backend, ggml_t
@@ -59,3 +59,14 @@ index 4f1f937bb..f4c88f822 100644
      }
  
      switch (op->op) {
+@@ -9058,7 +9083,9 @@ static bool ggml_opencl_supports_op(ggml_backend_dev_t dev, const struct ggml_te
+                 return op->src[1]->type == GGML_TYPE_F32;
+             } else if (op->src[0]->type == GGML_TYPE_Q4_0) {
+                 // Non-contig src0 routes through on-device dequant-to-f16.
+-                return op->src[1]->type == GGML_TYPE_F32;
++                // [ling] the Q4_0 mat-vec kernels (*_8x_flat) index src1 as if contiguous (no nb11/nb12),
++                // so a permuted src1 (e.g. MLA q_nope / v_mla input) silently reads wrong data -> leave it to CPU.
++                return op->src[1]->type == GGML_TYPE_F32 && ggml_is_contiguous(op->src[1]);
+             } else if (op->src[0]->type == GGML_TYPE_Q4_1 ||
+                        op->src[0]->type == GGML_TYPE_Q5_0  || op->src[0]->type == GGML_TYPE_Q5_1 ||
+                        op->src[0]->type == GGML_TYPE_MXFP4 ||

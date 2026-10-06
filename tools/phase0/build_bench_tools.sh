@@ -8,6 +8,7 @@ ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 IMG=${HEXAGON_IMAGE:-ghcr.io/snapdragon-toolchain/arm64-android:v0.7}
 BUILD=$ROOT/build-phase0
 mkdir -p "$BUILD"
+cmake -P "$ROOT/patches/apply.cmake"   # 앱과 같은 llama.cpp 로컬 패치
 
 docker run --rm --platform linux/amd64 -u "$(id -u):$(id -g)" \
     -v "$ROOT/third_party/llama.cpp:/src:ro" -v "$BUILD:/build" "$IMG" bash -lc '

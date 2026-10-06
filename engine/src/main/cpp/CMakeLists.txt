@@ -40,20 +40,7 @@ if (LING_OPENCL AND ANDROID_ABI STREQUAL "arm64-v8a")
 endif ()
 
 # 고정 커밋 llama.cpp 에 로컬 패치 적용(멱등). 내용: patches/README.md
-file(GLOB LING_PATCHES ${ROOT}/patches/*.patch)
-file(LOCK ${ROOT}/patches DIRECTORY GUARD PROCESS)
-foreach (p IN LISTS LING_PATCHES)
-    execute_process(COMMAND git apply --reverse --check ${p} WORKING_DIRECTORY ${LLAMA_DIR}
-                    RESULT_VARIABLE already OUTPUT_QUIET ERROR_QUIET)
-    if (NOT already EQUAL 0)
-        execute_process(COMMAND git apply ${p} WORKING_DIRECTORY ${LLAMA_DIR} RESULT_VARIABLE r)
-        if (NOT r EQUAL 0)
-            message(FATAL_ERROR "패치 적용 실패: ${p}")
-        endif ()
-        message(STATUS "패치 적용: ${p}")
-    endif ()
-endforeach ()
-file(LOCK ${ROOT}/patches DIRECTORY RELEASE)
+include(${ROOT}/patches/apply.cmake)
 
 add_subdirectory(${LLAMA_DIR} build-llama)
 

@@ -21,6 +21,7 @@ if (LING_HOST_BACKEND_DL)
     set(GGML_CPU_ALL_VARIANTS ON CACHE BOOL "" FORCE)
     set(GGML_NATIVE           OFF CACHE BOOL "" FORCE)
 endif ()
+include(${ROOT}/patches/apply.cmake)
 add_subdirectory(${ROOT}/third_party/llama.cpp build-llama)
 
 add_executable(ling_engine_test
