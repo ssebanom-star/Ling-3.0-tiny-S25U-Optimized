@@ -39,7 +39,12 @@ class ModelStore(private val context: Context) {
 
     fun networkState(): NetState {
         val cm = context.getSystemService(ConnectivityManager::class.java)
-        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return NetState.NONE
+        // 권한/시스템 오류로 상태를 못 읽으면 막지 않고 진행(종량제 여부 불명 → UNMETERED 취급)
+        val caps = try {
+            cm.getNetworkCapabilities(cm.activeNetwork) ?: return NetState.NONE
+        } catch (e: SecurityException) {
+            return NetState.UNMETERED
+        }
         if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return NetState.NONE
         return if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)) NetState.UNMETERED else NetState.METERED
     }

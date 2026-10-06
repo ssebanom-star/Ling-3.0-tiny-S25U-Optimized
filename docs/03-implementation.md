@@ -87,6 +87,7 @@ top-k log-prob, 벤치, cpumask 포함 스레드 변경 → **전 항목 통과*
 | 6 | 앱 시작 시 모든 백엔드 로드 → CPU 모드에서도 NPU 세션 생성 | CPU 변형 점수 선택만 로드, GPU/NPU 는 지연 로드 |
 | 7 | AGP 가 Hexagon DSP skel(QDSP6 ELF)까지 strip | `keepDebugSymbols` 로 제외, APK 내 파일이 빌드 산출물과 바이트 동일함을 확인 |
 | 8 | Phase 0 도구 실행 시 백엔드 미탐색 | ggml 은 실행 파일 디렉터리·cwd 만 탐색 → 스크립트에서 cwd 를 lib/ 로 |
+| 9 | 실기기 첫 실행: `ACCESS_NETWORK_STATE` 미선언 → ConnectivityManager SecurityException 으로 다운로드 실패 | 권한 추가 + 상태 조회 실패 시 진행(0.2.1) |
 
 ---
 
