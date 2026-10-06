@@ -133,9 +133,12 @@ class LingEngine private constructor(nativeLibDir: String) {
         BenchStats(nPrompt, nGen, b[0], b[1])
     }
 
-    /** 고정 토큰열의 마지막 위치 상위 k 토큰 (id → log-prob). 컨텍스트를 비운다. */
-    suspend fun evalTopK(tokens: IntArray, k: Int): List<Pair<Int, Float>> = onInfer {
-        val a = LingNative.nativeEvalTopK(handle, tokens, k)
+    /**
+     * 고정 토큰열의 마지막 위치 상위 k 토큰 (id → log-prob). 컨텍스트를 비운다.
+     * [nSingle] > 0 이면 마지막 nSingle 토큰을 1개씩 디코드해 생성(배치 1) 경로를 검사한다.
+     */
+    suspend fun evalTopK(tokens: IntArray, k: Int, nSingle: Int = 0): List<Pair<Int, Float>> = onInfer {
+        val a = LingNative.nativeEvalTopK(handle, tokens, k, nSingle)
         (0 until a.size / 2).map { a[2 * it].toInt() to a[2 * it + 1] }
     }
 

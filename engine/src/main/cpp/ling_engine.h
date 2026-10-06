@@ -154,7 +154,8 @@ public:
     BenchResult bench(int n_prompt, int n_gen, int reps);
 
     // 정확성 검사용: 주어진 토큰열을 처음부터 계산한 마지막 logits (vocab 크기)
-    std::vector<float> eval_logits(const std::vector<token> & toks);
+    // n_single > 0: 마지막 n_single 토큰은 1개씩 디코드(생성 경로 검사), 나머지는 배치 prefill
+    std::vector<float> eval_logits(const std::vector<token> & toks, int n_single = 0);
 
     const std::vector<token> & context_tokens() const { return tokens_; }
     int    n_ctx() const;

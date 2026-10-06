@@ -56,7 +56,12 @@ class InferenceManager(
     }
 
     /** 설정 + 기기 프로파일 → 엔진 구성 */
-    fun configFor(s: AppSettings, path: File, backend: Backend = s.backend): EngineConfig {
+    fun configFor(
+        s: AppSettings,
+        path: File,
+        backend: Backend = s.backend,
+        quirks: GpuQuirks = GpuQuirks.decode(s.gpuQuirks),
+    ): EngineConfig {
         val p = profile
         val decode = when {
             s.threads > 0 -> s.threads
@@ -76,6 +81,7 @@ class InferenceManager(
                 engine.devices().filter { it.name.startsWith("HTP") }.joinToString(",") { it.name }
             }
             Backend.GPU -> {
+                applyGpuQuirks(quirks)
                 engine.loadBackend("opencl")
                 engine.devices().firstOrNull { it.type == "GPU" || it.name.contains("OpenCL", true) }?.name ?: ""
             }
@@ -103,7 +109,8 @@ class InferenceManager(
         val want = configFor(s, path, backend)
         if (backend != Backend.CPU && want.devices.isEmpty()) return fallbackToCpu(s, path, "${backend.label}: 디바이스 없음")
         val cur = engine.config
-        if (cur != null && sameLoad(cur, want)) {
+        val quirksOk = backend != Backend.GPU || loadedQuirks == GpuQuirks.decode(s.gpuQuirks)
+        if (cur != null && sameLoad(cur, want) && quirksOk) {
             if (cur.nThreads != want.nThreads || cur.nThreadsBatch != want.nThreadsBatch || cur.cpuMask != want.cpuMask) {
                 engine.setThreads(want.nThreads, want.nThreadsBatch, want.cpuMask)
             }
@@ -117,7 +124,10 @@ class InferenceManager(
             if (!r.passed) lastFallback = "${backend.label} 정확성 검사 실패 → CPU: ${r.detail}"
             return status.value is EngineStatus.Ready
         }
-        if (load(want, backend)) return true
+        if (load(want, backend)) {
+            if (backend == Backend.GPU) loadedQuirks = GpuQuirks.decode(s.gpuQuirks)
+            return true
+        }
         return fallbackToCpu(s, path, "${backend.label} 로드 실패: ${(status.value as? EngineStatus.Error)?.message}")
     }
 
@@ -143,9 +153,9 @@ class InferenceManager(
         if (avail < need + 600L * 1024 * 1024) {
             Log.w(TAG, "가용 메모리 부족 가능: avail=${avail shr 20}MiB need=${need shr 20}MiB")
         }
-        _status.value = EngineStatus.Loading(0f, File(cfg.modelPath).name)
+        _status.value = EngineStatus.Loading(0f, note ?: File(cfg.modelPath).name)
         return try {
-            engine.load(cfg) { p -> _status.value = EngineStatus.Loading(p, File(cfg.modelPath).name) }
+            engine.load(cfg) { p -> _status.value = EngineStatus.Loading(p, note ?: File(cfg.modelPath).name) }
             _status.value = EngineStatus.Ready(engine.modelInfo!!, cfg, backend)
             true
         } catch (e: EngineException) {
@@ -218,48 +228,118 @@ class InferenceManager(
 
     /**
      * 가속기 정확성 검사: 고정 프롬프트의 마지막 위치 상위 20 log-prob 을 CPU 기준값과 비교.
+     * 두 경로를 본다 — (B) 전체 배치 prefill, (S) 마지막 [PROBE_SINGLE] 토큰을 1개씩 디코드(생성 경로).
      * 기준값은 CPU 로 1회 계산해 파일로 보관(두 모델을 동시에 올리지 않기 위해).
-     * 통과 기준: top-1 일치, top-10 중 7개 이상 겹침, 공통 top-5 평균 |Δlogp| < 0.5
+     * 통과 기준(각 경로): top-1 일치, top-10 중 7개 이상 겹침, 공통 top-5 평균 |Δlogp| < 0.5
+     *
+     * GPU 는 실패 시 [GpuQuirks.CANDIDATES] 를 차례로 적용·재로드해 통과하는 첫 구성을 저장한다.
      */
     suspend fun validateAccelerator(backend: Backend, onProgress: (String) -> Unit): AccelCheck =
         lock.withLock { validateAcceleratorLocked(backend, onProgress) }
 
-    private suspend fun validateAcceleratorLocked(backend: Backend, onProgress: (String) -> Unit): AccelCheck {
-        val s = settings.current()
-        val path = modelPath(s) ?: return AccelCheck(backend, false, false, 0, 0.0, "모델 없음")
-        val refFile = File(context.filesDir, "accel_ref_${path.name}.txt")
-        if (!refFile.exists()) {
-            onProgress("CPU 기준값 계산")
-            if (!load(configFor(s, path, Backend.CPU), Backend.CPU)) return AccelCheck(backend, false, false, 0, 0.0, "CPU 기준 로드 실패")
-            val ref = engine.evalTopK(engine.tokenize(PROBE), 20)
-            refFile.writeText(ref.joinToString("\n") { "${it.first} ${it.second}" })
-        }
-        val ref = refFile.readLines().filter { it.isNotBlank() }.map { l -> l.split(' ').let { it[0].toInt() to it[1].toFloat() } }
+    private data class Probe(val batch: List<Pair<Int, Float>>, val single: List<Pair<Int, Float>>)
 
-        onProgress("${backend.label} 로드")
-        val cfg = configFor(s, path, backend)
-        if (cfg.devices.isEmpty()) return fail(backend, "디바이스 없음 (빌드에 백엔드 미포함 또는 권한 거부)", s, path)
-        if (!load(cfg, backend)) return fail(backend, (status.value as? EngineStatus.Error)?.message ?: "로드 실패", s, path)
-        onProgress("${backend.label} 평가")
-        val got = runCatching { engine.evalTopK(engine.tokenize(PROBE), 20) }.getOrElse {
-            return fail(backend, "평가 실패: ${it.message}", s, path)
-        }
+    private data class Verdict(val passed: Boolean, val top1: Boolean, val overlap: Int, val mad: Double, val detail: String)
+
+    private suspend fun runProbe(): Probe {
+        val toks = engine.tokenize(PROBE)
+        return Probe(engine.evalTopK(toks, 20), engine.evalTopK(toks, 20, PROBE_SINGLE))
+    }
+
+    private fun compare(got: List<Pair<Int, Float>>, ref: List<Pair<Int, Float>>): Verdict {
         val top1 = got.firstOrNull()?.first == ref.firstOrNull()?.first
         val overlap = got.take(10).map { it.first }.intersect(ref.take(10).map { it.first }.toSet()).size
         val refMap = ref.toMap()
         val diffs = got.take(5).mapNotNull { (id, lp) -> refMap[id]?.let { kotlin.math.abs(it - lp).toDouble() } }
         val mad = if (diffs.isEmpty()) 99.0 else diffs.average()
-        val passed = top1 && overlap >= 7 && mad < 0.5
-        var detail = "top1=${top1}, overlap10=$overlap, mean|Δlogp|=${"%.3f".format(mad)}"
-        if (passed) {
-            onProgress("${backend.label} 속도 측정 (tg$ACCEL_TG)")
-            runCatching { engine.bench(0, ACCEL_TG, 1) }.onSuccess { detail += ", tg$ACCEL_TG=${"%.1f".format(it.tgTps)} tok/s" }
+        return Verdict(top1 && overlap >= 7 && mad < 0.5, top1, overlap, mad,
+            "top1=${if (top1) "O" else "X"} ov10=$overlap |Δ|=${"%.2f".format(mad)}")
+    }
+
+    private fun compare(got: Probe, ref: Probe): Verdict {
+        val b = compare(got.batch, ref.batch)
+        val g = compare(got.single, ref.single)
+        return Verdict(b.passed && g.passed, b.top1 && g.top1, minOf(b.overlap, g.overlap), maxOf(b.mad, g.mad),
+            "prefill[${b.detail}] decode[${g.detail}]")
+    }
+
+    private suspend fun cpuReference(s: AppSettings, path: File, onProgress: (String) -> Unit): Probe? {
+        val refFile = File(context.filesDir, "accel_ref2_${path.name}.txt")
+        if (!refFile.exists()) {
+            onProgress("CPU 기준값 계산")
+            if (!load(configFor(s, path, Backend.CPU), Backend.CPU)) return null
+            val p = runProbe()
+            refFile.writeText((p.batch.map { "B ${it.first} ${it.second}" } + p.single.map { "S ${it.first} ${it.second}" }).joinToString("\n"))
         }
-        return if (passed) {
-            settings.update { it.copy(backend = backend, acceleratorValidated = "${backend.name}:${path.name}") }
-            AccelCheck(backend, true, top1, overlap, mad, detail)
-        } else {
-            fail(backend, "정확성 기준 미달: $detail", s, path).copy(top1Match = top1, overlap10 = overlap, meanAbsDiff = mad)
+        val rows = refFile.readLines().filter { it.isNotBlank() }.map { it.split(' ') }
+        fun pick(tag: String) = rows.filter { it[0] == tag }.map { it[1].toInt() to it[2].toFloat() }
+        return Probe(pick("B"), pick("S"))
+    }
+
+    private suspend fun validateAcceleratorLocked(backend: Backend, onProgress: (String) -> Unit): AccelCheck =
+        try {
+            validateInner(backend) { note = it; onProgress(it) }
+        } finally {
+            note = null
+        }
+
+    /** 로드 상태 표시에 덧붙일 진행 메모(정확성 검사 중) */
+    @Volatile private var note: String? = null
+
+    private suspend fun validateInner(backend: Backend, onProgress: (String) -> Unit): AccelCheck {
+        val s = settings.current()
+        val path = modelPath(s) ?: return AccelCheck(backend, false, false, 0, 0.0, "모델 없음")
+        val ref = cpuReference(s, path, onProgress) ?: return AccelCheck(backend, false, false, 0, 0.0, "CPU 기준 로드 실패")
+
+        val candidates = if (backend == Backend.GPU) {
+            (listOf(GpuQuirks.decode(s.gpuQuirks)) + GpuQuirks.CANDIDATES).distinct()
+        } else listOf(GpuQuirks())
+        val log = StringBuilder()
+        var last: Verdict? = null
+        for ((i, q) in candidates.withIndex()) {
+            val tag = if (backend == Backend.GPU) " [${i + 1}/${candidates.size}: ${q.label}]" else ""
+            onProgress("${backend.label} 로드$tag")
+            val cfg = configFor(s, path, backend, q)
+            if (cfg.devices.isEmpty()) return fail(backend, "디바이스 없음 (빌드에 백엔드 미포함 또는 권한 거부)", s, path)
+            if (!load(cfg, backend)) {
+                log.append("${q.label}: 로드 실패\n")
+                continue
+            }
+            if (backend == Backend.GPU) loadedQuirks = q
+            onProgress("${backend.label} 평가$tag")
+            val got = runCatching { runProbe() }.getOrElse {
+                log.append("${q.label}: 평가 실패 ${it.message}\n")
+                continue
+            }
+            val v = compare(got, ref)
+            last = v
+            log.append("${q.label}: ${if (v.passed) "통과" else "실패"} ${v.detail}\n")
+            Log.i(TAG, "validate ${backend.name} ${q.label}: ${v.detail}")
+            if (!v.passed) continue
+
+            var detail = log.toString()
+            onProgress("${backend.label} 속도 측정 (tg$ACCEL_TG)")
+            runCatching { engine.bench(0, ACCEL_TG, 1) }.onSuccess { detail += "tg$ACCEL_TG=${"%.1f".format(it.tgTps)} tok/s" }
+            settings.update {
+                it.copy(
+                    backend = backend,
+                    acceleratorValidated = "${backend.name}:${path.name}",
+                    gpuQuirks = if (backend == Backend.GPU) q.encode() else it.gpuQuirks,
+                )
+            }
+            return AccelCheck(backend, true, v.top1, v.overlap, v.mad, detail.trim())
+        }
+        val v = last
+        return fail(backend, "정확성 기준 미달(모든 구성)\n$log".trim(), s, path)
+            .copy(top1Match = v?.top1 ?: false, overlap10 = v?.overlap ?: 0, meanAbsDiff = v?.mad ?: 0.0)
+    }
+
+    /** 현재 GPU 에 올라간 우회 구성 */
+    @Volatile private var loadedQuirks: GpuQuirks? = null
+
+    private fun applyGpuQuirks(q: GpuQuirks) {
+        for ((k, v) in q.env()) {
+            runCatching { if (v == null) android.system.Os.unsetenv(k) else android.system.Os.setenv(k, v, true) }
         }
     }
 
@@ -273,6 +353,8 @@ class InferenceManager(
         private const val TAG = "InferenceManager"
         /** NPU/GPU 속도 측정 시 생성 토큰 수 (가속기는 느릴 수 있어 짧게) */
         const val ACCEL_TG = 5
+        /** 정확성 검사에서 1개씩 디코드할 마지막 토큰 수 */
+        const val PROBE_SINGLE = 8
         /** 정확성 검사용 고정 프롬프트(한국어/영어/수식 혼합) */
         const val PROBE = "<role>SYSTEM</role>detailed thinking off<|role_end|><role>HUMAN</role>" +
             "대한민국의 수도는 어디인가요? Then compute 17*23 and explain briefly.<|role_end|>" +

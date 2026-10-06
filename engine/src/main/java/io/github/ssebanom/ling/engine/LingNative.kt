@@ -49,7 +49,7 @@ internal object LingNative {
     @JvmStatic external fun nativeBench(h: Long, nPrompt: Int, nGen: Int, reps: Int): DoubleArray
 
     /** 반환: [id0, logprob0, id1, logprob1, ...] */
-    @JvmStatic external fun nativeEvalTopK(h: Long, tokens: IntArray, k: Int): FloatArray
+    @JvmStatic external fun nativeEvalTopK(h: Long, tokens: IntArray, k: Int, nSingle: Int): FloatArray
 
     /** 반환: desc,sizeBytes,nParams,nVocab */
     @JvmStatic external fun nativeModelInfo(h: Long): Array<String>

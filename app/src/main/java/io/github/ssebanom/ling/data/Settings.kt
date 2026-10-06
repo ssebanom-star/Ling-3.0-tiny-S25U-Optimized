@@ -46,6 +46,8 @@ data class AppSettings(
     val autoUnloadMinutes: Int = 10,
     /** 가속기 정확성 검사 통과 기록 "BACKEND:modelFile" */
     val acceleratorValidated: String = "",
+    /** GPU 정확성 우회 구성(GpuQuirks.encode). 자동 탐색 결과 */
+    val gpuQuirks: String = "",
     /** 첫 실행 자동 설치(다운로드→검증→로드→튜닝) 완료 여부 */
     val setupDone: Boolean = false,
     /** 모바일 데이터(종량제)로 모델 다운로드 허용 */
@@ -79,6 +81,7 @@ class SettingsRepository(private val context: Context) {
         val perfHints = booleanPreferencesKey("perf_hints")
         val autoUnloadMinutes = intPreferencesKey("auto_unload_minutes")
         val acceleratorValidated = stringPreferencesKey("accel_validated")
+        val gpuQuirks = stringPreferencesKey("gpu_quirks")
         val setupDone = booleanPreferencesKey("setup_done")
         val allowMeteredDownload = booleanPreferencesKey("allow_metered_download")
     }
@@ -113,6 +116,7 @@ class SettingsRepository(private val context: Context) {
             p[K.perfHints] = n.perfHints
             p[K.autoUnloadMinutes] = n.autoUnloadMinutes
             p[K.acceleratorValidated] = n.acceleratorValidated
+            p[K.gpuQuirks] = n.gpuQuirks
             p[K.setupDone] = n.setupDone
             p[K.allowMeteredDownload] = n.allowMeteredDownload
         }
@@ -142,6 +146,7 @@ class SettingsRepository(private val context: Context) {
         perfHints = p[K.perfHints] ?: d.perfHints,
         autoUnloadMinutes = p[K.autoUnloadMinutes] ?: d.autoUnloadMinutes,
         acceleratorValidated = p[K.acceleratorValidated] ?: d.acceleratorValidated,
+        gpuQuirks = p[K.gpuQuirks] ?: d.gpuQuirks,
         setupDone = p[K.setupDone] ?: d.setupDone,
         allowMeteredDownload = p[K.allowMeteredDownload] ?: d.allowMeteredDownload,
     )

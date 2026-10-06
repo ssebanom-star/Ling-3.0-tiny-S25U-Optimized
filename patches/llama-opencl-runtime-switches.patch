@@ -1,0 +1,61 @@
+diff --git a/ggml/src/ggml-opencl/ggml-opencl.cpp b/ggml/src/ggml-opencl/ggml-opencl.cpp
+index 4f1f937bb..f4c88f822 100644
+--- a/ggml/src/ggml-opencl/ggml-opencl.cpp
++++ b/ggml/src/ggml-opencl/ggml-opencl.cpp
+@@ -8417,6 +8417,8 @@ static void ggml_opencl_op_rms_norm_mul_add_fused(ggml_backend_t backend, ggml_t
+ 
+ static ggml_status ggml_backend_opencl_graph_compute(ggml_backend_t backend, ggml_cgraph * cgraph) {
+     ggml_backend_opencl_context *backend_ctx = (ggml_backend_opencl_context *)backend->context;
++    // [ling] re-read per compute so the app can toggle fusion without restarting the process
++    backend_ctx->disable_fusion = getenv("GGML_OPENCL_DISABLE_FUSION") != nullptr;
+ 
+     for (int i = 0; i < cgraph->n_nodes; i++) {
+         ggml_tensor * node = cgraph->nodes[i];
+@@ -8523,6 +8525,10 @@ static ggml_status ggml_backend_opencl_graph_compute(ggml_backend_t backend, ggm
+ // The optimized gemm and gemv kernels are used for large matrices without batch.
+ // tensor is the quantized weights matrix.
+ inline bool use_adreno_kernels(const ggml_backend_opencl_context *backend_ctx, const ggml_tensor *tensor) {
++    // [ling] runtime switch (read at weight upload) to fall back to the generic layout/kernels
++    if (const char * e = getenv("LING_OPENCL_NO_ADRENO_GEMM"); e && e[0] == '1') {
++        return false;
++    }
+     int64_t threshold_ne0 = 512;
+     int64_t threshold_ne1 = 512;
+     if (!backend_ctx->adreno_cl_compiler_version.newer_than_or_same(E031, 38, 11, 0) &&
+@@ -8576,6 +8582,11 @@ inline bool use_adreno_moe_kernels(const ggml_backend_opencl_context *backend_ct
+         return false;
+     }
+ 
++    // [ling] runtime switch: skip the MoE weight repack (*_trans4_ns, known miscompiles on some compilers)
++    if (const char * e = getenv("LING_OPENCL_NO_ADRENO_MOE"); e && e[0] == '1') {
++        return false;
++    }
++
+     int ne01 = tensor->ne[1];
+     return (((strstr(tensor->name, "ffn") != NULL) && (strstr(tensor->name, "exps") != NULL)) || (strstr(tensor->name, "as") != NULL)) && (ne01 % 32 == 0);
+ }
+@@ -8839,8 +8850,22 @@ static bool ggml_opencl_supports_op(ggml_backend_dev_t dev, const struct ggml_te
+     ggml_backend_opencl_context *        backend_ctx = dev_ctx->backend_ctx;
+ 
+     // reject ops that match the opfilter regex
+-    if (dev_ctx->opfilter && std::regex_match(std::string(ggml_op_desc(op)), *dev_ctx->opfilter)) {
+-        return false;
++    // [ling] GGML_OPENCL_OPFILTER is re-read on every call instead of being fixed at device probe,
++    // so the app can bisect broken ops by reloading the model with a different filter.
++    {
++        static std::mutex mtx;
++        static std::string cur;
++        static std::unique_ptr<std::regex> re;
++        std::lock_guard<std::mutex> lock(mtx);
++        const char * e = getenv("GGML_OPENCL_OPFILTER");
++        const std::string want = e ? e : "";
++        if (want != cur) {
++            cur = want;
++            re.reset(want.empty() ? nullptr : new std::regex(want, std::regex_constants::icase));
++        }
++        if (re && std::regex_match(std::string(ggml_op_desc(op)), *re)) {
++            return false;
++        }
+     }
+ 
+     switch (op->op) {

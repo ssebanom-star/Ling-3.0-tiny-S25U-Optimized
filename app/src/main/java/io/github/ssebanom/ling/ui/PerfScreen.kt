@@ -31,6 +31,7 @@ import io.github.ssebanom.ling.data.AppSettings
 import io.github.ssebanom.ling.data.Backend
 import io.github.ssebanom.ling.engine.EngineState
 import io.github.ssebanom.ling.runtime.EngineStatus
+import io.github.ssebanom.ling.runtime.GpuQuirks
 import io.github.ssebanom.ling.runtime.InferenceManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -100,7 +101,7 @@ fun PerfScreen(c: AppContainer, modifier: Modifier = Modifier) {
                             Mono("컨텍스트 ${it.contextTokens}/${it.nCtx} tok · 체크포인트 ${it.checkpoints}개 (${it.checkpointBytes shr 20} MiB)")
                         }
                     }
-                    is EngineStatus.Loading -> Mono("로드 중 ${(s.progress * 100).toInt()}%")
+                    is EngineStatus.Loading -> Mono("로드 중 ${(s.progress * 100).toInt()}% · ${s.what}")
                     is EngineStatus.Error -> Mono("오류: ${s.message}")
                     EngineStatus.NoModel -> Mono("모델 없음")
                     EngineStatus.Unloaded -> Mono("언로드됨")
@@ -183,6 +184,7 @@ fun PerfScreen(c: AppContainer, modifier: Modifier = Modifier) {
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Mono("백엔드: $devicesText")
+                Mono("GPU 우회 구성: ${GpuQuirks.decode(settings.gpuQuirks).label}")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     for (b in listOf(Backend.NPU, Backend.GPU)) {
                         OutlinedButton(onClick = {

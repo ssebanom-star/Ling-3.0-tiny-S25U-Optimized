@@ -333,8 +333,8 @@ JNIEXPORT jdoubleArray JNICALL JFN(nativeBench)(JNIEnv * env, jclass, jlong h, j
 }
 
 // 정확성 검사: 마지막 위치 logits 의 log-softmax 상위 k개 [id0, lp0, id1, lp1, ...]
-JNIEXPORT jfloatArray JNICALL JFN(nativeEvalTopK)(JNIEnv * env, jclass, jlong h, jintArray toks, jint k) {
-    const auto logits = H(h)->engine.eval_logits(from_jints(env, toks));
+JNIEXPORT jfloatArray JNICALL JFN(nativeEvalTopK)(JNIEnv * env, jclass, jlong h, jintArray toks, jint k, jint n_single) {
+    const auto logits = H(h)->engine.eval_logits(from_jints(env, toks), n_single);
     if (logits.empty()) {
         return env->NewFloatArray(0);
     }

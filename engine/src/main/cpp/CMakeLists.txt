@@ -39,6 +39,22 @@ if (LING_OPENCL AND ANDROID_ABI STREQUAL "arm64-v8a")
     set(GGML_OPENCL_USE_ADRENO_KERNELS   ON CACHE BOOL "" FORCE)
 endif ()
 
+# 고정 커밋 llama.cpp 에 로컬 패치 적용(멱등). 내용: patches/README.md
+file(GLOB LING_PATCHES ${ROOT}/patches/*.patch)
+file(LOCK ${ROOT}/patches DIRECTORY GUARD PROCESS)
+foreach (p IN LISTS LING_PATCHES)
+    execute_process(COMMAND git apply --reverse --check ${p} WORKING_DIRECTORY ${LLAMA_DIR}
+                    RESULT_VARIABLE already OUTPUT_QUIET ERROR_QUIET)
+    if (NOT already EQUAL 0)
+        execute_process(COMMAND git apply ${p} WORKING_DIRECTORY ${LLAMA_DIR} RESULT_VARIABLE r)
+        if (NOT r EQUAL 0)
+            message(FATAL_ERROR "패치 적용 실패: ${p}")
+        endif ()
+        message(STATUS "패치 적용: ${p}")
+    endif ()
+endforeach ()
+file(LOCK ${ROOT}/patches DIRECTORY RELEASE)
+
 add_subdirectory(${LLAMA_DIR} build-llama)
 
 # 동적 백엔드(MODULE)는 ggml 이 bin/ 으로 내보낸다 → AGP 가 패키징하는 라이브러리 출력 경로로 옮긴다

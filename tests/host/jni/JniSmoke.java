@@ -62,8 +62,11 @@ public class JniSmoke {
         System.out.println("state: " + Arrays.toString(st));
         check(st[0] >= 1, "checkpoints exist");
 
-        float[] top = LingNative.nativeEvalTopK(h, LingNative.nativeTokenize(h, sys + user + gp), 5);
+        float[] top = LingNative.nativeEvalTopK(h, LingNative.nativeTokenize(h, sys + user + gp), 5, 0);
         check(top.length == 10 && top[1] <= 0f && top[1] >= top[3], "eval top-k log-probs sorted");
+        float[] topStep = LingNative.nativeEvalTopK(h, LingNative.nativeTokenize(h, sys + user + gp), 5, 8);
+        System.out.println("eval batch " + Arrays.toString(top) + " / stepwise8 " + Arrays.toString(topStep));
+        check(topStep.length == 10 && topStep[0] == top[0] && Math.abs(topStep[1] - top[1]) < 0.1f, "stepwise decode == batch prefill (top-1, log-prob)");
 
         double[] b = LingNative.nativeBench(h, 64, 16, 1);
         System.out.println("bench pp64 " + b[0] + " tg16 " + b[1]);

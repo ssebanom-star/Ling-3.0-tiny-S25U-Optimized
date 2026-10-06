@@ -699,14 +699,21 @@ BenchResult Engine::bench(int n_prompt, int n_gen, int reps) {
     return br;
 }
 
-std::vector<float> Engine::eval_logits(const std::vector<token> & toks) {
+std::vector<float> Engine::eval_logits(const std::vector<token> & toks, int n_single) {
     std::vector<float> out;
     if (!ctx_ || toks.empty()) {
         return out;
     }
     reset();
-    if (!decode_range(toks, 0, (int) toks.size(), true, {}, 0, (int) toks.size())) {
+    const int n     = (int) toks.size();
+    const int split = std::max(1, n - std::max(0, n_single));
+    if (!decode_range(toks, 0, split, split == n, {}, 0, n)) {
         return out;
+    }
+    for (int i = split; i < n; ++i) {
+        if (!decode_range(toks, i, i + 1, i == n - 1, {}, 0, n)) {
+            return out;
+        }
     }
     const float * lg = llama_get_logits_ith(ctx_, -1);
     out.assign(lg, lg + n_vocab());
