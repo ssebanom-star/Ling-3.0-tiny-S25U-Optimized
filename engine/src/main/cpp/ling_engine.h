@@ -55,6 +55,7 @@ struct SamplerParams {
     int      top_k          = 20;
     float    min_p          = 0.0f;
     float    repeat_penalty = 1.0f;
+    float    presence_penalty = 0.0f;  // Qwen3.6 권장 1.5 (반복 루프 억제)
     int      repeat_last_n  = 64;
     uint32_t seed           = 0xFFFFFFFF;  // LLAMA_DEFAULT_SEED
 };

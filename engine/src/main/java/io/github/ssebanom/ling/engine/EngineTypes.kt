@@ -30,6 +30,8 @@ data class SamplerConfig(
     val topK: Int = 20,
     val minP: Float = 0.0f,
     val repeatPenalty: Float = 1.0f,
+    /** 0 = 끔. 등장한 토큰에 고정 감점(Qwen3.6 권장 1.5) */
+    val presencePenalty: Float = 0.0f,
     val repeatLastN: Int = 64,
     val seed: Int = -1,
     val maxTokens: Int = 4096,

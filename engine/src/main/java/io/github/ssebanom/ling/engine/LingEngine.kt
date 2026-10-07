@@ -104,7 +104,7 @@ class LingEngine private constructor(nativeLibDir: String) {
     suspend fun generate(sampler: SamplerConfig, onPiece: (String) -> Boolean): GenerateStats = onInfer {
         val toks = LingNative.nativeGenerate(
             handle,
-            floatArrayOf(sampler.temperature, sampler.topP, sampler.minP, sampler.repeatPenalty),
+            floatArrayOf(sampler.temperature, sampler.topP, sampler.minP, sampler.repeatPenalty, sampler.presencePenalty),
             intArrayOf(sampler.maxTokens, sampler.topK, sampler.repeatLastN, sampler.seed),
             NativeCallbacks.Token { piece, _ -> onPiece(piece) },
         )

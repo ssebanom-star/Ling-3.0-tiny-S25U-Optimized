@@ -87,6 +87,8 @@ fun ModelsScreen(c: AppContainer, modifier: Modifier = Modifier) {
                         when (family) {
                             ModelFamily.LING -> "7.9B 총 / 1.3B 활성 · KDA+MLA · 출처 ${ModelCatalog.REPO} (MIT)"
                             ModelFamily.LFM2 -> "8.3B 총 / 1.5B 활성 · conv+GQA · 툴 호출 특화, 항상 추론 · 출처 ${ModelCatalog.LFM_REPO} (LFM Open License v1.0)"
+                            ModelFamily.QWEN36 -> "36B 총 / 3B 활성 · ⚠ 실험: 파일(9.4GB)이 RAM 보다 커서 저장장치에서 읽으며 실행. " +
+                                "CPU 전용, 수 tok/s 예상, 다른 앱이 종료될 수 있음. 1bit 양자화로 원본보다 품질 낮음 · 출처 ${ModelCatalog.QWEN_REPO} (Apache-2.0)"
                         },
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline,
                     )

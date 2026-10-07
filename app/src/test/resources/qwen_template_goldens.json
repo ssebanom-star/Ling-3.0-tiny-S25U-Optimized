@@ -1,0 +1,407 @@
+[
+ {
+  "name": "single_user_think",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "안녕?"
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|im_start|>user\n안녕?<|im_end|>\n<|im_start|>assistant\n<think>\n"
+ },
+ {
+  "name": "single_user_nothink",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "Hi"
+    }
+   ],
+   "enable_thinking": false,
+   "add_generation_prompt": true
+  },
+  "expected": "<|im_start|>user\nHi<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+ },
+ {
+  "name": "system_user_trim",
+  "input": {
+   "messages": [
+    {
+     "role": "system",
+     "content": "  You are helpful.\n"
+    },
+    {
+     "role": "user",
+     "content": " Q \n"
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|im_start|>system\nYou are helpful.<|im_end|>\n<|im_start|>user\nQ<|im_end|>\n<|im_start|>assistant\n<think>\n"
+ },
+ {
+  "name": "multi_turn_drop_old_thinking",
+  "input": {
+   "messages": [
+    {
+     "role": "system",
+     "content": "S"
+    },
+    {
+     "role": "user",
+     "content": "1+1?"
+    },
+    {
+     "role": "assistant",
+     "content": "2",
+     "reasoning_content": "\nadd\n"
+    },
+    {
+     "role": "user",
+     "content": "times 3?"
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|im_start|>system\nS<|im_end|>\n<|im_start|>user\n1+1?<|im_end|>\n<|im_start|>assistant\n2<|im_end|>\n<|im_start|>user\ntimes 3?<|im_end|>\n<|im_start|>assistant\n<think>\n"
+ },
+ {
+  "name": "multi_turn_preserve",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "1+1?"
+    },
+    {
+     "role": "assistant",
+     "content": "2",
+     "reasoning_content": "add"
+    },
+    {
+     "role": "user",
+     "content": "times 3?"
+    }
+   ],
+   "preserve_thinking": true,
+   "enable_thinking": false,
+   "add_generation_prompt": true
+  },
+  "expected": "<|im_start|>user\n1+1?<|im_end|>\n<|im_start|>assistant\n<think>\nadd\n</think>\n\n2<|im_end|>\n<|im_start|>user\ntimes 3?<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+ },
+ {
+  "name": "inline_think_split",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "a"
+    },
+    {
+     "role": "assistant",
+     "content": "<think>\nr1\n</think>\n\nans1"
+    },
+    {
+     "role": "user",
+     "content": "b"
+    },
+    {
+     "role": "assistant",
+     "content": "<think>r2</think>ans2"
+    }
+   ],
+   "add_generation_prompt": false
+  },
+  "expected": "<|im_start|>user\na<|im_end|>\n<|im_start|>assistant\nans1<|im_end|>\n<|im_start|>user\nb<|im_end|>\n<|im_start|>assistant\n<think>\nr2\n</think>\n\nans2<|im_end|>\n"
+ },
+ {
+  "name": "tools_basic",
+  "input": {
+   "messages": [
+    {
+     "role": "system",
+     "content": "Sys"
+    },
+    {
+     "role": "user",
+     "content": "서울 날씨?"
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "get_weather",
+      "description": "현재 날씨 조회",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "city": {
+         "type": "string"
+        },
+        "days": {
+         "type": "integer"
+        }
+       },
+       "required": [
+        "city"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "calc",
+      "description": "Evaluate",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "expr": {
+         "type": "string"
+        }
+       }
+      }
+     }
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|im_start|>system\n# Tools\n\nYou have access to the following functions:\n\n<tools>\n{\"type\": \"function\", \"function\": {\"name\": \"get_weather\", \"description\": \"현재 날씨 조회\", \"parameters\": {\"type\": \"object\", \"properties\": {\"city\": {\"type\": \"string\"}, \"days\": {\"type\": \"integer\"}}, \"required\": [\"city\"]}}}\n{\"type\": \"function\", \"function\": {\"name\": \"calc\", \"description\": \"Evaluate\", \"parameters\": {\"type\": \"object\", \"properties\": {\"expr\": {\"type\": \"string\"}}}}}\n</tools>\n\nIf you choose to call a function ONLY reply in the following format with NO suffix:\n\n<tool_call>\n<function=example_function_name>\n<parameter=example_parameter_1>\nvalue_1\n</parameter>\n<parameter=example_parameter_2>\nThis is the value for the second parameter\nthat can span\nmultiple lines\n</parameter>\n</function>\n</tool_call>\n\n<IMPORTANT>\nReminder:\n- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags\n- Required parameters MUST be specified\n- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after\n- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls\n</IMPORTANT>\n\nSys<|im_end|>\n<|im_start|>user\n서울 날씨?<|im_end|>\n<|im_start|>assistant\n<think>\n"
+ },
+ {
+  "name": "tools_no_system",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "x"
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "calc",
+      "description": "Evaluate",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "expr": {
+         "type": "string"
+        }
+       }
+      }
+     }
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|im_start|>system\n# Tools\n\nYou have access to the following functions:\n\n<tools>\n{\"type\": \"function\", \"function\": {\"name\": \"calc\", \"description\": \"Evaluate\", \"parameters\": {\"type\": \"object\", \"properties\": {\"expr\": {\"type\": \"string\"}}}}}\n</tools>\n\nIf you choose to call a function ONLY reply in the following format with NO suffix:\n\n<tool_call>\n<function=example_function_name>\n<parameter=example_parameter_1>\nvalue_1\n</parameter>\n<parameter=example_parameter_2>\nThis is the value for the second parameter\nthat can span\nmultiple lines\n</parameter>\n</function>\n</tool_call>\n\n<IMPORTANT>\nReminder:\n- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags\n- Required parameters MUST be specified\n- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after\n- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls\n</IMPORTANT><|im_end|>\n<|im_start|>user\nx<|im_end|>\n<|im_start|>assistant\n<think>\n"
+ },
+ {
+  "name": "tool_call_roundtrip",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "서울 날씨?"
+    },
+    {
+     "role": "assistant",
+     "content": "",
+     "reasoning_content": "need tool",
+     "tool_calls": [
+      {
+       "type": "function",
+       "function": {
+        "name": "get_weather",
+        "arguments": {
+         "city": "서울",
+         "days": 2
+        }
+       }
+      }
+     ]
+    },
+    {
+     "role": "tool",
+     "content": "{\"temp\": 21}"
+    },
+    {
+     "role": "assistant",
+     "content": "21도입니다.",
+     "reasoning_content": "answer"
+    },
+    {
+     "role": "user",
+     "content": "thanks"
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "get_weather",
+      "description": "현재 날씨 조회",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "city": {
+         "type": "string"
+        },
+        "days": {
+         "type": "integer"
+        }
+       },
+       "required": [
+        "city"
+       ]
+      }
+     }
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|im_start|>system\n# Tools\n\nYou have access to the following functions:\n\n<tools>\n{\"type\": \"function\", \"function\": {\"name\": \"get_weather\", \"description\": \"현재 날씨 조회\", \"parameters\": {\"type\": \"object\", \"properties\": {\"city\": {\"type\": \"string\"}, \"days\": {\"type\": \"integer\"}}, \"required\": [\"city\"]}}}\n</tools>\n\nIf you choose to call a function ONLY reply in the following format with NO suffix:\n\n<tool_call>\n<function=example_function_name>\n<parameter=example_parameter_1>\nvalue_1\n</parameter>\n<parameter=example_parameter_2>\nThis is the value for the second parameter\nthat can span\nmultiple lines\n</parameter>\n</function>\n</tool_call>\n\n<IMPORTANT>\nReminder:\n- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags\n- Required parameters MUST be specified\n- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after\n- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls\n</IMPORTANT><|im_end|>\n<|im_start|>user\n서울 날씨?<|im_end|>\n<|im_start|>assistant\n<tool_call>\n<function=get_weather>\n<parameter=city>\n서울\n</parameter>\n<parameter=days>\n2\n</parameter>\n</function>\n</tool_call><|im_end|>\n<|im_start|>user\n<tool_response>\n{\"temp\": 21}\n</tool_response><|im_end|>\n<|im_start|>assistant\n21도입니다.<|im_end|>\n<|im_start|>user\nthanks<|im_end|>\n<|im_start|>assistant\n<think>\n"
+ },
+ {
+  "name": "multi_step_in_progress",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "q"
+    },
+    {
+     "role": "assistant",
+     "content": "Let me check.",
+     "reasoning_content": "r",
+     "tool_calls": [
+      {
+       "type": "function",
+       "function": {
+        "name": "calc",
+        "arguments": {
+         "expr": "1+2"
+        }
+       }
+      },
+      {
+       "type": "function",
+       "function": {
+        "name": "calc",
+        "arguments": {
+         "expr": "3*4",
+         "flag": true,
+         "obj": {
+          "a": [
+           1,
+           "b"
+          ]
+         },
+         "x": 1.5
+        }
+       }
+      }
+     ]
+    },
+    {
+     "role": "tool",
+     "content": "3"
+    },
+    {
+     "role": "tool",
+     "content": "12"
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "calc",
+      "description": "Evaluate",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "expr": {
+         "type": "string"
+        }
+       }
+      }
+     }
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|im_start|>system\n# Tools\n\nYou have access to the following functions:\n\n<tools>\n{\"type\": \"function\", \"function\": {\"name\": \"calc\", \"description\": \"Evaluate\", \"parameters\": {\"type\": \"object\", \"properties\": {\"expr\": {\"type\": \"string\"}}}}}\n</tools>\n\nIf you choose to call a function ONLY reply in the following format with NO suffix:\n\n<tool_call>\n<function=example_function_name>\n<parameter=example_parameter_1>\nvalue_1\n</parameter>\n<parameter=example_parameter_2>\nThis is the value for the second parameter\nthat can span\nmultiple lines\n</parameter>\n</function>\n</tool_call>\n\n<IMPORTANT>\nReminder:\n- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags\n- Required parameters MUST be specified\n- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after\n- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls\n</IMPORTANT><|im_end|>\n<|im_start|>user\nq<|im_end|>\n<|im_start|>assistant\n<think>\nr\n</think>\n\nLet me check.\n\n<tool_call>\n<function=calc>\n<parameter=expr>\n1+2\n</parameter>\n</function>\n</tool_call>\n<tool_call>\n<function=calc>\n<parameter=expr>\n3*4\n</parameter>\n<parameter=flag>\ntrue\n</parameter>\n<parameter=obj>\n{\"a\": [1, \"b\"]}\n</parameter>\n<parameter=x>\n1.5\n</parameter>\n</function>\n</tool_call><|im_end|>\n<|im_start|>user\n<tool_response>\n3\n</tool_response>\n<tool_response>\n12\n</tool_response><|im_end|>\n<|im_start|>assistant\n<think>\n"
+ },
+ {
+  "name": "preserve_with_tools",
+  "input": {
+   "messages": [
+    {
+     "role": "system",
+     "content": "S"
+    },
+    {
+     "role": "user",
+     "content": "q"
+    },
+    {
+     "role": "assistant",
+     "content": "",
+     "reasoning_content": "r",
+     "tool_calls": [
+      {
+       "type": "function",
+       "function": {
+        "name": "calc",
+        "arguments": {
+         "expr": "2"
+        }
+       }
+      }
+     ]
+    },
+    {
+     "role": "tool",
+     "content": "2"
+    },
+    {
+     "role": "assistant",
+     "content": "two",
+     "reasoning_content": "r2"
+    },
+    {
+     "role": "user",
+     "content": "q2"
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "calc",
+      "description": "Evaluate",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "expr": {
+         "type": "string"
+        }
+       }
+      }
+     }
+    }
+   ],
+   "preserve_thinking": true,
+   "add_generation_prompt": true
+  },
+  "expected": "<|im_start|>system\n# Tools\n\nYou have access to the following functions:\n\n<tools>\n{\"type\": \"function\", \"function\": {\"name\": \"calc\", \"description\": \"Evaluate\", \"parameters\": {\"type\": \"object\", \"properties\": {\"expr\": {\"type\": \"string\"}}}}}\n</tools>\n\nIf you choose to call a function ONLY reply in the following format with NO suffix:\n\n<tool_call>\n<function=example_function_name>\n<parameter=example_parameter_1>\nvalue_1\n</parameter>\n<parameter=example_parameter_2>\nThis is the value for the second parameter\nthat can span\nmultiple lines\n</parameter>\n</function>\n</tool_call>\n\n<IMPORTANT>\nReminder:\n- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags\n- Required parameters MUST be specified\n- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after\n- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls\n</IMPORTANT>\n\nS<|im_end|>\n<|im_start|>user\nq<|im_end|>\n<|im_start|>assistant\n<think>\nr\n</think>\n\n<tool_call>\n<function=calc>\n<parameter=expr>\n2\n</parameter>\n</function>\n</tool_call><|im_end|>\n<|im_start|>user\n<tool_response>\n2\n</tool_response><|im_end|>\n<|im_start|>assistant\n<think>\nr2\n</think>\n\ntwo<|im_end|>\n<|im_start|>user\nq2<|im_end|>\n<|im_start|>assistant\n<think>\n"
+ }
+]

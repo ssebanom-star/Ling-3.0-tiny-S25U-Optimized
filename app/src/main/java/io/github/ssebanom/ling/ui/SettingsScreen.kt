@@ -129,8 +129,12 @@ fun SettingsScreen(c: AppContainer, modifier: Modifier = Modifier) {
         }
         Section("메모리 · 컨텍스트 (변경 시 모델 재로드)") {
             Text(
-                if (family == ModelFamily.LING) "MLA 캐시 6.9KB/토큰 + KDA 상태 19MiB 고정 → 32K = 약 216MiB"
-                else "LFM2.5: GQA 6층 KV f16 12KB/토큰(8 KV헤드×64차원) + conv 상태 소량 → 32K = 약 384MiB",
+                when (family) {
+                    ModelFamily.LING -> "MLA 캐시 6.9KB/토큰 + KDA 상태 19MiB 고정 → 32K = 약 216MiB"
+                    ModelFamily.LFM2 -> "LFM2.5: GQA 6층 KV f16 12KB/토큰(8 KV헤드×64차원) + conv 상태 소량 → 32K = 약 384MiB"
+                    ModelFamily.QWEN36 -> "Qwen3.6(실험): 어텐션 10층 KV f16 20KB/토큰 + DeltaNet 상태 ~63MiB(체크포인트 최대 2개) → 32K = 약 640MiB. " +
+                        "가중치는 저장장치에서 읽으므로 컨텍스트를 줄일수록 가중치 캐시에 RAM 이 더 남음"
+                },
                 style = MaterialTheme.typography.bodySmall,
             )
             Choice("컨텍스트", listOf(4096, 8192, 16384, 32768, 65536), s.nCtx) { v -> set { it.copy(nCtx = v) } }

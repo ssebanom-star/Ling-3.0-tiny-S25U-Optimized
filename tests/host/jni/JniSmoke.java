@@ -38,13 +38,16 @@ public class JniSmoke {
 
         // -Dling.fmt=lfm : LFM2.5 채팅 포맷(항상 추론 → 생성 길이 늘림)
         boolean lfm = "lfm".equals(System.getProperty("ling.fmt"));
-        String sys = lfm ? "<|startoftext|><|im_start|>system\nAnswer in one word.<|im_end|>\n"
+        boolean qwen = "qwen".equals(System.getProperty("ling.fmt")); // -Dling.fmt=qwen : Qwen3.6 (thinking off)
+        String sys = qwen ? "<|im_start|>system\nAnswer in one word.<|im_end|>\n"
+                   : lfm ? "<|startoftext|><|im_start|>system\nAnswer in one word.<|im_end|>\n"
                          : "<role>SYSTEM</role>detailed thinking off<|role_end|>";
-        String user = lfm ? "<|im_start|>user\n한국의 수도는? 한 단어로.<|im_end|>\n"
+        String user = (lfm || qwen) ? "<|im_start|>user\n한국의 수도는? 한 단어로.<|im_end|>\n"
                           : "<role>HUMAN</role>한국의 수도는? 한 단어로.<|role_end|>";
-        String gp = lfm ? "<|im_start|>assistant\n" : "<role>ASSISTANT</role>\n<think></think>";
-        String end = lfm ? "<|im_end|>\n" : "<|role_end|>";
-        String user2 = lfm ? "<|im_start|>user\n일본은?<|im_end|>\n" : "<role>HUMAN</role>일본은?<|role_end|>";
+        String gp = qwen ? "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+                  : lfm ? "<|im_start|>assistant\n" : "<role>ASSISTANT</role>\n<think></think>";
+        String end = (lfm || qwen) ? "<|im_end|>\n" : "<|role_end|>";
+        String user2 = (lfm || qwen) ? "<|im_start|>user\n일본은?<|im_end|>\n" : "<role>HUMAN</role>일본은?<|role_end|>";
         int maxGen = lfm ? 400 : 32;
         final int[] prog = {0, 0};
         double[] s = LingNative.nativeSync(h, new String[]{sys, user, gp}, new int[][]{null, null, null},
@@ -73,7 +76,9 @@ public class JniSmoke {
         check(top.length == 10 && top[1] <= 0f && top[1] >= top[3], "eval top-k log-probs sorted");
         float[] topStep = LingNative.nativeEvalTopK(h, LingNative.nativeTokenize(h, sys + user + gp), 5, 8);
         System.out.println("eval batch " + Arrays.toString(top) + " / stepwise8 " + Arrays.toString(topStep));
-        check(topStep.length == 10 && topStep[0] == top[0] && Math.abs(topStep[1] - top[1]) < 0.1f, "stepwise decode == batch prefill (top-1, log-prob)");
+        // Qwen3.6 IQ1_M: DeltaNet 청크(prefill)/재귀(decode) 경로 차이가 1bit 가중치에서 커져 ~0.13 차이 관측(top-1 동일)
+        float tol = qwen ? 0.25f : 0.1f;
+        check(topStep.length == 10 && topStep[0] == top[0] && Math.abs(topStep[1] - top[1]) < tol, "stepwise decode == batch prefill (top-1, log-prob)");
 
         double[] b = LingNative.nativeBench(h, 64, 16, 1);
         System.out.println("bench pp64 " + b[0] + " tg16 " + b[1]);

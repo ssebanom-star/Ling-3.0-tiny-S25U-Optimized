@@ -6,6 +6,7 @@ import io.github.ssebanom.ling.domain.ModelFamily
  * 배포 GGUF 목록.
  * - Ling-3.0-tiny: bartowski/Ling-3.0-tiny-GGUF (llama.cpp b10472 imatrix 양자화), MIT
  * - LFM2.5-8B-A1B: LiquidAI/LFM2.5-8B-A1B-GGUF (공식), LFM Open License v1.0
+ * - Qwen3.6-35B-A3B: bartowski/Qwen_Qwen3.6-35B-A3B-GGUF (imatrix IQ1_M), Apache-2.0 — 실험
  * 크기/SHA-256 은 HF API(LFS oid) 기준. 토큰당 읽기량은 tools/gguf_budget.py 계산값.
  */
 data class ModelVariant(
@@ -18,13 +19,22 @@ data class ModelVariant(
     val recommended: Boolean = false,
     val family: ModelFamily = ModelFamily.LING,
     val repo: String = ModelCatalog.REPO,
+    /**
+     * 실험(RAM 보다 큰 모델): CPU 전용 + mmap 으로 저장장치에서 필요한 가중치만 읽는다.
+     * CPU 가중치 재배열(repack)은 전체를 RAM 에 복사하므로 끈다.
+     */
+    val experimental: Boolean = false,
 ) {
     val url: String get() = "https://huggingface.co/$repo/resolve/main/$fileName"
 }
 
+/** tools/gguf_budget.py 로 계산한 IQ1_M 토큰당 가중치 읽기량 */
+private const val QWEN_IQ1M_DECODE_BYTES = 1_497_000_000L
+
 object ModelCatalog {
     const val REPO = "bartowski/Ling-3.0-tiny-GGUF"
     const val LFM_REPO = "LiquidAI/LFM2.5-8B-A1B-GGUF"
+    const val QWEN_REPO = "bartowski/Qwen_Qwen3.6-35B-A3B-GGUF"
 
     val variants = listOf(
         ModelVariant(
@@ -68,6 +78,13 @@ object ModelCatalog {
             "LFM-Q5_K_M", "LFM2.5-8B-A1B-Q5_K_M.gguf", 6_030_339_296L,
             "eb8bd10148ea21e195502d6d6a205983ba40815302068ce72eb160684df92b3e", 1_250_000_000L,
             "LFM2.5 고품질. 12GB 는 LMK 위험", family = ModelFamily.LFM2, repo = LFM_REPO,
+        ),
+        // Qwen3.6-35B-A3B: 36B 총 / 3B 활성, Gated DeltaNet+어텐션 하이브리드. 1bit(IQ1_M)로도 12GB 폰 RAM 보다 큼
+        ModelVariant(
+            "QWEN-IQ1_M", "Qwen_Qwen3.6-35B-A3B-IQ1_M.gguf", 9_421_649_536L,
+            "d291e12a0f693b5f14c11bb1278ba43b432b2b6f6c33c7fdaf750c214ff83f28", QWEN_IQ1M_DECODE_BYTES,
+            "실험: RAM 초과 → 저장장치에서 읽으며 실행(CPU 전용). 느리고 1bit 라 품질 저하 큼",
+            family = ModelFamily.QWEN36, repo = QWEN_REPO, experimental = true,
         ),
     )
 

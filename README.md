@@ -6,6 +6,7 @@ Galaxy S25 Ultra(Snapdragon 8 Elite for Galaxy)에서 소형 MoE LLM 을 기기 
 |---|---|---|
 | [inclusionAI/Ling-3.0-tiny](https://huggingface.co/inclusionAI/Ling-3.0-tiny) (기본) | 7.9B 총 / 1.3B 활성, KDA+MLA | Thinking/Instant 전환 |
 | [LiquidAI/LFM2.5-8B-A1B](https://huggingface.co/LiquidAI/LFM2.5-8B-A1B) | 8.3B 총 / 1.5B 활성, conv+GQA | 툴 호출 특화, 항상 추론 |
+| [Qwen/Qwen3.6-35B-A3B](https://huggingface.co/Qwen/Qwen3.6-35B-A3B) IQ1_M (실험) | 36B 총 / 3B 활성, DeltaNet+어텐션 | 9.4GB > RAM → CPU·mmap 으로 저장장치에서 읽으며 실행 |
 
 현재 상태: **Phase 1~4 구현 완료, 실기기 검증 전.** 엔진·JNI는 호스트에서 실모델로 검증,
 앱은 빌드만 확인했다. 상세: [docs/03-implementation.md](docs/03-implementation.md)

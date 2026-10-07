@@ -9,6 +9,7 @@ data class RecommendedSampling(
     val topK: Int,
     val minP: Float = 0f,
     val repeatPenalty: Float = 1f,
+    val presencePenalty: Float = 0f,
 )
 
 /**
@@ -46,6 +47,24 @@ enum class ModelFamily(
         // 생성 프롬프트가 "<|im_start|>assistant\n" 로 끝나고 모델이 스스로 <think> 를 연다
         override fun startInThink(thinking: Boolean) = false
         override fun toolSpec(fn: Map<String, Any?>) = fn
+    },
+
+    /** Qwen3.6-35B-A3B (실험: 1bit 양자화, CPU·mmap 전용) */
+    QWEN36("Qwen3.6-35B-A3B (실험)", thinkingToggle = true, RecommendedSampling(1.0f, 0.95f, 20, presencePenalty = 1.5f)) {
+        override fun segments(messages: List<ChatMessage>, tools: List<Map<String, Any?>>, thinking: Boolean) =
+            QwenPromptBuilder.segments(messages, tools, thinking)
+
+        override fun render(messages: List<ChatMessage>, tools: List<Map<String, Any?>>, thinking: Boolean, addGenerationPrompt: Boolean) =
+            QwenPromptBuilder.render(messages, tools, thinking, preserveThinking = true, addGenerationPrompt = addGenerationPrompt)
+
+        override fun parseToolCalls(content: String) = QwenToolCallParser.parse(content)
+        override fun visibleContent(content: String) = QwenToolCallParser.visiblePrefix(content)
+        override fun startInThink(thinking: Boolean) = thinking
+        override fun toolSpec(fn: Map<String, Any?>) = linkedMapOf<String, Any?>("type" to "function", "function" to fn)
+
+        // 모델 카드: thinking 일반 1.0/0.95/20, non-thinking 0.7/0.8/20, 둘 다 presence_penalty 1.5
+        override fun samplingFor(thinking: Boolean) =
+            if (thinking) sampling else RecommendedSampling(0.7f, 0.8f, 20, presencePenalty = 1.5f)
     };
 
     abstract fun segments(messages: List<ChatMessage>, tools: List<Map<String, Any?>>, thinking: Boolean): List<PromptSegment>
@@ -56,6 +75,9 @@ enum class ModelFamily(
     abstract fun startInThink(thinking: Boolean): Boolean
     /** 공통 function 스키마({name, description, parameters}) → 이 계열 템플릿이 기대하는 형태 */
     abstract fun toolSpec(fn: Map<String, Any?>): Map<String, Any?>
+
+    /** 모드별 권장 샘플링(기본은 [sampling]) */
+    open fun samplingFor(thinking: Boolean): RecommendedSampling = sampling
 
     /**
      * 가속기 정확성 검사용 고정 프롬프트. 다음 토큰 분포가 정보량이 있도록 끝을 맞춘다
@@ -70,7 +92,11 @@ enum class ModelFamily(
         /** GGUF 파일명/모델 설명으로 계열 추정 */
         fun detect(fileName: String, modelDesc: String = ""): ModelFamily {
             val s = (fileName + " " + modelDesc).lowercase()
-            return if (s.contains("lfm")) LFM2 else LING
+            return when {
+                s.contains("lfm") -> LFM2
+                s.contains("qwen") -> QWEN36
+                else -> LING
+            }
         }
     }
 }

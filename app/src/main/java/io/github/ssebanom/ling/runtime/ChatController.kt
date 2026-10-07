@@ -200,10 +200,10 @@ class ChatController(
             var level = thermal.snapshot().level
             setPhase(if (family.startInThink(conv.thinking)) Phase.THINKING else Phase.ANSWERING)
 
-            val rec = family.sampling
+            val rec = family.samplingFor(conv.thinking)
             val sampler = if (s.useRecommendedSampling) SamplerConfig(
                 temperature = rec.temperature, topP = rec.topP, topK = rec.topK, minP = rec.minP,
-                repeatPenalty = rec.repeatPenalty, maxTokens = s.maxTokens,
+                repeatPenalty = rec.repeatPenalty, presencePenalty = rec.presencePenalty, maxTokens = s.maxTokens,
             ) else SamplerConfig(
                 temperature = s.temperature, topP = s.topP, topK = s.topK, minP = s.minP,
                 repeatPenalty = s.repeatPenalty, maxTokens = s.maxTokens,

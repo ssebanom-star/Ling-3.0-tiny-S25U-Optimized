@@ -248,20 +248,21 @@ JNIEXPORT jdoubleArray JNICALL JFN(nativeSync)(JNIEnv * env, jclass, jlong h, jo
                               r.restored_ckpt ? 1.0 : 0.0, r.full_reset ? 1.0 : 0.0, r.prefill_ms });
 }
 
-// fp: [temperature, topP, minP, repeatPenalty], ip: [maxTokens, topK, repeatLastN, seed]
+// fp: [temperature, topP, minP, repeatPenalty(, presencePenalty)], ip: [maxTokens, topK, repeatLastN, seed]
 // 반환: 생성 토큰. 통계는 nativeLastGenerate
 JNIEXPORT jintArray JNICALL JFN(nativeGenerate)(JNIEnv * env, jclass, jlong h, jfloatArray fp, jintArray ip,
                                                 jobject listener) {
     auto *              hd = H(h);
-    std::vector<jfloat> fv(4);
+    std::vector<jfloat> fv(5, 0.0f);
     std::vector<jint>   iv(4);
-    env->GetFloatArrayRegion(fp, 0, 4, fv.data());
+    env->GetFloatArrayRegion(fp, 0, std::min<jsize>(5, env->GetArrayLength(fp)), fv.data());
     env->GetIntArrayRegion(ip, 0, 4, iv.data());
     ling::SamplerParams sp;
     sp.temperature    = fv[0];
     sp.top_p          = fv[1];
     sp.min_p          = fv[2];
     sp.repeat_penalty = fv[3];
+    sp.presence_penalty = fv[4];
     sp.top_k          = iv[1];
     sp.repeat_last_n  = iv[2];
     sp.seed           = (uint32_t) iv[3];

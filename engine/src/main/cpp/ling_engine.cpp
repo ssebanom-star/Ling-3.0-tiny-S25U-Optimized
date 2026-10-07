@@ -570,8 +570,9 @@ GenerateResult Engine::generate(int max_tokens, const SamplerParams & sp, const 
     if (sp.top_k > 0 && sp.temperature > 0.0f) {
         llama_sampler_chain_add(smpl, llama_sampler_init_top_k(sp.top_k));
     }
-    if (sp.repeat_penalty != 1.0f) {
-        llama_sampler_chain_add(smpl, llama_sampler_init_penalties(n_vocab(), sp.repeat_last_n, sp.repeat_penalty, 0.0f, 0.0f));
+    if (sp.repeat_penalty != 1.0f || sp.presence_penalty != 0.0f) {
+        llama_sampler_chain_add(smpl, llama_sampler_init_penalties(n_vocab(), sp.repeat_last_n, sp.repeat_penalty, 0.0f,
+                                                                   sp.presence_penalty));
     }
     if (sp.temperature <= 0.0f) {
         llama_sampler_chain_add(smpl, llama_sampler_init_greedy());

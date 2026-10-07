@@ -60,6 +60,11 @@ class InferenceManager(
     /** 모델 파일의 계열(템플릿·툴 포맷·권장 샘플링) */
     fun familyFor(path: File): ModelFamily = ModelCatalog.byFile(path.name)?.family ?: ModelFamily.detect(path.name)
 
+    /** 실험 모델(RAM 초과)은 설정과 무관하게 CPU+mmap 으로만 돌린다 */
+    fun isExperimental(path: File): Boolean = ModelCatalog.byFile(path.name)?.experimental == true
+
+    fun effectiveBackend(s: AppSettings, path: File): Backend = if (isExperimental(path)) Backend.CPU else s.backend
+
     /** 현재 로드된(없으면 설정상) 모델의 계열 */
     val family: ModelFamily
         get() = engine.config?.modelPath?.let { familyFor(File(it)) } ?: ModelFamily.LING
@@ -102,10 +107,12 @@ class InferenceManager(
             nThreadsBatch = batch,
             cpuMask = mask,
             kvQ8 = s.kvQ8,
-            maxCheckpoints = s.maxCheckpoints,
+            // 실험 모델(Qwen3.6)은 재귀 상태가 체크포인트당 ~65MB → RAM 압박을 줄이려 2개로 제한
+            maxCheckpoints = if (isExperimental(path)) minOf(2, s.maxCheckpoints) else s.maxCheckpoints,
             devices = devices,
-            // NPU/GPU 는 디바이스 버퍼로 올리므로 CPU 재배열 불필요(메모리 이중 상주 방지)
-            weightRepack = backend == Backend.CPU,
+            // NPU/GPU 는 디바이스 버퍼로 올리므로 CPU 재배열 불필요(메모리 이중 상주 방지).
+            // 실험 모델은 재배열하면 전체가 RAM 에 복사되어 mmap 으로 읽는 의미가 없어진다
+            weightRepack = backend == Backend.CPU && !isExperimental(path),
             useMmap = backend == Backend.CPU,
         )
     }
@@ -114,7 +121,7 @@ class InferenceManager(
     suspend fun ensureLoaded(): Boolean {
         val s = settings.current()
         val path = modelPath(s) ?: run { _status.value = EngineStatus.NoModel; return false }
-        val backend = s.backend
+        val backend = effectiveBackend(s, path)
         val want = configFor(s, path, backend)
         if (backend != Backend.CPU && want.devices.isEmpty()) return fallbackToCpu(s, path, "${backend.label}: 디바이스 없음")
         val cur = engine.config
@@ -199,8 +206,11 @@ class InferenceManager(
         }
         val p = profile
         val n = p.nCpus
-        val decodeCands = listOf(2, 3, 4, 5, 6, 8).filter { it <= n }.distinct()
+        // 실험 모델(저장장치 스트리밍)은 느려서 후보와 측정 길이를 줄인다
+        val slow = isExperimental(File(engine.config!!.modelPath))
+        val decodeCands = (if (slow) listOf(4, 6, 8) else listOf(2, 3, 4, 5, 6, 8)).filter { it <= n }.distinct()
         val batchCands = listOf(4, 6, 8).filter { it <= n }.distinct()
+        val tgN = if (slow) 8 else 32
         val table = ArrayList<Triple<String, Double, Double>>()
         val cfg0 = engine.config!!
         var bestTg = -1.0; var bestDecode = cfg0.nThreads; var bestMask = ""
@@ -209,8 +219,8 @@ class InferenceManager(
                 val label = "tg t=$t ${if (mask.isEmpty()) "OS" else "cpu[$mask]"}"
                 onProgress(label)
                 engine.setThreads(t, cfg0.nThreadsBatch, mask)
-                engine.bench(0, 8) // 워밍업
-                val b = engine.bench(0, 32, 2)
+                engine.bench(0, if (slow) 2 else 8) // 워밍업
+                val b = engine.bench(0, tgN, if (slow) 1 else 2)
                 table += Triple(label, 0.0, b.tgTps)
                 if (b.tgTps > bestTg) { bestTg = b.tgTps; bestDecode = t; bestMask = mask }
             }
@@ -220,7 +230,7 @@ class InferenceManager(
             val label = "pp t=$t"
             onProgress(label)
             engine.setThreads(bestDecode, t, bestMask)
-            val b = engine.bench(128, 0, 1)
+            val b = engine.bench(if (slow) 32 else 128, 0, 1)
             table += Triple(label, b.ppTps, 0.0)
             if (b.ppTps > bestPp) { bestPp = b.ppTps; bestBatch = t }
         }

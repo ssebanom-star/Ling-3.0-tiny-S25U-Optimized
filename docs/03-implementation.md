@@ -48,6 +48,22 @@ Phase 0 도구(`tools/phase0/build_bench_tools.sh`): llama-bench/llama-completio
 이 서버 IP 에서는 DuckDuckGo 가 봇 챌린지(HTTP 202), Bing 이 무관한 결과를 돌려줘 실검색 품질은 확인 불가.
 기기(가정/모바일 IP)에서 다를 수 있음. 안정적으로 쓰려면 Brave Search API 키 또는 SearXNG 주소 설정.
 
+### 0.6.0: Qwen3.6-35B-A3B IQ1_M 실험 선택지 (2026-10-07)
+
+`bartowski/Qwen_Qwen3.6-35B-A3B-GGUF` IQ1_M(9.42GB, 1.75bpw, SHA-256 일치). 파일이 12GB 폰 RAM 보다 커서
+**CPU 전용 + mmap**(저장장치에서 필요한 expert 만 페이지 인), 가중치 repack 끔, 체크포인트 최대 2개(DeltaNet 상태 ~63MiB/개).
+
+| 항목 | 결과 |
+|---|---|
+| 템플릿 | `QwenPromptBuilder`, jinja 골든 11케이스 바이트 일치(thinking on/off, preserve_thinking, 툴 묶음) [검증] |
+| 툴 호출 | `<tool_call><function=..><parameter=..>` 파서. 실모델이 날씨→web_search, 알람→set_alarm(7,30) 생성 [검증] |
+| 샘플링 | 모델 카드: thinking 1.0/0.95/20, non-thinking 0.7/0.8/20, presence_penalty 1.5 → 엔진에 presence penalty 추가 |
+| 호스트 실모델(x86 4 vCPU) | "서울" 정답, 2턴 재사용 32/49, 체크포인트 2개 126MiB |
+| 속도(호스트) | 메모리 무제한 tg 8.3 / pp 25.7 tok/s · cgroup 6GB 제한 tg 7.1 · 4GB 제한 tg 4.9 tok/s (페이지 캐시 강제 축출, 주 페이지 폴트 25만~49만) |
+| 관찰 | 배치 prefill 과 1토큰 디코드의 log-prob 차이 0.13(top-1 동일). Ling/LFM 은 <0.001 — DeltaNet 청크/재귀 경로 차이가 1bit 에서 증폭된 것으로 추정 |
+
+호스트 디스크·CPU 는 폰(UFS 4.0, Oryon)과 달라 **기기 속도는 미검증**. 품질은 원본 대비 크게 떨어질 수 있음(1bit).
+
 ---
 
 ## 2. 호스트 검증 결과 (x86-64, 4 vCPU, 15 GB, 실모델 Q4_0)
