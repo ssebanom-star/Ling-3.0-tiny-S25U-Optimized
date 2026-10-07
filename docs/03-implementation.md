@@ -64,6 +64,22 @@ Phase 0 도구(`tools/phase0/build_bench_tools.sh`): llama-bench/llama-completio
 
 호스트 디스크·CPU 는 폰(UFS 4.0, Oryon)과 달라 **기기 속도는 미검증**. 품질은 원본 대비 크게 떨어질 수 있음(1bit).
 
+#### 더 작은 빌드 (0.6.1, 호스트 greedy, 모델 전부 RAM)
+
+| 빌드 | 크기 | "한국의 수도" | 툴 호출(날씨·알람) | tg tok/s | 앱 |
+|---|---|---|---|---|---|
+| bartowski IQ1_M (원본) | 9.42GB | 서울 | 정상 | 8.3 | 포함(권장) |
+| mradermacher IQ1_S (원본) | 7.48GB | 서울 | 붕괴(엉뚱한 JSON, 반복) | 8.7 | 포함(실험) |
+| dxx117 REAP25 IQ1_M (192 expert) | 7.93GB | 오답 | `<function=` 누락 → 관용 파싱 | 8.6 | 포함(실험) |
+| dxx117 REAP40 IQ1_M (154) | 6.68GB | Tokyo | 정상(인자에 중국어) | 7.8 | 포함(실험) |
+| dxx117 REAP50 IQ1_M (128) | 5.82GB | 오답 | 정상(인자에 중국어) | 8.3 | 포함(실험) |
+| mradermacher 28B-REAP IQ1_S (205) | 6.19GB | 서울 | 붕괴(`<parameter>` 반복) | 9.0 | 포함(실험) |
+| WaveCut REAM-160 Q1_0 | 4.16GB | "ssss…" | 붕괴 | 12.8 | 제외 |
+| DJLougen REAP-90% IQ1_S | 1.66GB | — | — | — | 제외(작성자: 대부분 무의미한 출력) |
+
+GPU/NPU: 실험 모델도 선택 가능. routed expert(`\.ffn_[a-z_]*_exps\.`)만 `tensor_buft_overrides` 로 CPU(mmap)에 두고
+나머지를 가속기에 올린다. 호스트에서 CPU 디바이스로 오버라이드 경로 동작 확인 [검증], 실제 GPU/NPU 분할은 [미검증].
+
 ---
 
 ## 2. 호스트 검증 결과 (x86-64, 4 vCPU, 15 GB, 실모델 Q4_0)
