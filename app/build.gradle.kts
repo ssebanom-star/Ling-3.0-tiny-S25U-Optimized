@@ -14,8 +14,8 @@ android {
         applicationId = "io.github.ssebanom.ling"
         minSdk = 33
         targetSdk = 36
-        versionCode = 12
-        versionName = "0.6.2"
+        versionCode = 13
+        versionName = "0.7.0"
         ndk { abiFilters += listOf("arm64-v8a") }
     }
 

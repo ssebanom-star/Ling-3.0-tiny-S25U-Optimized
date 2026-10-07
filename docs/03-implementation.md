@@ -80,6 +80,15 @@ Phase 0 도구(`tools/phase0/build_bench_tools.sh`): llama-bench/llama-completio
 GPU/NPU: 실험 모델도 선택 가능. routed expert(`\.ffn_[a-z_]*_exps\.`)만 `tensor_buft_overrides` 로 CPU(mmap)에 두고
 나머지를 가속기에 올린다. 호스트에서 CPU 디바이스로 오버라이드 경로 동작 확인 [검증], 실제 GPU/NPU 분할은 [미검증].
 
+### 0.7.0: K2-Horizon 3.7B + llama.cpp 최신화 (2026-10-07)
+
+- llama.cpp 806eee98 → 26908739(상류 `k2-horizon` 지원). 로컬 패치 2개 그대로 적용. Hexagon 백엔드 재빌드(docker)
+- 회귀(호스트 실모델): Ling JNI·엔진 전 항목 통과(tg16 20.7 tok/s), LFM JNI 통과
+- K2-Horizon 3.7B Q4_K_M(공식 3.16GB): 정답·2턴 재사용 33/47·배치↔1토큰 일치, tg 7.9 / pp 79.6 tok/s(호스트)
+  - 툴 호출(날씨→web_search, 알람→set_alarm 7:30) 정상. 영어 설명 정확, **한국어 설명은 사실 오류**(effort high 도 동일; 모델 카드 언어 en)
+  - 템플릿: tool_presentation=json, call=xml 로 고정해 이식(골든 10케이스). 추론 끄기 없음 → Thinking=high, Instant=low
+  - KV f16 144KB/토큰 → 컨텍스트 8K·KV q8 자동 제한
+
 ---
 
 ## 2. 호스트 검증 결과 (x86-64, 4 vCPU, 15 GB, 실모델 Q4_0)
