@@ -10,6 +10,9 @@ coroutines = "1.10.2"
 junit = "4.13.2"
 json = "20250517"
 jsoup = "1.23.2"
+markwon = "4.6.2"
+jlatexmath = "0.2.0"
+navigation = "2.9.8"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -31,8 +34,18 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 org-json = { group = "org.json", name = "json", version.ref = "json" }
 # 웹 툴: 검색 결과/페이지 본문 추출
 jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
+# 채팅 렌더링: 마크다운(표·취소선·체크리스트·링크) + LaTeX(JLatexMath)
+markwon-core = { group = "io.noties.markwon", name = "core", version.ref = "markwon" }
+markwon-latex = { group = "io.noties.markwon", name = "ext-latex", version.ref = "markwon" }
+markwon-tables = { group = "io.noties.markwon", name = "ext-tables", version.ref = "markwon" }
+markwon-strikethrough = { group = "io.noties.markwon", name = "ext-strikethrough", version.ref = "markwon" }
+markwon-tasklist = { group = "io.noties.markwon", name = "ext-tasklist", version.ref = "markwon" }
+markwon-inline-parser = { group = "io.noties.markwon", name = "inline-parser", version.ref = "markwon" }
+markwon-linkify = { group = "io.noties.markwon", name = "linkify", version.ref = "markwon" }
+androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
 
 [plugins]
+paparazzi = { id = "app.cash.paparazzi", version = "2.0.0-alpha05.1" }
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }

@@ -38,8 +38,26 @@ data class MessageStats(
 
 data class StoredMessage(val id: Long, val message: ChatMessage, val stats: MessageStats?)
 
+enum class ToolStatus { OK, ERROR, DENIED }
+
+/** 툴 실행 기록(활동 화면) */
+data class ToolRun(
+    val id: Long,
+    val convId: Long,
+    val tool: String,
+    val group: String,
+    val args: Map<String, Any?>,
+    val result: String,
+    val status: ToolStatus,
+    val startedAt: Long,
+    val durationMs: Long,
+)
+
+/** 성능 추이 차트용(최근 응답) */
+data class StatPoint(val at: Long, val model: String?, val stats: MessageStats)
+
 /** SQLite 대화 저장소. rawTokens 는 BLOB(int32 LE)로 저장해 재시작 후에도 캐시 정합성 유지 */
-class ConversationStore(context: Context) : SQLiteOpenHelper(context, "ling.db", null, 2) {
+class ConversationStore(context: Context) : SQLiteOpenHelper(context, "ling.db", null, 3) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -55,10 +73,22 @@ class ConversationStore(context: Context) : SQLiteOpenHelper(context, "ling.db",
                 FOREIGN KEY(conv_id) REFERENCES conversations(id) ON DELETE CASCADE)""",
         )
         db.execSQL("CREATE INDEX idx_messages_conv ON messages(conv_id, idx)")
+        createToolRuns(db)
+    }
+
+    private fun createToolRuns(db: SQLiteDatabase) {
+        // 대화를 지워도 기록은 남긴다(conv_id 는 참조만)
+        db.execSQL(
+            """CREATE TABLE tool_runs(
+                id INTEGER PRIMARY KEY AUTOINCREMENT, conv_id INTEGER NOT NULL, tool TEXT NOT NULL, grp TEXT NOT NULL,
+                args TEXT NOT NULL, result TEXT NOT NULL, status TEXT NOT NULL, started_at INTEGER NOT NULL, duration_ms INTEGER NOT NULL)""",
+        )
+        db.execSQL("CREATE INDEX idx_tool_runs_time ON tool_runs(started_at)")
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) db.execSQL("ALTER TABLE messages ADD COLUMN raw_model TEXT")
+        if (oldVersion < 3) createToolRuns(db)
     }
 
     override fun onConfigure(db: SQLiteDatabase) {
@@ -143,6 +173,53 @@ class ConversationStore(context: Context) : SQLiteOpenHelper(context, "ling.db",
             db.setTransactionSuccessful()
         } finally {
             db.endTransaction()
+        }
+    }
+
+    suspend fun addToolRun(r: ToolRun): Long = withContext(Dispatchers.IO) {
+        writableDatabase.insertOrThrow("tool_runs", null, ContentValues().apply {
+            put("conv_id", r.convId); put("tool", r.tool); put("grp", r.group)
+            put("args", JSONObject().apply { for ((k, v) in r.args) put(k, v?.toString() ?: JSONObject.NULL) }.toString())
+            put("result", r.result); put("status", r.status.name); put("started_at", r.startedAt); put("duration_ms", r.durationMs)
+        })
+    }
+
+    suspend fun toolRuns(limit: Int = 500, convId: Long? = null): List<ToolRun> = withContext(Dispatchers.IO) {
+        val (where, args) = if (convId != null) "WHERE conv_id=?" to arrayOf(convId.toString()) else "" to null
+        readableDatabase.rawQuery("SELECT * FROM tool_runs $where ORDER BY started_at DESC LIMIT $limit", args).use { c ->
+            buildList {
+                while (c.moveToNext()) {
+                    val a = JSONObject(c.getString(c.getColumnIndexOrThrow("args")))
+                    add(ToolRun(
+                        id = c.getLong(c.getColumnIndexOrThrow("id")),
+                        convId = c.getLong(c.getColumnIndexOrThrow("conv_id")),
+                        tool = c.getString(c.getColumnIndexOrThrow("tool")),
+                        group = c.getString(c.getColumnIndexOrThrow("grp")),
+                        args = linkedMapOf<String, Any?>().apply { for (k in a.keys()) put(k, if (a.isNull(k)) null else a.get(k).toString()) },
+                        result = c.getString(c.getColumnIndexOrThrow("result")),
+                        status = runCatching { ToolStatus.valueOf(c.getString(c.getColumnIndexOrThrow("status"))) }.getOrDefault(ToolStatus.OK),
+                        startedAt = c.getLong(c.getColumnIndexOrThrow("started_at")),
+                        durationMs = c.getLong(c.getColumnIndexOrThrow("duration_ms")),
+                    ))
+                }
+            }
+        }
+    }
+
+    suspend fun clearToolRuns() = withContext(Dispatchers.IO) { writableDatabase.delete("tool_runs", null, null) }
+
+    /** 최근 응답들의 성능 기록(오래된 → 최신) */
+    suspend fun recentStats(limit: Int = 60): List<StatPoint> = withContext(Dispatchers.IO) {
+        readableDatabase.rawQuery(
+            "SELECT m.stats, m.raw_model, c.updated_at FROM messages m JOIN conversations c ON c.id = m.conv_id " +
+                "WHERE m.stats IS NOT NULL ORDER BY m.id DESC LIMIT $limit", null,
+        ).use { c ->
+            buildList {
+                while (c.moveToNext()) {
+                    val st = runCatching { decodeStats(c.getString(0)) }.getOrNull() ?: continue
+                    if (st.decodeTokens > 0) add(StatPoint(c.getLong(2), c.getString(1), st))
+                }
+            }.reversed()
         }
     }
 

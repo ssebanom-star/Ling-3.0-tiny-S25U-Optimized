@@ -67,6 +67,10 @@ data class AppSettings(
     val skipAccelCheck: Boolean = false,
     /** 한 번의 사용자 요청에서 툴 호출 최대 라운드 */
     val maxToolRounds: Int = 8,
+    /** 0=시스템, 1=라이트, 2=다크 */
+    val themeMode: Int = 0,
+    /** 배경화면 기반 다이내믹 컬러(끄면 앱 고유 팔레트) */
+    val dynamicColor: Boolean = false,
 )
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -106,6 +110,8 @@ class SettingsRepository(private val context: Context) {
         val braveApiKey = stringPreferencesKey("brave_api_key")
         val maxToolRounds = intPreferencesKey("max_tool_rounds")
         val skipAccelCheck = booleanPreferencesKey("skip_accel_check")
+        val themeMode = intPreferencesKey("theme_mode")
+        val dynamicColor = booleanPreferencesKey("dynamic_color")
     }
 
     val flow: Flow<AppSettings> = context.dataStore.data.map { flowValue(it, AppSettings()) }
@@ -148,6 +154,8 @@ class SettingsRepository(private val context: Context) {
             p[K.braveApiKey] = n.braveApiKey
             p[K.maxToolRounds] = n.maxToolRounds
             p[K.skipAccelCheck] = n.skipAccelCheck
+            p[K.themeMode] = n.themeMode
+            p[K.dynamicColor] = n.dynamicColor
         }
     }
 
@@ -185,5 +193,7 @@ class SettingsRepository(private val context: Context) {
         braveApiKey = p[K.braveApiKey] ?: d.braveApiKey,
         maxToolRounds = p[K.maxToolRounds] ?: d.maxToolRounds,
         skipAccelCheck = p[K.skipAccelCheck] ?: d.skipAccelCheck,
+        themeMode = p[K.themeMode] ?: d.themeMode,
+        dynamicColor = p[K.dynamicColor] ?: d.dynamicColor,
     )
 }

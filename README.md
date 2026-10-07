@@ -38,6 +38,13 @@ APK 를 설치하고 열면 아래가 자동으로 진행된다. 사용자는 �
 - **기기 최적화** — 스레드·코어 배치 자동 튜닝, 열 거버너, ADPF 성능 힌트, 포그라운드 서비스 + wake lock
 - **기본 백엔드 Adreno GPU(OpenCL)** — 디바이스 없음·로드 실패 시 CPU 자동 복귀. NPU/GPU 정확성 검사(CPU 기준 logits 비교)는 성능 탭에서 수동
 - 모델 다운로드(이어받기 + SHA-256), 파일 가져오기, 대화 저장(SQLite)
+- **UI** — 대화가 홈, 드로어(날짜별 대화·검색·이름 바꾸기)에서 모델/툴 활동/성능/설정으로 이동(슬라이드 전환)
+  - 응답 렌더링: 마크다운(Markwon) + LaTeX(인라인 `$…$`·`\(…\)`, 블록 `$$…$$`·`\[…\]` → JLatexMath) +
+    표(Compose, 가로 스크롤) + 코드 블록(언어 표시·복사·구문 강조). 빈 줄 단위로 나눠 스트리밍 중엔 마지막 블록만 다시 그림
+  - 추론 카드(진행 중 경과 시간·빛 효과·미리보기), 툴 실행 카드(툴별 아이콘·상태·소요 시간, 검색 결과/파일 목록/기기 상태 전용 보기)
+  - 툴 활동 화면: 실행 기록(SQLite `tool_runs`) · 성공률/평균 소요 · 툴별·일별 차트 · 필터 · 상세 · JSON 내보내기
+  - 성능 화면: 최근 응답 tok/s·TTFT 추이 차트, 상단 모델 칩에서 모델·실행 장치 빠른 전환
+  - 라이트/다크/시스템 테마, 다이내믹 컬러 선택
 
 ## 빌드
 
@@ -53,7 +60,8 @@ tools/build_hexagon_backend.sh
 ## 테스트
 
 ```bash
-./gradlew :app:testDebugUnitTest                       # 템플릿 골든·파서
+./gradlew :app:testDebugUnitTest                       # 템플릿 골든·파서·마크다운 분할
+./gradlew :app:recordPaparazziDebug                     # UI 스냅샷(app/src/test/snapshots) 다시 그리기
 cmake -S tests/host -B build-host -DCMAKE_BUILD_TYPE=Release && cmake --build build-host -j
 ./build-host/ling_engine_test Ling-3.0-tiny-Q4_0.gguf   # 실모델 엔진 테스트
 tools/run_host_jni_test.sh Ling-3.0-tiny-Q4_0.gguf      # 실모델 JNI 테스트

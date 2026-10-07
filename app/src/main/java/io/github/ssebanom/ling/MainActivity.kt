@@ -10,7 +10,9 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import io.github.ssebanom.ling.service.LingService
 import io.github.ssebanom.ling.ui.LingRoot
-import io.github.ssebanom.ling.ui.LingTheme
+import io.github.ssebanom.ling.ui.theme.LingTheme
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 
 class MainActivity : ComponentActivity() {
     private val notifPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -25,7 +27,10 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             if (!container.settings.current().setupDone) container.setup.start()
         }
-        setContent { LingTheme { LingRoot(container) } }
+        setContent {
+            val s by container.settings.flow.collectAsState(initial = null)
+            LingTheme(themeMode = s?.themeMode ?: 0, dynamicColor = s?.dynamicColor ?: false) { LingRoot(container) }
+        }
     }
 
     // 툴 승인: 앱이 보이면 다이얼로그, 아니면 접근성 오버레이

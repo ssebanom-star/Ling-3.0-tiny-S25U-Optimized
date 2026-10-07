@@ -7,6 +7,8 @@ import io.github.ssebanom.ling.data.ConversationStore
 import io.github.ssebanom.ling.data.MessageStats
 import io.github.ssebanom.ling.data.SettingsRepository
 import io.github.ssebanom.ling.data.StoredMessage
+import io.github.ssebanom.ling.data.ToolRun
+import io.github.ssebanom.ling.data.ToolStatus
 import io.github.ssebanom.ling.domain.ChatMessage
 import io.github.ssebanom.ling.domain.ModelFamily
 import io.github.ssebanom.ling.domain.Role
@@ -36,6 +38,11 @@ data class Streaming(
     val thermal: ThermalGovernor.Level = ThermalGovernor.Level.NORMAL,
     /** TOOL 단계에서 실행 중인 툴 */
     val toolName: String = "",
+    val toolArgs: Map<String, Any?> = emptyMap(),
+    /** 현재 생성(라운드) 시작 시각 — 추론 경과 시간 표시용 */
+    val startedAt: Long = 0L,
+    /** 추론이 끝난 시각(0=진행 중) */
+    val thinkEndedAt: Long = 0L,
 )
 
 data class ChatState(
@@ -70,6 +77,9 @@ class ChatController(
 
     /** 서비스가 구독: 생성 중 여부 */
     val busyFlow = MutableStateFlow(false)
+
+    /** 툴 실행 기록이 추가될 때마다 증가(활동 화면 갱신) */
+    val toolRunTick = MutableStateFlow(0)
 
     fun openConversation(id: Long) = scope.launch {
         if (_state.value.busy) return@launch // 생성 중 전환 금지(진행 중 턴이 상태를 덮어씀)
@@ -199,7 +209,13 @@ class ChatController(
             var lastUi = 0L
             var lastThermalCheck = 0L
             var level = thermal.snapshot().level
-            setPhase(if (family.startInThink(conv.thinking)) Phase.THINKING else Phase.ANSWERING)
+            val startWall = System.currentTimeMillis()
+            _state.update { st ->
+                st.copy(streaming = st.streaming.copy(
+                    phase = if (family.startInThink(conv.thinking)) Phase.THINKING else Phase.ANSWERING,
+                    reasoning = "", content = "", tokens = 0, startedAt = startWall, thinkEndedAt = 0L,
+                ))
+            }
 
             val rec = family.samplingFor(conv.thinking)
             val sampler = if (s.useRecommendedSampling) SamplerConfig(
@@ -227,7 +243,9 @@ class ChatController(
                     lastUi = now
                     val tps = nTok * 1e9 / (now - t0)
                     _state.update { st ->
+                        val ended = if (!parser.isThinking && st.streaming.thinkEndedAt == 0L && parser.reasoning.isNotEmpty()) System.currentTimeMillis() else st.streaming.thinkEndedAt
                         st.copy(streaming = st.streaming.copy(
+                            thinkEndedAt = ended,
                             phase = if (parser.isThinking) Phase.THINKING else Phase.ANSWERING,
                             reasoning = parser.reasoning,
                             content = family.visibleContent(parser.content),
@@ -258,7 +276,7 @@ class ChatController(
             )
             msgs += assistant to stats
             _state.update { it.copy(lastStats = stats) }
-            persist(conv, msgs)
+            persist(conv, msgs, clearLive = true)
 
             if (gen.reason == StopReason.CONTEXT_FULL) {
                 _state.update { it.copy(error = "컨텍스트가 가득 찼습니다. 새 대화를 시작하거나 설정에서 컨텍스트를 늘리세요.") }
@@ -269,8 +287,18 @@ class ChatController(
             // 툴 실행 → 결과(tool 역할) 추가 후 다음 라운드
             for (call in parsed.calls) {
                 if (stopRequested) return
-                _state.update { st -> st.copy(streaming = st.streaming.copy(phase = Phase.TOOL, toolName = call.name)) }
-                msgs += ChatMessage(Role.TOOL, tools.execute(call.name, call.arguments, s)) to null
+                _state.update { st -> st.copy(streaming = st.streaming.copy(phase = Phase.TOOL, toolName = call.name, toolArgs = call.arguments)) }
+                val t0Wall = System.currentTimeMillis()
+                val result = tools.execute(call.name, call.arguments, s)
+                msgs += ChatMessage(Role.TOOL, result) to null
+                runCatching {
+                    store.addToolRun(ToolRun(
+                        id = 0, convId = conv.id, tool = call.name, group = tools.groupOf(call.name)?.name ?: "",
+                        args = call.arguments, result = result, status = toolStatusOf(result),
+                        startedAt = t0Wall, durationMs = System.currentTimeMillis() - t0Wall,
+                    ))
+                    toolRunTick.value++
+                }
             }
             persist(conv, msgs)
         }
@@ -285,10 +313,22 @@ class ChatController(
         return created
     }
 
-    private suspend fun persist(conv: Conversation, msgs: List<Pair<ChatMessage, MessageStats?>>) {
+    /** [clearLive]: 방금 저장한 응답이 실시간 표시와 겹치지 않게 스트리밍 텍스트를 같은 갱신에서 비운다 */
+    private suspend fun persist(conv: Conversation, msgs: List<Pair<ChatMessage, MessageStats?>>, clearLive: Boolean = false) {
         store.replaceMessages(conv.id, msgs)
         val stored = store.messages(conv.id)
-        _state.update { it.copy(messages = stored) }
+        _state.update {
+            if (clearLive) it.copy(messages = stored, streaming = it.streaming.copy(reasoning = "", content = "", tokens = 0))
+            else it.copy(messages = stored)
+        }
+    }
+
+    companion object {
+        fun toolStatusOf(result: String): ToolStatus = when {
+            result.startsWith("error: the user declined") -> ToolStatus.DENIED
+            result.startsWith("error:") -> ToolStatus.ERROR
+            else -> ToolStatus.OK
+        }
     }
 
     private fun setPhase(p: Phase) = _state.update { it.copy(streaming = it.streaming.copy(phase = p)) }

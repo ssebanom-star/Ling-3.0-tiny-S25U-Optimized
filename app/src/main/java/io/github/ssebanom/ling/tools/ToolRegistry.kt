@@ -27,6 +27,8 @@ class ToolRegistry(context: Context, private val approvals: ToolApprovals) {
         ReadScreenTool(), TapTool(), TypeTextTool(), ScrollTool(), PressKeyTool(),
     )
 
+    fun groupOf(name: String): ToolGroup? = all.firstOrNull { it.name == name }?.group
+
     fun groupReady(g: ToolGroup): Boolean = when (g) {
         ToolGroup.FILES -> Environment.isExternalStorageManager()
         ToolGroup.SCREEN -> LingAccessibilityService.instance != null

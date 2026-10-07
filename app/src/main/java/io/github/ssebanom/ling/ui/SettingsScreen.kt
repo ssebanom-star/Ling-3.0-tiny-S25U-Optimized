@@ -32,6 +32,18 @@ import io.github.ssebanom.ling.AppContainer
 import io.github.ssebanom.ling.data.AppSettings
 import io.github.ssebanom.ling.domain.ModelFamily
 import io.github.ssebanom.ling.tools.ToolGroup
+import io.github.ssebanom.ling.ui.components.ChipRow
+import io.github.ssebanom.ling.ui.components.ScreenScaffold
+import io.github.ssebanom.ling.ui.components.SectionCard
+import io.github.ssebanom.ling.ui.components.SwitchRow
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material.icons.outlined.Forum
+import androidx.compose.material.icons.outlined.Memory
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Thermostat
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.ui.graphics.vector.ImageVector
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -44,7 +56,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun SettingsScreen(c: AppContainer, modifier: Modifier = Modifier) {
+fun SettingsScreen(c: AppContainer, onBack: () -> Unit) {
     val s by c.settings.flow.collectAsState(initial = AppSettings())
     val scope = rememberCoroutineScope()
     fun set(f: (AppSettings) -> AppSettings) = scope.launch { c.settings.update(f) }
@@ -55,14 +67,22 @@ fun SettingsScreen(c: AppContainer, modifier: Modifier = Modifier) {
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { resumed++ }
     val family = c.inference.familyFor(File(s.modelFile))
 
-    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Section("대화") {
+    ScreenScaffold("설정", onBack) { pad ->
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(pad).padding(horizontal = 16.dp).padding(bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        SectionCard("화면", Icons.Outlined.Palette) {
+            ChipRow("테마", listOf(0, 1, 2), s.themeMode, display = { listOf("시스템", "라이트", "다크")[it] }) { v -> set { it.copy(themeMode = v) } }
+            SwitchRow("다이내믹 컬러", s.dynamicColor, desc = "배경화면 색을 따릅니다. 끄면 Ling 고유 팔레트") { v -> set { it.copy(dynamicColor = v) } }
+        }
+        Section("대화", Icons.Outlined.Forum) {
             Toggle("새 대화 기본 Thinking 모드 (Ling 전용, LFM2.5 는 항상 추론)", s.defaultThinking) { v -> set { it.copy(defaultThinking = v) } }
             var sys by remember(s.systemPrompt) { mutableStateOf(s.systemPrompt) }
             OutlinedTextField(sys, { sys = it }, Modifier.fillMaxWidth(), label = { Text("시스템 프롬프트 (새 대화부터 적용)") }, minLines = 2)
             TextButton(onClick = { set { it.copy(systemPrompt = sys) } }, enabled = sys != s.systemPrompt) { Text("저장") }
         }
-        Section("툴") {
+        Section("툴", Icons.Outlined.Build) {
             Toggle("툴 사용", s.toolsEnabled) { v -> set { it.copy(toolsEnabled = v) } }
             if (s.toolsEnabled) {
                 key(resumed) {
@@ -109,7 +129,7 @@ fun SettingsScreen(c: AppContainer, modifier: Modifier = Modifier) {
                     enabled = sx != s.searxngUrl || bk != s.braveApiKey) { Text("저장") }
             }
         }
-        Section("샘플링") {
+        Section("샘플링", Icons.Outlined.Tune) {
             val r = family.sampling
             Toggle(
                 "모델 권장값 사용 (${family.label}: temp ${r.temperature}, top_p ${r.topP}, top_k ${r.topK}, rep ${r.repeatPenalty})",
@@ -127,7 +147,7 @@ fun SettingsScreen(c: AppContainer, modifier: Modifier = Modifier) {
             }
             Choice("최대 생성 토큰", listOf(1024, 2048, 4096, 8192, 16384), s.maxTokens) { v -> set { it.copy(maxTokens = v) } }
         }
-        Section("메모리 · 컨텍스트 (변경 시 모델 재로드)") {
+        Section("메모리 · 컨텍스트", Icons.Outlined.Memory, "변경 시 모델 재로드") {
             Text(
                 when (family) {
                     ModelFamily.LING -> "MLA 캐시 6.9KB/토큰 + KDA 상태 19MiB 고정 → 32K = 약 216MiB"
@@ -143,7 +163,7 @@ fun SettingsScreen(c: AppContainer, modifier: Modifier = Modifier) {
             Choice("턴 체크포인트 최대 개수 (개당 ~19MiB)", listOf(2, 4, 8, 16), s.maxCheckpoints) { v -> set { it.copy(maxCheckpoints = v) } }
             Choice("유휴 시 자동 언로드(분, 0=안 함)", listOf(0, 5, 10, 30), s.autoUnloadMinutes) { v -> set { it.copy(autoUnloadMinutes = v) } }
         }
-        Section("CPU · 열 관리") {
+        Section("CPU · 열 관리", Icons.Outlined.Thermostat) {
             Choice("디코드 스레드 (0=자동/튜닝값 ${s.tunedThreads})", listOf(0, 2, 3, 4, 5, 6, 8), s.threads) { v -> set { it.copy(threads = v) } }
             Choice("prefill 스레드 (0=자동/튜닝값 ${s.tunedThreadsBatch})", listOf(0, 4, 6, 8), s.threadsBatch) { v -> set { it.copy(threadsBatch = v) } }
             Toggle("열 거버너 (온도 상승 시 스레드/속도 제한)", s.thermalGovernor) { v -> set { it.copy(thermalGovernor = v) } }
@@ -151,23 +171,19 @@ fun SettingsScreen(c: AppContainer, modifier: Modifier = Modifier) {
         }
     }
 }
+}
 
 @Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            content()
-        }
-    }
+private fun Section(title: String, icon: ImageVector, subtitle: String? = null, content: @Composable () -> Unit) {
+    SectionCard(title, icon, subtitle = subtitle) { content() }
 }
 
 @Composable
 private fun Toggle(label: String, value: Boolean, onChange: (Boolean) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(label, Modifier.weight(1f))
-        Switch(value, onChange)
-    }
+    // "제목 (설명)" 형태면 설명을 아래 줄로
+    val m = Regex("^(.*?)\\s*\\((.*)\\)$").find(label)
+    if (m != null) SwitchRow(m.groupValues[1], value, desc = m.groupValues[2], onChange = onChange)
+    else SwitchRow(label, value, onChange = onChange)
 }
 
 @Composable
@@ -179,11 +195,6 @@ private fun SliderRow(label: String, value: Float, range: ClosedFloatingPointRan
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Choice(label: String, options: List<Int>, value: Int, onChange: (Int) -> Unit) {
-    Text(label, style = MaterialTheme.typography.bodyMedium)
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        options.forEach { o -> FilterChip(selected = o == value, onClick = { onChange(o) }, label = { Text(o.toString()) }) }
-    }
-}
+private fun Choice(label: String, options: List<Int>, value: Int, onChange: (Int) -> Unit) =
+    ChipRow(label, options, value, onChange = onChange)
