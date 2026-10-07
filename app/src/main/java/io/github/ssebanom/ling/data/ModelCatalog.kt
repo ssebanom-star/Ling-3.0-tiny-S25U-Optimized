@@ -83,8 +83,39 @@ object ModelCatalog {
         ModelVariant(
             "QWEN-IQ1_M", "Qwen_Qwen3.6-35B-A3B-IQ1_M.gguf", 9_421_649_536L,
             "d291e12a0f693b5f14c11bb1278ba43b432b2b6f6c33c7fdaf750c214ff83f28", QWEN_IQ1M_DECODE_BYTES,
-            "실험: RAM 초과 → 저장장치에서 읽으며 실행. 느리고 1bit 라 품질 저하 큼",
+            "원본 가중치 IQ1_M(1.75bpw). 시험: 답·툴 호출 모두 정상 — Qwen 빌드 중 가장 양호. RAM 초과라 저장장치에서 읽으며 실행",
             family = ModelFamily.QWEN36, repo = QWEN_REPO, experimental = true,
+        ),
+        // ---- 같은 모델의 더 작은 빌드(호스트 greedy 시험 결과를 note 에 기록) ----
+        ModelVariant(
+            "QWEN-IQ1_S", "Qwen3.6-35B-A3B.i1-IQ1_S.gguf", 7_484_142_304L,
+            "866e42dd53c834bdf2c0b05a92cd912c56c2990fbc56258fa9e12c9831778fbc", 1_108_000_000L,
+            "원본 가중치 IQ1_S(1.56bpw). 시험: 일반 답 정상, 툴 호출 깨짐(형식 붕괴·반복)",
+            family = ModelFamily.QWEN36, repo = "mradermacher/Qwen3.6-35B-A3B-i1-GGUF", experimental = true,
+        ),
+        ModelVariant(
+            "QWEN-REAP25", "qwen3.6-35b-reap25_iq1m.gguf", 7_932_246_080L,
+            "0f591699a08251582b34ba6ecc2aab1a23d2dc03b089206b81683e088e7c2d1c", 1_500_000_000L,
+            "사용자 빌드: expert 25% 가지치기(256→192)+IQ1_M. 시험: 상식 오답, 툴 호출 태그 일부 누락(앱이 보정)",
+            family = ModelFamily.QWEN36, repo = "dxx117/Qwen3.6-35B-REAP-IQ1M", experimental = true,
+        ),
+        ModelVariant(
+            "QWEN-REAP40", "qwen3.6-35b-reap40-iq1m.gguf", 6_678_657_120L,
+            "a5174823ab6bc0c03373762bb7fa524ef4c426581be4e6df45c74422c2a2478a", 1_500_000_000L,
+            "사용자 빌드: expert 40% 가지치기(→154)+IQ1_M. 시험: 상식 오답(서울→Tokyo), 툴 호출 형식 정상",
+            family = ModelFamily.QWEN36, repo = "dxx117/Qwen3.6-35B-REAP-IQ1M", experimental = true,
+        ),
+        ModelVariant(
+            "QWEN-REAP50", "qwen3.6-35b-reap50-iq1m.gguf", 5_820_938_368L,
+            "4c38e3678d8e30c073696059d914f2b44d0ca8bebffef13c2b05c14cf096152f", 1_500_000_000L,
+            "사용자 빌드: expert 50% 가지치기(→128)+IQ1_M. 시험: 상식 오답, 툴 호출 형식 정상(인자에 중국어 섞임)",
+            family = ModelFamily.QWEN36, repo = "dxx117/Qwen3.6-35B-REAP-IQ1M", experimental = true,
+        ),
+        ModelVariant(
+            "QWEN28-IQ1_S", "Qwen3.6-28B-REAP.i1-IQ1_S.gguf", 6_192_747_488L,
+            "b01d1d0188bf39a79842bb6ef9e6ed629cc3a1f4e5b8b99c71d6f395ef9ee43f", 1_091_000_000L,
+            "사용자 빌드: 0xSero 28B REAP(→205 expert)+IQ1_S. 시험: 일반 답 정상, 툴 호출 깨짐(반복)",
+            family = ModelFamily.QWEN36, repo = "mradermacher/Qwen3.6-28B-REAP-i1-GGUF", experimental = true,
         ),
     )
 

@@ -141,10 +141,13 @@ object QwenToolCallParser {
     private val FUNC = Regex("<function=([^>\\n]+)>(.*?)(</function>|$)", RegexOption.DOT_MATCHES_ALL)
     private val PARAM = Regex("<parameter=([^>\\n]+)>(.*?)</parameter>", RegexOption.DOT_MATCHES_ALL)
 
+    // 극단 양자화 모델이 "<function=" 를 빠뜨리고 "<tool_call>name>" 으로 쓰는 경우(REAP25 IQ1_M 에서 관측)
+    private val LOOSE_FUNC = Regex("^\\s*([A-Za-z_][A-Za-z0-9_.-]*)>(.*)$", RegexOption.DOT_MATCHES_ALL)
+
     fun parse(content: String): ToolCallParser.Result {
         val calls = ArrayList<ToolCall>()
         for (m in CALL.findAll(content)) {
-            val f = FUNC.find(m.groupValues[1]) ?: continue
+            val f = FUNC.find(m.groupValues[1]) ?: LOOSE_FUNC.find(m.groupValues[1]) ?: continue
             val args = LinkedHashMap<String, Any?>()
             for (p in PARAM.findAll(f.groupValues[2])) {
                 args[p.groupValues[1].trim()] = p.groupValues[2].removePrefix("\n").removeSuffix("\n")

@@ -89,6 +89,13 @@ class QwenPromptBuilderTest {
     }
 
     @Test
+    fun parsesMalformedFunctionTag() {
+        val r = QwenToolCallParser.parse("<tool_call>web_search>\n<parameter=query>\n서울 날씨\n</parameter>\n</function>\n</tool_call>")
+        assertEquals("web_search", r.calls.single().name)
+        assertEquals("서울 날씨", r.calls.single().arguments["query"])
+    }
+
+    @Test
     fun familyAndSampling() {
         assertEquals(ModelFamily.QWEN36, ModelFamily.detect("Qwen_Qwen3.6-35B-A3B-IQ1_M.gguf"))
         assertEquals(1.5f, ModelFamily.QWEN36.samplingFor(true).presencePenalty)
