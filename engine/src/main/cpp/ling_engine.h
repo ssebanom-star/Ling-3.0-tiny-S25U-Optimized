@@ -45,6 +45,9 @@ struct EngineParams {
     bool kv_q8           = false;  // MLA 캐시 q8_0
     // 오프로드 대상 디바이스 이름(쉼표 구분, 예: "HTP0" / "GPUOpenCL"). 비어 있으면 CPU 전용
     std::string devices;
+    // 오프로드 중에도 CPU 메모리(mmap)에 둘 텐서 이름 정규식. 예: "\\.ffn_.*_exps\\." = MoE routed expert
+    // → RAM 보다 큰 MoE 모델에서 expert 는 저장장치에서 읽고 나머지(어텐션·공유 expert·출력)는 GPU/NPU 로
+    std::string cpu_tensors;
     int  n_gpu_layers    = 0;
     int  max_checkpoints = 8;
 };

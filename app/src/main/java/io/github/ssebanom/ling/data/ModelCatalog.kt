@@ -20,8 +20,8 @@ data class ModelVariant(
     val family: ModelFamily = ModelFamily.LING,
     val repo: String = ModelCatalog.REPO,
     /**
-     * 실험(RAM 보다 큰 모델): CPU 전용 + mmap 으로 저장장치에서 필요한 가중치만 읽는다.
-     * CPU 가중치 재배열(repack)은 전체를 RAM 에 복사하므로 끈다.
+     * 실험(RAM 보다 큰 모델): mmap 으로 저장장치에서 필요한 가중치만 읽는다. GPU/NPU 사용 시 routed expert 만
+     * CPU(mmap)에 두고 나머지를 가속기에 올린다. CPU 가중치 재배열(repack)은 전체를 RAM 에 복사하므로 끈다.
      */
     val experimental: Boolean = false,
 ) {
@@ -83,7 +83,7 @@ object ModelCatalog {
         ModelVariant(
             "QWEN-IQ1_M", "Qwen_Qwen3.6-35B-A3B-IQ1_M.gguf", 9_421_649_536L,
             "d291e12a0f693b5f14c11bb1278ba43b432b2b6f6c33c7fdaf750c214ff83f28", QWEN_IQ1M_DECODE_BYTES,
-            "실험: RAM 초과 → 저장장치에서 읽으며 실행(CPU 전용). 느리고 1bit 라 품질 저하 큼",
+            "실험: RAM 초과 → 저장장치에서 읽으며 실행. 느리고 1bit 라 품질 저하 큼",
             family = ModelFamily.QWEN36, repo = QWEN_REPO, experimental = true,
         ),
     )

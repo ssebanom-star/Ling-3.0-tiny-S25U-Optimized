@@ -19,6 +19,8 @@ data class EngineConfig(
     val weightRepack: Boolean = true,
     /** 오프로드 디바이스(예: "HTP0,HTP1", "GPUOpenCL"). 빈 문자열 = CPU 전용 */
     val devices: String = "",
+    /** 오프로드 중에도 CPU(mmap)에 둘 텐서 이름 정규식. 빈 문자열 = 없음 */
+    val cpuTensors: String = "",
     val nGpuLayers: Int = 0,
     val maxCheckpoints: Int = 8,
 )

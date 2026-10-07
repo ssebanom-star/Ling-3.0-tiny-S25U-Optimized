@@ -60,10 +60,13 @@ class InferenceManager(
     /** 모델 파일의 계열(템플릿·툴 포맷·권장 샘플링) */
     fun familyFor(path: File): ModelFamily = ModelCatalog.byFile(path.name)?.family ?: ModelFamily.detect(path.name)
 
-    /** 실험 모델(RAM 초과)은 설정과 무관하게 CPU+mmap 으로만 돌린다 */
+    /**
+     * 실험 모델(RAM 초과 MoE): 가중치는 mmap 으로 저장장치에서 읽는다. GPU/NPU 를 고르면
+     * routed expert([EXPERT_TENSORS])만 CPU(mmap)에 두고 나머지(어텐션·DeltaNet·공유 expert·출력)를 가속기에 올린다.
+     */
     fun isExperimental(path: File): Boolean = ModelCatalog.byFile(path.name)?.experimental == true
 
-    fun effectiveBackend(s: AppSettings, path: File): Backend = if (isExperimental(path)) Backend.CPU else s.backend
+    fun effectiveBackend(s: AppSettings, @Suppress("UNUSED_PARAMETER") path: File): Backend = s.backend
 
     /** 현재 로드된(없으면 설정상) 모델의 계열 */
     val family: ModelFamily
@@ -110,10 +113,11 @@ class InferenceManager(
             // 실험 모델(Qwen3.6)은 재귀 상태가 체크포인트당 ~65MB → RAM 압박을 줄이려 2개로 제한
             maxCheckpoints = if (isExperimental(path)) minOf(2, s.maxCheckpoints) else s.maxCheckpoints,
             devices = devices,
+            cpuTensors = if (backend != Backend.CPU && isExperimental(path)) EXPERT_TENSORS else "",
             // NPU/GPU 는 디바이스 버퍼로 올리므로 CPU 재배열 불필요(메모리 이중 상주 방지).
             // 실험 모델은 재배열하면 전체가 RAM 에 복사되어 mmap 으로 읽는 의미가 없어진다
             weightRepack = backend == Backend.CPU && !isExperimental(path),
-            useMmap = backend == Backend.CPU,
+            useMmap = backend == Backend.CPU || isExperimental(path),
         )
     }
 
@@ -161,7 +165,7 @@ class InferenceManager(
 
     private fun sameLoad(a: EngineConfig, b: EngineConfig) =
         a.modelPath == b.modelPath && a.nCtx == b.nCtx && a.kvQ8 == b.kvQ8 && a.devices == b.devices &&
-            a.maxCheckpoints == b.maxCheckpoints && a.weightRepack == b.weightRepack
+            a.maxCheckpoints == b.maxCheckpoints && a.weightRepack == b.weightRepack && a.cpuTensors == b.cpuTensors
 
     private suspend fun load(cfg: EngineConfig, backend: Backend): Boolean {
         val need = File(cfg.modelPath).length()
@@ -379,6 +383,8 @@ class InferenceManager(
         private const val TAG = "InferenceManager"
         /** NPU/GPU 속도 측정 시 생성 토큰 수 (가속기는 느릴 수 있어 짧게) */
         const val ACCEL_TG = 5
+        /** MoE routed expert 텐서(ffn_{gate,up,down,gate_up}_exps). 공유 expert(_shexp)는 제외 */
+        const val EXPERT_TENSORS = "\\.ffn_[a-z_]*_exps\\."
         /** 정확성 검사에서 1개씩 디코드할 마지막 토큰 수 */
         const val PROBE_SINGLE = 8
         /** 정확성 비교에서 무시할 꼬리 확률 경계(log-prob) */

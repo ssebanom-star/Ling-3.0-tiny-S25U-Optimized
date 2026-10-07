@@ -27,7 +27,7 @@ public class JniSmoke {
         String err = LingNative.nativeLoad(h, model,
             new int[]{4096, 512, 512, 4, 4, 50, 0, 8},
             new boolean[]{false, true, false, true, false, false /* x86 AMX repack off */},
-            "", "", p -> { lastProgress[0] = p; return true; });
+            "", "", "", p -> { lastProgress[0] = p; return true; });
         check(err == null, "nativeLoad " + err);
         check(lastProgress[0] > 0.99f, "load progress callback reached 1.0");
         String[] info = LingNative.nativeModelInfo(h);

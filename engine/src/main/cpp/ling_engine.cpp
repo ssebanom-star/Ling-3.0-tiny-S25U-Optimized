@@ -188,6 +188,14 @@ bool Engine::load(const EngineParams & p, std::string & err, const std::function
     mp.devices      = offload ? devs.data() : nullptr;
     mp.n_gpu_layers = offload ? (p.n_gpu_layers > 0 ? p.n_gpu_layers : 999) : 0;
 
+    // 패턴에 맞는 텐서는 CPU 버퍼(mmap 이면 파일 매핑 그대로)에 둔다. 배열은 NULL 패턴으로 끝나야 함
+    std::vector<llama_model_tensor_buft_override> overrides;
+    if (offload && !p.cpu_tensors.empty()) {
+        overrides.push_back({ p.cpu_tensors.c_str(), ggml_backend_cpu_buffer_type() });
+        overrides.push_back({ nullptr, nullptr });
+        mp.tensor_buft_overrides = overrides.data();
+    }
+
     struct ProgressCtx {
         const std::function<bool(float)> * fn;
     } pctx{ &progress };

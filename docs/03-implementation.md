@@ -51,7 +51,7 @@ Phase 0 도구(`tools/phase0/build_bench_tools.sh`): llama-bench/llama-completio
 ### 0.6.0: Qwen3.6-35B-A3B IQ1_M 실험 선택지 (2026-10-07)
 
 `bartowski/Qwen_Qwen3.6-35B-A3B-GGUF` IQ1_M(9.42GB, 1.75bpw, SHA-256 일치). 파일이 12GB 폰 RAM 보다 커서
-**CPU 전용 + mmap**(저장장치에서 필요한 expert 만 페이지 인), 가중치 repack 끔, 체크포인트 최대 2개(DeltaNet 상태 ~63MiB/개).
+**mmap**(저장장치에서 필요한 expert 만 페이지 인; 0.6.1 부터 GPU/NPU 선택 시 routed expert 만 CPU, 나머지는 가속기 — `tensor_buft_overrides`), 가중치 repack 끔, 체크포인트 최대 2개(DeltaNet 상태 ~63MiB/개).
 
 | 항목 | 결과 |
 |---|---|

@@ -63,7 +63,7 @@ class LingEngine private constructor(nativeLibDir: String) {
             handle, cfg.modelPath,
             intArrayOf(cfg.nCtx, cfg.nBatch, cfg.nUbatch, cfg.nThreads, cfg.nThreadsBatch, cfg.poll, cfg.nGpuLayers, cfg.maxCheckpoints),
             booleanArrayOf(cfg.strictCpu, cfg.useMmap, cfg.useMlock, cfg.flashAttn, cfg.kvQ8, cfg.weightRepack),
-            cfg.cpuMask, cfg.devices,
+            cfg.cpuMask, cfg.devices, cfg.cpuTensors,
             NativeCallbacks.Load { p -> onProgress(p); true },
         )
         if (err != null) throw EngineException(err)

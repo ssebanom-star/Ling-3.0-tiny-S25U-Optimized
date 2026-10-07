@@ -17,7 +17,7 @@ internal object LingNative {
      *  bp: strictCpu,useMmap,useMlock,flashAttn,kvQ8,weightRepack. 반환: 오류 메시지(null=성공) */
     @JvmStatic external fun nativeLoad(
         h: Long, path: String, ip: IntArray, bp: BooleanArray,
-        cpumask: String, devices: String, progress: NativeCallbacks.Load?,
+        cpumask: String, devices: String, cpuTensors: String, progress: NativeCallbacks.Load?,
     ): String?
 
     @JvmStatic external fun nativeUnload(h: Long)

@@ -9,7 +9,7 @@ public class ToolCallProbe {
         LingNative.nativeInit("");
         long h = LingNative.nativeCreate();
         String err = LingNative.nativeLoad(h, args[0], new int[]{8192, 512, 512, 4, 4, 50, 0, 8},
-            new boolean[]{false, true, false, true, false, false}, "", "", p -> true);
+            new boolean[]{false, true, false, true, false, false}, "", "", "", p -> true);
         if (err != null) throw new RuntimeException(err);
         for (int i = 1; i < args.length; i++) {
             String prompt = Files.readString(Path.of(args[i]));

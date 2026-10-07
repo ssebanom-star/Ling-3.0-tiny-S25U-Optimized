@@ -142,7 +142,7 @@ JNIEXPORT void JNICALL JFN(nativeDestroy)(JNIEnv *, jclass, jlong h) {
 // ip: [nCtx, nBatch, nUbatch, nThreads, nThreadsBatch, poll, nGpuLayers, maxCheckpoints]
 // bp: [strictCpu, useMmap, useMlock, flashAttn, kvQ8, weightRepack]
 JNIEXPORT jstring JNICALL JFN(nativeLoad)(JNIEnv * env, jclass, jlong h, jstring path, jintArray ip, jbooleanArray bp,
-                                          jstring cpumask, jstring devices, jobject progress) {
+                                          jstring cpumask, jstring devices, jstring cpu_tensors, jobject progress) {
     auto * hd = H(h);
     std::vector<jint>     iv(8);
     std::vector<jboolean> bv(6);
@@ -167,6 +167,7 @@ JNIEXPORT jstring JNICALL JFN(nativeLoad)(JNIEnv * env, jclass, jlong h, jstring
     p.weight_repack   = bv[5];
     p.cpumask         = to_std(env, cpumask);
     p.devices         = to_std(env, devices);
+    p.cpu_tensors     = cpu_tensors ? to_std(env, cpu_tensors) : std::string();
 
     jmethodID on_progress = nullptr;
     if (progress) {
