@@ -63,6 +63,8 @@ data class AppSettings(
     val searxngUrl: String = "",
     /** Brave Search API 키(있으면 우선 사용) */
     val braveApiKey: String = "",
+    /** GPU/NPU 로드 전 정확성 검사(CPU 기준 비교) 건너뛰기 */
+    val skipAccelCheck: Boolean = false,
     /** 한 번의 사용자 요청에서 툴 호출 최대 라운드 */
     val maxToolRounds: Int = 8,
 )
@@ -103,6 +105,7 @@ class SettingsRepository(private val context: Context) {
         val searxngUrl = stringPreferencesKey("searxng_url")
         val braveApiKey = stringPreferencesKey("brave_api_key")
         val maxToolRounds = intPreferencesKey("max_tool_rounds")
+        val skipAccelCheck = booleanPreferencesKey("skip_accel_check")
     }
 
     val flow: Flow<AppSettings> = context.dataStore.data.map { flowValue(it, AppSettings()) }
@@ -144,6 +147,7 @@ class SettingsRepository(private val context: Context) {
             p[K.searxngUrl] = n.searxngUrl
             p[K.braveApiKey] = n.braveApiKey
             p[K.maxToolRounds] = n.maxToolRounds
+            p[K.skipAccelCheck] = n.skipAccelCheck
         }
     }
 
@@ -180,5 +184,6 @@ class SettingsRepository(private val context: Context) {
         searxngUrl = p[K.searxngUrl] ?: d.searxngUrl,
         braveApiKey = p[K.braveApiKey] ?: d.braveApiKey,
         maxToolRounds = p[K.maxToolRounds] ?: d.maxToolRounds,
+        skipAccelCheck = p[K.skipAccelCheck] ?: d.skipAccelCheck,
     )
 }

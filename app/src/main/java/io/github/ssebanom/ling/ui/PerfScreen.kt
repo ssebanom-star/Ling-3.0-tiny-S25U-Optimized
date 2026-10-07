@@ -2,6 +2,7 @@ package io.github.ssebanom.ling.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +15,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -22,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -131,6 +134,17 @@ fun PerfScreen(c: AppContainer, modifier: Modifier = Modifier) {
                         FilterChip(selected = lt == b, onClick = { loadTarget = b }, label = { Text(b.name) }, enabled = !running && !chat.busy)
                     }
                     OutlinedButton(onClick = { task("언로드") { c.inference.unload(); "언로드됨" } }, enabled = !running && !chat.busy) { Text("언로드") }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("GPU/NPU 정확성 검사 건너뛰기", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "켜면 CPU 기준 비교 없이 바로 로드합니다(로드 실패 시에만 CPU 복귀). 출력이 이상하면 끄고 다시 로드하세요.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline,
+                        )
+                    }
+                    Switch(settings.skipAccelCheck, { v -> c.appScope.launch { c.settings.update { it.copy(skipAccelCheck = v) } } },
+                        enabled = !running && !chat.busy)
                 }
             }
         }

@@ -138,8 +138,9 @@ class InferenceManager(
             return true
         }
         if (backend == Backend.CPU) return load(want, backend)
-        // 가속기는 이 모델로 정확성 검사를 통과한 적이 없으면 먼저 검사(실패 시 CPU 복귀)
-        if (s.acceleratorValidated != "${backend.name}:${path.name}") {
+        // 가속기는 이 모델로 정확성 검사를 통과한 적이 없으면 먼저 검사(실패 시 CPU 복귀).
+        // 사용자가 검사 건너뛰기를 켰으면 바로 로드(로드 실패 시에만 CPU 복귀)
+        if (!s.skipAccelCheck && s.acceleratorValidated != "${backend.name}:${path.name}") {
             val r = validateAcceleratorLocked(backend) { Log.i(TAG, "auto-validate: $it") }
             if (!r.passed) lastFallback = "${backend.label} 정확성 검사 실패 → CPU: ${r.detail}"
             return status.value is EngineStatus.Ready
@@ -273,7 +274,7 @@ class InferenceManager(
      * 비교는 기준 분포에서 의미 있는 토큰(log-prob > [TAIL_LP])만 본다 — 극단적 꼬리 확률은 정상 구현끼리도
      * 수치 오차가 커서 오판을 만든다. 의미 있는 토큰이 top-1 하나뿐이면 top-1 과 그 log-prob 만 비교.
      */
-    private fun compare(got: List<Pair<Int, Float>>, ref: List<Pair<Int, Float>>): Verdict {
+    private fun compare(got: List<Pair<Int, Float>>, ref: List<Pair<Int, Float>>, maxMad: Double): Verdict {
         val top1 = got.firstOrNull()?.first == ref.firstOrNull()?.first
         val refSig = ref.take(10).filter { it.second > TAIL_LP }.ifEmpty { ref.take(1) }
         val gotIds = got.take(10).map { it.first }.toSet()
@@ -281,14 +282,14 @@ class InferenceManager(
         val gotMap = got.toMap()
         val diffs = refSig.take(5).map { (id, lp) -> gotMap[id]?.let { kotlin.math.abs(it - lp).toDouble() } ?: 99.0 }
         val mad = diffs.average()
-        val passed = top1 && overlap >= kotlin.math.ceil(refSig.size * 0.7) && mad < 0.5
+        val passed = top1 && overlap >= kotlin.math.ceil(refSig.size * 0.7) && mad < maxMad
         return Verdict(passed, top1, overlap, mad,
             "top1=${if (top1) "O" else "X"} ov=$overlap/${refSig.size} |Δ|=${"%.2f".format(mad)}")
     }
 
-    private fun compare(got: Probe, ref: Probe): Verdict {
-        val b = compare(got.batch, ref.batch)
-        val g = compare(got.single, ref.single)
+    private fun compare(got: Probe, ref: Probe, maxMad: Double): Verdict {
+        val b = compare(got.batch, ref.batch, maxMad)
+        val g = compare(got.single, ref.single, maxMad)
         return Verdict(b.passed && g.passed, b.top1 && g.top1, minOf(b.overlap, g.overlap), maxOf(b.mad, g.mad),
             "prefill[${b.detail}] decode[${g.detail}]")
     }
@@ -341,7 +342,8 @@ class InferenceManager(
                 log.append("${q.label}: 평가 실패 ${it.message}\n")
                 continue
             }
-            val v = compare(got, ref)
+            // 1~2bit 실험 모델은 CPU 자체의 경로별 수치 잡음이 커서(호스트: 배치↔1토큰 0.13) 허용 폭을 넓힌다
+            val v = compare(got, ref, if (isExperimental(path)) MAX_MAD_EXPERIMENTAL else MAX_MAD)
             last = v
             log.append("${q.label}: ${if (v.passed) "통과" else "실패"} ${v.detail}\n")
             Log.i(TAG, "validate ${backend.name} ${q.label}: ${v.detail}")
@@ -389,5 +391,8 @@ class InferenceManager(
         const val PROBE_SINGLE = 8
         /** 정확성 비교에서 무시할 꼬리 확률 경계(log-prob) */
         const val TAIL_LP = -8f
+        /** 공통 top-5 평균 |Δlogp| 허용치 */
+        const val MAX_MAD = 0.5
+        const val MAX_MAD_EXPERIMENTAL = 1.0
     }
 }
