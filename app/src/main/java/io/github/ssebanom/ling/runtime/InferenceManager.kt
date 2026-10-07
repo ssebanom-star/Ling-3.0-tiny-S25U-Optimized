@@ -105,11 +105,11 @@ class InferenceManager(
         }
         return EngineConfig(
             modelPath = path.absolutePath,
-            nCtx = s.nCtx,
+            nCtx = minOf(s.nCtx, familyFor(path).ctxCap),
             nThreads = decode,
             nThreadsBatch = batch,
             cpuMask = mask,
-            kvQ8 = s.kvQ8,
+            kvQ8 = s.kvQ8 || familyFor(path).kvQ8Default,
             // 실험 모델(Qwen3.6)은 재귀 상태가 체크포인트당 ~65MB → RAM 압박을 줄이려 2개로 제한
             maxCheckpoints = if (isExperimental(path)) minOf(2, s.maxCheckpoints) else s.maxCheckpoints,
             devices = devices,

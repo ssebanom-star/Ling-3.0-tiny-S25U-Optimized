@@ -87,6 +87,8 @@ fun ModelsScreen(c: AppContainer, modifier: Modifier = Modifier) {
                         when (family) {
                             ModelFamily.LING -> "7.9B 총 / 1.3B 활성 · KDA+MLA · 출처 ${ModelCatalog.REPO} (MIT)"
                             ModelFamily.LFM2 -> "8.3B 총 / 1.5B 활성 · conv+GQA · 툴 호출 특화, 항상 추론 · 출처 ${ModelCatalog.LFM_REPO} (LFM Open License v1.0)"
+                            ModelFamily.K2H -> "3.7B dense · AA 지수 16(원본) · 툴 호출 정상, 한국어 약함(영어 권장) · " +
+                                "KV 가 커서 컨텍스트 8K·q8 고정 · 출처 ${ModelCatalog.K2H_REPO} (Apache-2.0)"
                             ModelFamily.QWEN36 -> "36B 총 / 3B 활성(원본) · ⚠ 실험: 1bit 양자화(+일부는 expert 가지치기). 파일이 크면 저장장치에서 " +
                                 "읽으며 실행. GPU/NPU 선택 시 expert 는 CPU(mmap), 나머지는 가속기. 다른 앱이 종료될 수 있음. 원본보다 품질 낮음 · Apache-2.0"
                         },

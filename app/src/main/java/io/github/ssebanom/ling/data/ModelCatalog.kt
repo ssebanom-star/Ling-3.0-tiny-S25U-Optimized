@@ -35,6 +35,7 @@ object ModelCatalog {
     const val REPO = "bartowski/Ling-3.0-tiny-GGUF"
     const val LFM_REPO = "LiquidAI/LFM2.5-8B-A1B-GGUF"
     const val QWEN_REPO = "bartowski/Qwen_Qwen3.6-35B-A3B-GGUF"
+    const val K2H_REPO = "IFM/K2-Horizon-3.7B-GGUF"
 
     val variants = listOf(
         ModelVariant(
@@ -85,6 +86,18 @@ object ModelCatalog {
             "d291e12a0f693b5f14c11bb1278ba43b432b2b6f6c33c7fdaf750c214ff83f28", QWEN_IQ1M_DECODE_BYTES,
             "원본 가중치 IQ1_M(1.75bpw). 시험: 답·툴 호출 모두 정상 — Qwen 빌드 중 가장 양호. RAM 초과라 저장장치에서 읽으며 실행",
             family = ModelFamily.QWEN36, repo = QWEN_REPO, experimental = true,
+        ),
+        // K2-Horizon 3.7B (IFM, 공식 GGUF): dense 3.7B, 전층 어텐션. AA 지수 16. 한국어 약함(모델 카드 언어: en)
+        ModelVariant(
+            "K2H-Q4_K_M", "K2-Horizon-4B-Q4_K_M.gguf", 3_156_598_144L,
+            "07773aed93890d4f5d08b421430000d5c8d73cefc74fbdc32e67d820f23207b2", 3_000_000_000L,
+            "K2-Horizon 3.7B. 시험: 툴 호출 정상, 영어 답 정상, 한국어 설명은 사실 오류(영어 사용 권장). 컨텍스트 8K·KV q8 고정",
+            recommended = true, family = ModelFamily.K2H, repo = K2H_REPO,
+        ),
+        ModelVariant(
+            "K2H-Q5_K_M", "K2-Horizon-4B-Q5_K_M.gguf", 3_643_776_384L,
+            "944ec9515178a0e138a8951cd53e23967b9d24ff0604e07ca590ac2003f14066", 3_500_000_000L,
+            "K2-Horizon 3.7B 고품질(느림)", family = ModelFamily.K2H, repo = K2H_REPO,
         ),
         // ---- 같은 모델의 더 작은 빌드(호스트 greedy 시험 결과를 note 에 기록) ----
         ModelVariant(

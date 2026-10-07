@@ -5,7 +5,12 @@ package io.github.ssebanom.ling.domain
  * thinking 모드 생성 프롬프트가 "<think>" 로 끝나므로, on 모드는 추론 상태에서 시작한다.
  * 태그가 조각 경계에 걸려 와도 처리하도록 태그 접두부는 보류한다.
  */
-class ThinkParser(startInThink: Boolean) {
+class ThinkParser(
+    startInThink: Boolean,
+    /** 모델별 추론 태그(K2-Horizon 은 `<ifm|think>` / `</ifm|think_faster>` 등) */
+    private val openTag: String = OPEN,
+    private val closeTag: String = CLOSE,
+) {
     private var inThink = startInThink
     private var pending = StringBuilder()
     private val reasoningBuf = StringBuilder()
@@ -22,7 +27,7 @@ class ThinkParser(startInThink: Boolean) {
         val r = StringBuilder()
         val c = StringBuilder()
         while (true) {
-            val tag = if (inThink) CLOSE else OPEN
+            val tag = if (inThink) closeTag else openTag
             val s = pending.toString()
             val idx = s.indexOf(tag)
             if (idx >= 0) {

@@ -39,16 +39,26 @@ public class JniSmoke {
         // -Dling.fmt=lfm : LFM2.5 채팅 포맷(항상 추론 → 생성 길이 늘림)
         boolean lfm = "lfm".equals(System.getProperty("ling.fmt"));
         boolean qwen = "qwen".equals(System.getProperty("ling.fmt")); // -Dling.fmt=qwen : Qwen3.6 (thinking off)
-        String sys = qwen ? "<|im_start|>system\nAnswer in one word.<|im_end|>\n"
-                   : lfm ? "<|startoftext|><|im_start|>system\nAnswer in one word.<|im_end|>\n"
-                         : "<role>SYSTEM</role>detailed thinking off<|role_end|>";
-        String user = (lfm || qwen) ? "<|im_start|>user\n한국의 수도는? 한 단어로.<|im_end|>\n"
-                          : "<role>HUMAN</role>한국의 수도는? 한 단어로.<|role_end|>";
-        String gp = qwen ? "<|im_start|>assistant\n<think>\n\n</think>\n\n"
-                  : lfm ? "<|im_start|>assistant\n" : "<role>ASSISTANT</role>\n<think></think>";
-        String end = (lfm || qwen) ? "<|im_end|>\n" : "<|role_end|>";
-        String user2 = (lfm || qwen) ? "<|im_start|>user\n일본은?<|im_end|>\n" : "<role>HUMAN</role>일본은?<|role_end|>";
-        int maxGen = lfm ? 400 : 32;
+        boolean k2 = "k2".equals(System.getProperty("ling.fmt"));     // -Dling.fmt=k2 : K2-Horizon (reasoning low)
+        String sys, user, gp, end, user2;
+        if (k2) {
+            sys = "<|ifm|begin_of_text|><|ifm|im_start|>system\nAnswer in one word.<|ifm|im_end|>";
+            user = "<|ifm|im_start|>user\n한국의 수도는? 한 단어로.<|ifm|im_end|>";
+            gp = "<|ifm|im_start|>assistant\n<ifm|think_faster>\n";
+            end = "<|ifm|im_end|>";
+            user2 = "<|ifm|im_start|>user\n일본은?<|ifm|im_end|>";
+        } else {
+            sys = qwen ? "<|im_start|>system\nAnswer in one word.<|im_end|>\n"
+                : lfm ? "<|startoftext|><|im_start|>system\nAnswer in one word.<|im_end|>\n"
+                      : "<role>SYSTEM</role>detailed thinking off<|role_end|>";
+            user = (lfm || qwen) ? "<|im_start|>user\n한국의 수도는? 한 단어로.<|im_end|>\n"
+                : "<role>HUMAN</role>한국의 수도는? 한 단어로.<|role_end|>";
+            gp = qwen ? "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+                : lfm ? "<|im_start|>assistant\n" : "<role>ASSISTANT</role>\n<think></think>";
+            end = (lfm || qwen) ? "<|im_end|>\n" : "<|role_end|>";
+            user2 = (lfm || qwen) ? "<|im_start|>user\n일본은?<|im_end|>\n" : "<role>HUMAN</role>일본은?<|role_end|>";
+        }
+        int maxGen = (lfm || k2) ? 400 : 32;
         final int[] prog = {0, 0};
         double[] s = LingNative.nativeSync(h, new String[]{sys, user, gp}, new int[][]{null, null, null},
             new boolean[]{true, false, false}, (d, t) -> { prog[0] = d; prog[1] = t; });

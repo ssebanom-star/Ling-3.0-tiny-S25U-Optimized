@@ -65,6 +65,25 @@ enum class ModelFamily(
         // 모델 카드: thinking 일반 1.0/0.95/20, non-thinking 0.7/0.8/20, 둘 다 presence_penalty 1.5
         override fun samplingFor(thinking: Boolean) =
             if (thinking) sampling else RecommendedSampling(0.7f, 0.8f, 20, presencePenalty = 1.5f)
+    },
+
+    /** K2-Horizon 3.7B (IFM). 추론 끄기 없음: Thinking=high, Instant=low(think_faster). 권장 temp 1.0, top_p 0.95 */
+    K2H("K2-Horizon 3.7B", thinkingToggle = true, RecommendedSampling(1.0f, 0.95f, 0)) {
+        override fun segments(messages: List<ChatMessage>, tools: List<Map<String, Any?>>, thinking: Boolean) =
+            K2hPromptBuilder.segments(messages, tools, thinking)
+
+        override fun render(messages: List<ChatMessage>, tools: List<Map<String, Any?>>, thinking: Boolean, addGenerationPrompt: Boolean) =
+            K2hPromptBuilder.render(messages, tools, thinking, addGenerationPrompt)
+
+        override fun parseToolCalls(content: String) = K2hToolCallParser.parse(content)
+        override fun visibleContent(content: String) = K2hToolCallParser.visiblePrefix(content)
+        override fun startInThink(thinking: Boolean) = true // 생성 프롬프트가 추론 태그를 연 상태로 끝남
+        override fun toolSpec(fn: Map<String, Any?>) = linkedMapOf<String, Any?>("type" to "function", "function" to fn)
+        override fun thinkTags(thinking: Boolean) = K2hPromptBuilder.thinkTag(thinking).let { "<$it>" to "</$it>" }
+
+        // 전층 어텐션(36층×KV 8헤드×128) → f16 KV 144KB/토큰. 32K 면 4.5GB 라 12GB 폰에선 8K·q8 로 제한
+        override val ctxCap = 8192
+        override val kvQ8Default = true
     };
 
     abstract fun segments(messages: List<ChatMessage>, tools: List<Map<String, Any?>>, thinking: Boolean): List<PromptSegment>
@@ -76,6 +95,15 @@ enum class ModelFamily(
     /** 공통 function 스키마({name, description, parameters}) → 이 계열 템플릿이 기대하는 형태 */
     abstract fun toolSpec(fn: Map<String, Any?>): Map<String, Any?>
 
+    /** 이 계열에서 허용할 최대 컨텍스트(KV 메모리 보호) */
+    open val ctxCap: Int = Int.MAX_VALUE
+
+    /** KV 캐시를 기본으로 q8_0 으로 둘지 */
+    open val kvQ8Default: Boolean = false
+
+    /** 추론 구간 여닫는 태그 */
+    open fun thinkTags(thinking: Boolean): Pair<String, String> = ThinkParser.OPEN to ThinkParser.CLOSE
+
     /** 모드별 권장 샘플링(기본은 [sampling]) */
     open fun samplingFor(thinking: Boolean): RecommendedSampling = sampling
 
@@ -86,7 +114,12 @@ enum class ModelFamily(
     fun probePrompt(): String = render(
         listOf(ChatMessage(Role.USER, "대한민국의 수도는 어디인가요? Then compute 17*23 and explain briefly.")),
         emptyList(), thinking = false,
-    ) + if (this == LFM2) "<think>\nThe user asks about the capital of South Korea and 17*23. The capital is" else ""
+    ) + when (this) {
+        LFM2 -> "<think>\nThe user asks about the capital of South Korea and 17*23. The capital is"
+        // 생성 프롬프트가 추론 태그를 연 채 끝나 첫 토큰이 닫는 태그로 거의 확정 → 답 문장 중간까지
+        K2H -> "</ifm|think_faster>The capital of South Korea is"
+        else -> ""
+    }
 
     companion object {
         /** GGUF 파일명/모델 설명으로 계열 추정 */
@@ -95,6 +128,7 @@ enum class ModelFamily(
             return when {
                 s.contains("lfm") -> LFM2
                 s.contains("qwen") -> QWEN36
+                s.contains("k2-horizon") || s.contains("k2_horizon") || s.contains("k2horizon") -> K2H
                 else -> LING
             }
         }

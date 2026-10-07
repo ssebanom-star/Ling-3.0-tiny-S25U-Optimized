@@ -16,7 +16,7 @@ public class ToolCallProbe {
             LingNative.nativeSync(h, new String[]{prompt}, new int[][]{null}, new boolean[]{false}, null);
             StringBuilder sb = new StringBuilder();
             // greedy, 최대 700 토큰
-            LingNative.nativeGenerate(h, new float[]{0f, 1f, 0f, 1f}, new int[]{700, 1, 0, 1}, (piece, t) -> { sb.append(piece); return true; });
+            LingNative.nativeGenerate(h, new float[]{0f, 1f, 0f, 1f}, new int[]{Integer.getInteger("maxgen", 700), 1, 0, 1}, (piece, t) -> { sb.append(piece); return true; });
             System.out.println("=== " + Path.of(args[i]).getFileName());
             System.out.println(sb);
         }

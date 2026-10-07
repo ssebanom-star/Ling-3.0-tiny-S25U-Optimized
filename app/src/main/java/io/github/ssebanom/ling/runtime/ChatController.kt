@@ -191,7 +191,8 @@ class ChatController(
             // ADPF: 추론 스레드 + ggml 워커, 목표 25ms/토큰(40 tok/s)
             if (s.perfHints) hints.start(DeviceProfiler.inferenceThreadIds(), 1_000_000_000L / 40)
 
-            val parser = ThinkParser(startInThink = family.startInThink(conv.thinking))
+            val (openTag, closeTag) = family.thinkTags(conv.thinking)
+            val parser = ThinkParser(startInThink = family.startInThink(conv.thinking), openTag = openTag, closeTag = closeTag)
             var nTok = 0
             val t0 = SystemClock.elapsedRealtimeNanos()
             var lastTokNs = t0
