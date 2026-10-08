@@ -83,6 +83,8 @@ private fun familyInfo(f: ModelFamily): Pair<String, String> = when (f) {
     ModelFamily.LING -> "7.9B 총 · 1.3B 활성 MoE" to "KDA+MLA 하이브리드 · 빠르고 한국어 양호 · 출처 ${ModelCatalog.REPO} (MIT)"
     ModelFamily.LFM2 -> "8.3B 총 · 1.5B 활성 MoE" to "conv+GQA · 툴 호출 특화, 항상 추론 · 출처 ${ModelCatalog.LFM_REPO} (LFM Open License v1.0)"
     ModelFamily.K2H -> "3.7B dense" to "툴 호출 정상, 한국어 약함(영어 권장) · KV 가 커서 컨텍스트 8K·q8 고정 · 출처 ${ModelCatalog.K2H_REPO} (Apache-2.0)"
+    ModelFamily.GRANITE -> "6.9B 총 · 약 1B 활성 MoE" to "Mamba2+어텐션 혼합(어텐션 4층뿐) → 긴 컨텍스트도 메모리 거의 안 늘어남 · 한국어 공식 지원 · " +
+        "툴 호출 · 추론 단계 없음(바로 답함) · 출처 ${ModelCatalog.GRANITE_REPO} (Apache-2.0)"
     ModelFamily.QWEN36 -> "36B 총 · 3B 활성 MoE (실험)" to "1bit 양자화(+일부 expert 가지치기). 큰 파일은 저장장치에서 읽으며 실행, " +
         "GPU/NPU 선택 시 expert 는 CPU(mmap). 다른 앱이 종료될 수 있고 원본보다 품질 낮음 · Apache-2.0"
 }

@@ -1,0 +1,320 @@
+[
+ {
+  "name": "single_user_default_system",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "안녕?"
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|start_of_role|>system<|end_of_role|>You are a helpful assistant. Please ensure responses are professional, accurate, and safe.<|end_of_text|>\n<|start_of_role|>user<|end_of_role|>안녕?<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>"
+ },
+ {
+  "name": "system_user",
+  "input": {
+   "messages": [
+    {
+     "role": "system",
+     "content": "You are helpful."
+    },
+    {
+     "role": "user",
+     "content": "Q"
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|start_of_role|>system<|end_of_role|>You are helpful.<|end_of_text|>\n<|start_of_role|>user<|end_of_role|>Q<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>"
+ },
+ {
+  "name": "multi_turn",
+  "input": {
+   "messages": [
+    {
+     "role": "system",
+     "content": "S"
+    },
+    {
+     "role": "user",
+     "content": "1+1?"
+    },
+    {
+     "role": "assistant",
+     "content": "2"
+    },
+    {
+     "role": "user",
+     "content": "times 3?"
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|start_of_role|>system<|end_of_role|>S<|end_of_text|>\n<|start_of_role|>user<|end_of_role|>1+1?<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>2<|end_of_text|>\n<|start_of_role|>user<|end_of_role|>times 3?<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>"
+ },
+ {
+  "name": "tools_basic",
+  "input": {
+   "messages": [
+    {
+     "role": "system",
+     "content": "Sys"
+    },
+    {
+     "role": "user",
+     "content": "서울 날씨?"
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "get_weather",
+      "description": "현재 날씨 조회",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "city": {
+         "type": "string"
+        },
+        "days": {
+         "type": "integer"
+        }
+       },
+       "required": [
+        "city"
+       ]
+      }
+     }
+    },
+    {
+     "type": "function",
+     "function": {
+      "name": "calc",
+      "description": "Evaluate",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "expr": {
+         "type": "string"
+        }
+       },
+       "required": []
+      }
+     }
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|start_of_role|>system<|end_of_role|>Sys\n\nYou are a helpful assistant with access to the following tools. You may call one or more tools to assist with the user query.\n\nYou are provided with function signatures within <tools></tools> XML tags:\n<tools>\n{\"type\": \"function\", \"function\": {\"name\": \"get_weather\", \"description\": \"현재 날씨 조회\", \"parameters\": {\"type\": \"object\", \"properties\": {\"city\": {\"type\": \"string\"}, \"days\": {\"type\": \"integer\"}}, \"required\": [\"city\"]}}}\n{\"type\": \"function\", \"function\": {\"name\": \"calc\", \"description\": \"Evaluate\", \"parameters\": {\"type\": \"object\", \"properties\": {\"expr\": {\"type\": \"string\"}}, \"required\": []}}}\n</tools>\n\nFor each tool call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:\n<tool_call>\n{\"name\": <function-name>, \"arguments\": <args-json-object>}\n</tool_call>. If a tool does not exist in the provided list of tools, notify the user that you do not have the ability to fulfill the request.<|end_of_text|>\n<|start_of_role|>user<|end_of_role|>서울 날씨?<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>"
+ },
+ {
+  "name": "tools_no_system",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "x"
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "calc",
+      "description": "Evaluate",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "expr": {
+         "type": "string"
+        }
+       },
+       "required": []
+      }
+     }
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|start_of_role|>system<|end_of_role|>You are a helpful assistant with access to the following tools. You may call one or more tools to assist with the user query.\n\nYou are provided with function signatures within <tools></tools> XML tags:\n<tools>\n{\"type\": \"function\", \"function\": {\"name\": \"calc\", \"description\": \"Evaluate\", \"parameters\": {\"type\": \"object\", \"properties\": {\"expr\": {\"type\": \"string\"}}, \"required\": []}}}\n</tools>\n\nFor each tool call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:\n<tool_call>\n{\"name\": <function-name>, \"arguments\": <args-json-object>}\n</tool_call>. If a tool does not exist in the provided list of tools, notify the user that you do not have the ability to fulfill the request.<|end_of_text|>\n<|start_of_role|>user<|end_of_role|>x<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>"
+ },
+ {
+  "name": "tool_call_roundtrip",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "서울 날씨?"
+    },
+    {
+     "role": "assistant",
+     "content": "",
+     "tool_calls": [
+      {
+       "type": "function",
+       "function": {
+        "name": "get_weather",
+        "arguments": {
+         "city": "서울",
+         "days": 2
+        }
+       }
+      }
+     ]
+    },
+    {
+     "role": "tool",
+     "content": "{\"temp\": 21}"
+    },
+    {
+     "role": "assistant",
+     "content": "21도입니다."
+    },
+    {
+     "role": "user",
+     "content": "thanks"
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "get_weather",
+      "description": "현재 날씨 조회",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "city": {
+         "type": "string"
+        },
+        "days": {
+         "type": "integer"
+        }
+       },
+       "required": [
+        "city"
+       ]
+      }
+     }
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|start_of_role|>system<|end_of_role|>You are a helpful assistant with access to the following tools. You may call one or more tools to assist with the user query.\n\nYou are provided with function signatures within <tools></tools> XML tags:\n<tools>\n{\"type\": \"function\", \"function\": {\"name\": \"get_weather\", \"description\": \"현재 날씨 조회\", \"parameters\": {\"type\": \"object\", \"properties\": {\"city\": {\"type\": \"string\"}, \"days\": {\"type\": \"integer\"}}, \"required\": [\"city\"]}}}\n</tools>\n\nFor each tool call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:\n<tool_call>\n{\"name\": <function-name>, \"arguments\": <args-json-object>}\n</tool_call>. If a tool does not exist in the provided list of tools, notify the user that you do not have the ability to fulfill the request.<|end_of_text|>\n<|start_of_role|>user<|end_of_role|>서울 날씨?<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|><tool_call>\n{\"name\": \"get_weather\", \"arguments\": {\"city\": \"서울\", \"days\": 2}}\n</tool_call><|end_of_text|>\n<|start_of_role|>user<|end_of_role|>\n<tool_response>\n{\"temp\": 21}\n</tool_response><|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>21도입니다.<|end_of_text|>\n<|start_of_role|>user<|end_of_role|>thanks<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>"
+ },
+ {
+  "name": "two_calls_two_results",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "q"
+    },
+    {
+     "role": "assistant",
+     "content": "Let me check.",
+     "tool_calls": [
+      {
+       "type": "function",
+       "function": {
+        "name": "calc",
+        "arguments": {
+         "expr": "1+2"
+        }
+       }
+      },
+      {
+       "type": "function",
+       "function": {
+        "name": "calc",
+        "arguments": {
+         "expr": "3*4",
+         "flag": true,
+         "obj": {
+          "a": [
+           1,
+           "b"
+          ]
+         }
+        }
+       }
+      }
+     ]
+    },
+    {
+     "role": "tool",
+     "content": "3"
+    },
+    {
+     "role": "tool",
+     "content": "12"
+    }
+   ],
+   "tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "calc",
+      "description": "Evaluate",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "expr": {
+         "type": "string"
+        }
+       },
+       "required": []
+      }
+     }
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|start_of_role|>system<|end_of_role|>You are a helpful assistant with access to the following tools. You may call one or more tools to assist with the user query.\n\nYou are provided with function signatures within <tools></tools> XML tags:\n<tools>\n{\"type\": \"function\", \"function\": {\"name\": \"calc\", \"description\": \"Evaluate\", \"parameters\": {\"type\": \"object\", \"properties\": {\"expr\": {\"type\": \"string\"}}, \"required\": []}}}\n</tools>\n\nFor each tool call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:\n<tool_call>\n{\"name\": <function-name>, \"arguments\": <args-json-object>}\n</tool_call>. If a tool does not exist in the provided list of tools, notify the user that you do not have the ability to fulfill the request.<|end_of_text|>\n<|start_of_role|>user<|end_of_role|>q<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>Let me check.\n<tool_call>\n{\"name\": \"calc\", \"arguments\": {\"expr\": \"1+2\"}}\n</tool_call>\n<tool_call>\n{\"name\": \"calc\", \"arguments\": {\"expr\": \"3*4\", \"flag\": true, \"obj\": {\"a\": [1, \"b\"]}}}\n</tool_call><|end_of_text|>\n<|start_of_role|>user<|end_of_role|>\n<tool_response>\n3\n</tool_response>\n<tool_response>\n12\n</tool_response><|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>"
+ },
+ {
+  "name": "mid_system",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "a"
+    },
+    {
+     "role": "assistant",
+     "content": "b"
+    },
+    {
+     "role": "system",
+     "content": "late"
+    },
+    {
+     "role": "user",
+     "content": "c"
+    }
+   ],
+   "add_generation_prompt": true
+  },
+  "expected": "<|start_of_role|>system<|end_of_role|>You are a helpful assistant. Please ensure responses are professional, accurate, and safe.<|end_of_text|>\n<|start_of_role|>user<|end_of_role|>a<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>b<|end_of_text|>\n<|start_of_role|>system<|end_of_role|>late<|end_of_text|>\n<|start_of_role|>user<|end_of_role|>c<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>"
+ },
+ {
+  "name": "no_generation_prompt",
+  "input": {
+   "messages": [
+    {
+     "role": "user",
+     "content": "a"
+    },
+    {
+     "role": "assistant",
+     "content": "b"
+    }
+   ],
+   "add_generation_prompt": false
+  },
+  "expected": "<|start_of_role|>system<|end_of_role|>You are a helpful assistant. Please ensure responses are professional, accurate, and safe.<|end_of_text|>\n<|start_of_role|>user<|end_of_role|>a<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>b<|end_of_text|>\n"
+ }
+]

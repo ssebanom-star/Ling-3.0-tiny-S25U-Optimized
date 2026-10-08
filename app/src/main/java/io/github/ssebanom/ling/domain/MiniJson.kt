@@ -1,6 +1,6 @@
 package io.github.ssebanom.ling.domain
 
-/** 테스트용 최소 JSON 파서 (키 순서 보존: LinkedHashMap, 정수는 Long) */
+/** 최소 JSON 파서(툴 호출 인자·테스트 골든) (키 순서 보존: LinkedHashMap, 정수는 Long) */
 class MiniJson(private val s: String) {
     private var i = 0
 

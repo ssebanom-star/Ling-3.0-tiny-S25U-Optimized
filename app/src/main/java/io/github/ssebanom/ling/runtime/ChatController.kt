@@ -217,13 +217,16 @@ class ChatController(
                 ))
             }
 
+            val grammar = if (toolSpecs.isEmpty()) null else family.toolGrammar(tools.available(s).map { it.name })
             val rec = family.samplingFor(conv.thinking)
             val sampler = if (s.useRecommendedSampling) SamplerConfig(
                 temperature = rec.temperature, topP = rec.topP, topK = rec.topK, minP = rec.minP,
                 repeatPenalty = rec.repeatPenalty, presencePenalty = rec.presencePenalty, maxTokens = s.maxTokens,
+                grammar = grammar?.first, grammarTrigger = grammar?.second,
             ) else SamplerConfig(
                 temperature = s.temperature, topP = s.topP, topK = s.topK, minP = s.minP,
                 repeatPenalty = s.repeatPenalty, maxTokens = s.maxTokens,
+                grammar = grammar?.first, grammarTrigger = grammar?.second,
             )
             val gen = engine.generate(sampler) { piece ->
                 parser.feed(piece)

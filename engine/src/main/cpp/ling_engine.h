@@ -61,6 +61,9 @@ struct SamplerParams {
     float    presence_penalty = 0.0f;  // Qwen3.6 권장 1.5 (반복 루프 억제)
     int      repeat_last_n  = 64;
     uint32_t seed           = 0xFFFFFFFF;  // LLAMA_DEFAULT_SEED
+    // GBNF 문법(비우면 끔). trigger 가 있으면 lazy: 생성 텍스트가 그 정규식(첫 캡처 그룹부터 문법 적용)에 걸린 뒤에만 제약
+    std::string grammar;
+    std::string grammar_trigger;
 };
 
 // 프롬프트 조각: 텍스트(토큰화 대상) 또는 이미 알고 있는 토큰열(이전에 생성한 assistant 출력)

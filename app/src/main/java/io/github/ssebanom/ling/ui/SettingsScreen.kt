@@ -153,6 +153,7 @@ fun SettingsScreen(c: AppContainer, onBack: () -> Unit) {
                     ModelFamily.LING -> "MLA 캐시 6.9KB/토큰 + KDA 상태 19MiB 고정 → 32K = 약 216MiB"
                     ModelFamily.LFM2 -> "LFM2.5: GQA 6층 KV f16 12KB/토큰(8 KV헤드×64차원) + conv 상태 소량 → 32K = 약 384MiB"
                     ModelFamily.K2H -> "K2-Horizon: 전층 어텐션 KV f16 144KB/토큰(q8 72KB) → 이 모델은 컨텍스트 최대 8K·KV q8 로 자동 제한(약 0.56GiB)"
+                    ModelFamily.GRANITE -> "Granite 4.0-H-Tiny: 어텐션 4층만 KV f16 8KB/토큰 + Mamba2 상태 고정 → 64K 도 약 0.5GiB"
                     ModelFamily.QWEN36 -> "Qwen3.6(실험): 어텐션 10층 KV f16 20KB/토큰 + DeltaNet 상태 ~63MiB(체크포인트 최대 2개) → 32K = 약 640MiB. " +
                         "가중치는 저장장치에서 읽으므로 컨텍스트를 줄일수록 가중치 캐시에 RAM 이 더 남음"
                 },

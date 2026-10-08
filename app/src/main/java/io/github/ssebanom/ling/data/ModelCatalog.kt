@@ -31,11 +31,17 @@ data class ModelVariant(
 /** tools/gguf_budget.py 로 계산한 IQ1_M 토큰당 가중치 읽기량 */
 private const val QWEN_IQ1M_DECODE_BYTES = 1_497_000_000L
 
+/** tools/gguf_budget.py: Granite 4.0-H-Tiny 토큰당 가중치 읽기량(라우티드 expert 6/64) */
+private const val GRANITE_Q40_DECODE_BYTES = 880_000_000L
+private const val GRANITE_Q4KM_DECODE_BYTES = 913_000_000L
+private const val GRANITE_Q5KM_DECODE_BYTES = 1_061_000_000L
+
 object ModelCatalog {
     const val REPO = "bartowski/Ling-3.0-tiny-GGUF"
     const val LFM_REPO = "LiquidAI/LFM2.5-8B-A1B-GGUF"
     const val QWEN_REPO = "bartowski/Qwen_Qwen3.6-35B-A3B-GGUF"
     const val K2H_REPO = "IFM/K2-Horizon-3.7B-GGUF"
+    const val GRANITE_REPO = "ibm-granite/granite-4.0-h-tiny-GGUF"
 
     val variants = listOf(
         ModelVariant(
@@ -98,6 +104,23 @@ object ModelCatalog {
             "K2H-Q5_K_M", "K2-Horizon-4B-Q5_K_M.gguf", 3_643_776_384L,
             "944ec9515178a0e138a8951cd53e23967b9d24ff0604e07ca590ac2003f14066", 3_500_000_000L,
             "K2-Horizon 3.7B 고품질(느림)", family = ModelFamily.K2H, repo = K2H_REPO,
+        ),
+        // Granite 4.0-H-Tiny (IBM 공식 GGUF): 6.9B 총 / ~1B 활성 MoE, Mamba2 36층 + 어텐션 4층 → KV 8KB/토큰. 한국어 공식 지원 12개 언어 중 하나
+        ModelVariant(
+            "GR-Q4_0", "granite-4.0-h-tiny-Q4_0.gguf", 3_962_938_208L,
+            "85c1f5484c7974a06d33642779ed633b144d7cfa0b498a64e35d08a7116882ef", GRANITE_Q40_DECODE_BYTES,
+            "Granite 기본. 긴 컨텍스트에도 메모리 거의 안 늘어남, 툴 호출 지원", recommended = true,
+            family = ModelFamily.GRANITE, repo = GRANITE_REPO,
+        ),
+        ModelVariant(
+            "GR-Q4_K_M", "granite-4.0-h-tiny-Q4_K_M.gguf", 4_230_976_352L,
+            "5a38b08c441ae1adbafb1d2b8a7167e0d48734d83af68b268cefea1eec553dcd", GRANITE_Q4KM_DECODE_BYTES,
+            "Granite 품질 우선(CPU)", family = ModelFamily.GRANITE, repo = GRANITE_REPO,
+        ),
+        ModelVariant(
+            "GR-Q5_K_M", "granite-4.0-h-tiny-Q5_K_M.gguf", 4_948_534_112L,
+            "28f5214cfc50b4b05340c50ad5c5b116a955b70c1c980c8283362f441b038bc1", GRANITE_Q5KM_DECODE_BYTES,
+            "Granite 고품질", family = ModelFamily.GRANITE, repo = GRANITE_REPO,
         ),
         // ---- 같은 모델의 더 작은 빌드(호스트 greedy 시험 결과를 note 에 기록) ----
         ModelVariant(

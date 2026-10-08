@@ -102,6 +102,7 @@ class LingEngine private constructor(nativeLibDir: String) {
 
     /** sync 직후 호출. onPiece 가 false 를 반환하면 중단. */
     suspend fun generate(sampler: SamplerConfig, onPiece: (String) -> Boolean): GenerateStats = onInfer {
+        LingNative.nativeSetGrammar(handle, sampler.grammar, sampler.grammarTrigger)
         val toks = LingNative.nativeGenerate(
             handle,
             floatArrayOf(sampler.temperature, sampler.topP, sampler.minP, sampler.repeatPenalty, sampler.presencePenalty),

@@ -11,6 +11,9 @@ public class ToolCallProbe {
         String err = LingNative.nativeLoad(h, args[0], new int[]{8192, 512, 512, 4, 4, 50, 0, 8},
             new boolean[]{false, true, false, true, false, false}, "", "", "", p -> true);
         if (err != null) throw new RuntimeException(err);
+        // -Dgrammar=file.gbnf [-Dtrigger=regex] : 툴 호출 제약 문법 시험
+        String gf = System.getProperty("grammar");
+        if (gf != null) LingNative.nativeSetGrammar(h, Files.readString(Path.of(gf)), System.getProperty("trigger"));
         for (int i = 1; i < args.length; i++) {
             String prompt = Files.readString(Path.of(args[i]));
             LingNative.nativeSync(h, new String[]{prompt}, new int[][]{null}, new boolean[]{false}, null);

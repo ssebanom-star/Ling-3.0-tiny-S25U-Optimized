@@ -40,8 +40,15 @@ public class JniSmoke {
         boolean lfm = "lfm".equals(System.getProperty("ling.fmt"));
         boolean qwen = "qwen".equals(System.getProperty("ling.fmt")); // -Dling.fmt=qwen : Qwen3.6 (thinking off)
         boolean k2 = "k2".equals(System.getProperty("ling.fmt"));     // -Dling.fmt=k2 : K2-Horizon (reasoning low)
+        boolean granite = "granite".equals(System.getProperty("ling.fmt")); // -Dling.fmt=granite : Granite 4.0 (추론 없음)
         String sys, user, gp, end, user2;
-        if (k2) {
+        if (granite) {
+            sys = "<|start_of_role|>system<|end_of_role|>Answer in one word.<|end_of_text|>\n";
+            user = "<|start_of_role|>user<|end_of_role|>한국의 수도는? 한 단어로.<|end_of_text|>\n";
+            gp = "<|start_of_role|>assistant<|end_of_role|>";
+            end = "<|end_of_text|>\n";
+            user2 = "<|start_of_role|>user<|end_of_role|>일본은?<|end_of_text|>\n";
+        } else if (k2) {
             sys = "<|ifm|begin_of_text|><|ifm|im_start|>system\nAnswer in one word.<|ifm|im_end|>";
             user = "<|ifm|im_start|>user\n한국의 수도는? 한 단어로.<|ifm|im_end|>";
             gp = "<|ifm|im_start|>assistant\n<ifm|think_faster>\n";

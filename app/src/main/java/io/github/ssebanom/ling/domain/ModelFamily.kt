@@ -84,6 +84,21 @@ enum class ModelFamily(
         // 전층 어텐션(36층×KV 8헤드×128) → f16 KV 144KB/토큰. 32K 면 4.5GB 라 12GB 폰에선 8K·q8 로 제한
         override val ctxCap = 8192
         override val kvQ8Default = true
+    },
+
+    /** IBM Granite 4.0-H-Tiny (7B MoE·1B 활성, Mamba2+어텐션 혼합). 추론 단계 없음. IBM 권장: temperature 0(그리디), top_p 1, top_k 0 */
+    GRANITE("Granite 4.0-H-Tiny", thinkingToggle = false, RecommendedSampling(0.0f, 1.0f, 0)) {
+        override fun segments(messages: List<ChatMessage>, tools: List<Map<String, Any?>>, thinking: Boolean) =
+            GranitePromptBuilder.segments(messages, tools)
+
+        override fun render(messages: List<ChatMessage>, tools: List<Map<String, Any?>>, thinking: Boolean, addGenerationPrompt: Boolean) =
+            GranitePromptBuilder.render(messages, tools, addGenerationPrompt)
+
+        override fun parseToolCalls(content: String) = GraniteToolCallParser.parse(content)
+        override fun visibleContent(content: String) = GraniteToolCallParser.visiblePrefix(content)
+        override fun startInThink(thinking: Boolean) = false
+        override fun toolSpec(fn: Map<String, Any?>) = linkedMapOf<String, Any?>("type" to "function", "function" to fn)
+        override fun toolGrammar(toolNames: List<String>) = GraniteToolGrammar.build(toolNames) to GraniteToolGrammar.TRIGGER
     };
 
     abstract fun segments(messages: List<ChatMessage>, tools: List<Map<String, Any?>>, thinking: Boolean): List<PromptSegment>
@@ -103,6 +118,9 @@ enum class ModelFamily(
 
     /** 추론 구간 여닫는 태그 */
     open fun thinkTags(thinking: Boolean): Pair<String, String> = ThinkParser.OPEN to ThinkParser.CLOSE
+
+    /** 툴 호출 구간 제약 문법(GBNF, lazy 트리거 정규식). null = 제약 없음 */
+    open fun toolGrammar(toolNames: List<String>): Pair<String, String>? = null
 
     /** 모드별 권장 샘플링(기본은 [sampling]) */
     open fun samplingFor(thinking: Boolean): RecommendedSampling = sampling
@@ -129,6 +147,7 @@ enum class ModelFamily(
                 s.contains("lfm") -> LFM2
                 s.contains("qwen") -> QWEN36
                 s.contains("k2-horizon") || s.contains("k2_horizon") || s.contains("k2horizon") -> K2H
+                s.contains("granite") -> GRANITE
                 else -> LING
             }
         }

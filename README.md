@@ -30,6 +30,10 @@ APK 를 설치하고 열면 아래가 자동으로 진행된다. 사용자는 �
 - **캐시 재사용** — 이전 응답을 생성 토큰 그대로 재삽입해 접두부 캐시를 유지하고, 턴 경계마다 KDA 재귀 상태(~19 MiB)
   체크포인트를 남김 → 다음 턴·재생성·편집 시 차이분만 prefill
 - **템플릿 정확성** — Ling-3.0 chat_template.jinja 를 Kotlin 으로 이식, jinja2 골든 13케이스 바이트 일치
+- **지원 모델** — Ling-3.0-tiny(기본), LFM2.5-8B-A1B, K2-Horizon 3.7B, **Granite 4.0-H-Tiny**(7B MoE·1B 활성, Mamba2 혼합,
+  한국어 공식 지원, KV 8KB/토큰), Qwen3.6-35B-A3B 1bit(실험)
+  - Granite 툴 호출은 `<tool_call>` 이후에만 GBNF 문법을 거는 lazy grammar 로 생성(툴 이름 제한, JSON 객체 인자, `\u` 이스케이프 금지
+    → 한글 검색어가 깨지던 문제 해결)
 - **Thinking / Instant 모드**(Ling, 대화 단위), 추론 과정 접기
 - **툴** (설정에서 묶음별로 켬, 부수효과 동작은 실행 전 확인)
   - 기본: 계산기·시간·기기 상태 / 웹: 검색(DuckDuckGo·Bing, 선택 시 Brave API·SearXNG)·페이지 읽기

@@ -574,6 +574,20 @@ GenerateResult Engine::generate(int max_tokens, const SamplerParams & sp, const 
     cancel_.store(false);
 
     auto * smpl = llama_sampler_chain_init(llama_sampler_chain_default_params());
+    // 문법은 맨 앞(전체 어휘): top_k 뒤에 두면 후보가 모두 걸러져 막힐 수 있다
+    if (!sp.grammar.empty()) {
+        llama_sampler * gs = nullptr;
+        if (sp.grammar_trigger.empty()) {
+            gs = llama_sampler_init_grammar(vocab_, sp.grammar.c_str(), "root");
+        } else {
+            const char * pat = sp.grammar_trigger.c_str();
+            gs = llama_sampler_init_grammar_lazy_patterns(vocab_, sp.grammar.c_str(), "root", &pat, 1, nullptr, 0);
+        }
+        // 파싱 실패(NULL)면 제약 없이 생성(문법은 호스트 테스트에서 검증)
+        if (gs) {
+            llama_sampler_chain_add(smpl, gs);
+        }
+    }
     // 157K 어휘 → top_k로 먼저 줄여 이후 penalty/정렬 비용을 최소화
     if (sp.top_k > 0 && sp.temperature > 0.0f) {
         llama_sampler_chain_add(smpl, llama_sampler_init_top_k(sp.top_k));

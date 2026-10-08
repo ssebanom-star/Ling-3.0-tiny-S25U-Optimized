@@ -37,6 +37,10 @@ data class SamplerConfig(
     val repeatLastN: Int = 64,
     val seed: Int = -1,
     val maxTokens: Int = 4096,
+    /** GBNF 문법(null = 제약 없음) */
+    val grammar: String? = null,
+    /** 있으면 lazy 문법: 생성 텍스트가 이 정규식에 걸린 뒤(첫 캡처 그룹부터)만 제약 */
+    val grammarTrigger: String? = null,
 )
 
 /** 프롬프트 조각: 텍스트 또는 이미 알고 있는 토큰열. [boundaryAfter] = 턴 경계(체크포인트 후보) */

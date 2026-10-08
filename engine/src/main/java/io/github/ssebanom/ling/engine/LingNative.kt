@@ -32,6 +32,8 @@ internal object LingNative {
     ): DoubleArray
 
     /** fp: temp,topP,minP,repeatPenalty / ip: maxTokens,topK,repeatLastN,seed */
+    /** 이후 nativeGenerate 에 쓸 GBNF 문법(null = 해제). trigger: lazy 정규식(첫 캡처 그룹부터 문법 적용) */
+    @JvmStatic external fun nativeSetGrammar(h: Long, grammar: String?, trigger: String?)
     @JvmStatic external fun nativeGenerate(h: Long, fp: FloatArray, ip: IntArray, listener: NativeCallbacks.Token?): IntArray
 
     /** 반환: reason,decodeMs,ttftMs,nTokens */

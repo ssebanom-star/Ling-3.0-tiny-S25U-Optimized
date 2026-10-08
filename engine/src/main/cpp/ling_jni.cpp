@@ -25,6 +25,9 @@ struct Handle {
     std::string         last_error;
     ling::SyncResult    last_sync;
     ling::GenerateResult last_gen;
+    // 다음 nativeGenerate 에 적용할 문법(nativeSetGrammar)
+    std::string          grammar;
+    std::string          grammar_trigger;
 };
 
 Handle * H(jlong h) {
@@ -267,6 +270,8 @@ JNIEXPORT jintArray JNICALL JFN(nativeGenerate)(JNIEnv * env, jclass, jlong h, j
     sp.top_k          = iv[1];
     sp.repeat_last_n  = iv[2];
     sp.seed           = (uint32_t) iv[3];
+    sp.grammar         = hd->grammar;
+    sp.grammar_trigger = hd->grammar_trigger;
 
     jmethodID on_piece = nullptr;
     if (listener) {
@@ -290,6 +295,13 @@ JNIEXPORT jintArray JNICALL JFN(nativeGenerate)(JNIEnv * env, jclass, jlong h, j
     hd->last_gen   = g;
     hd->last_error = g.error;
     return to_jints(env, g.tokens);
+}
+
+// 이후 nativeGenerate 에 쓸 GBNF 문법. grammar 가 null/빈 문자열이면 해제, trigger 가 있으면 lazy(정규식, 첫 캡처 그룹부터 적용)
+JNIEXPORT void JNICALL JFN(nativeSetGrammar)(JNIEnv * env, jclass, jlong h, jstring grammar, jstring trigger) {
+    auto * hd           = H(h);
+    hd->grammar         = grammar ? from_jstring_utf8(env, grammar) : std::string();
+    hd->grammar_trigger = trigger ? from_jstring_utf8(env, trigger) : std::string();
 }
 
 // 반환: [reason, decodeMs, ttftMs, nTokens]
