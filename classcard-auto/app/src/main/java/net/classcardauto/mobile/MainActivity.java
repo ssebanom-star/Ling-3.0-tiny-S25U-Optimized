@@ -121,7 +121,7 @@ public final class MainActivity extends Activity {
         imageView.setImageResource(R.drawable.app_mark);
         imageView.setImportantForAccessibility(2);
         linearLayout.addView(imageView, new LinearLayout.LayoutParams(dp(34), dp(34)));
-        TextView label$default = label$default(this, "단어 도우미", 16.0f, false, true, 4, null);
+        TextView label$default = label$default(this, "MiMiC", 16.0f, false, true, 4, null);
         LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(-2, -2);
         layoutParams.leftMargin = dp(10);
         Unit unit = Unit.INSTANCE;
@@ -342,7 +342,7 @@ public final class MainActivity extends Activity {
                 return Unit.INSTANCE;
             }
         })));
-        help.add(new Screens.Nav("접근성 설정", "‘단어 테스트 도우미’ 권한을 켜거나 끕니다", guard(new Function0<Unit>() {
+        help.add(new Screens.Nav("접근성 설정", "‘MiMiC’ 권한을 켜거나 끕니다", guard(new Function0<Unit>() {
             @Override
             public Unit invoke() {
                 return MainActivity.settings$lambda$38(MainActivity.this);
@@ -857,7 +857,7 @@ public final class MainActivity extends Activity {
         }
         BotService companion = BotService.INSTANCE.getInstance();
         if (companion == null) {
-            throw new IllegalStateException("접근성 설정에서 단어 테스트 도우미를 켜주세요.".toString());
+            throw new IllegalStateException("접근성 설정에서 MiMiC를 켜주세요.".toString());
         }
         Storage storage = this.storage;
         if (storage == null) {

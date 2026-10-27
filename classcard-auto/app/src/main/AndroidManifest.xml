@@ -5,8 +5,9 @@
     </queries>
     <application
         android:theme="@style/AppTheme"
-        android:label="단어 테스트 도우미 (인증 없음)"
-        android:icon="@drawable/app_mark"
+        android:label="MiMiC"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:name="net.classcardauto.mobile.BotApplication"
         android:allowBackup="false"
         android:supportsRtl="true"
@@ -27,7 +28,7 @@
             android:enabled="false"
             android:exported="true"/>
         <service
-            android:label="단어 테스트 도우미 (인증 없음)"
+            android:label="MiMiC"
             android:name="net.classcardauto.mobile.BotService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="true">

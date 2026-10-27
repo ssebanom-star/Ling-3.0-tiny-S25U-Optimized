@@ -123,7 +123,7 @@ public final class FloatingPanel extends LinearLayout {
 
         LinearLayout texts = new LinearLayout(context);
         texts.setOrientation(VERTICAL);
-        caption = s.label(context, "단어 도우미", 10.5f, ON_PANEL_DIM, false);
+        caption = s.label(context, "MiMiC", 10.5f, ON_PANEL_DIM, false);
         caption.setLineSpacing(0, 1.0f);
         texts.addView(caption);
         statusText = s.label(context, "", 12.5f, ON_PANEL, true);
@@ -462,7 +462,7 @@ public final class FloatingPanel extends LinearLayout {
     private void updateCaption() {
         AppStyle s = AppStyle.INSTANCE;
         if (!running) {
-            caption.setText("단어 도우미");
+            caption.setText("MiMiC");
             caption.setTextColor(ON_PANEL_DIM);
             return;
         }

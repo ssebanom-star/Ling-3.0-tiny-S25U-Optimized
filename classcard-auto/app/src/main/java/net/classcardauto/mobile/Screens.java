@@ -85,7 +85,7 @@ public final class Screens {
         mark.setImageResource(R.drawable.app_mark);
         mark.setImportantForAccessibility(2);
         bar.addView(mark, new LinearLayout.LayoutParams(dp(c, 36), dp(c, 36)));
-        TextView name = s.label(c, "단어 도우미", 17.0f, s.getInk(), true);
+        TextView name = s.label(c, "MiMiC", 17.0f, s.getInk(), true);
         LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(0, -2, 1.0f);
         np.leftMargin = dp(c, 12);
         bar.addView(name, np);
@@ -174,7 +174,7 @@ public final class Screens {
                     chipFg = s.getWarn();
                     chipBg = s.getSoftWarn();
                     statusTitle.setText(AppStyle.keepWords("접근성 연결이 필요해요"));
-                    statusBody.setText(AppStyle.keepWords("접근성 설정에서 ‘단어 테스트 도우미’를 켜 주세요."));
+                    statusBody.setText(AppStyle.keepWords("접근성 설정에서 ‘MiMiC’를 켜 주세요."));
                     break;
                 case RUNNING:
                     dotColor = s.getInfo();

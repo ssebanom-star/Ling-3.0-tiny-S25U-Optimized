@@ -9,6 +9,7 @@ import app.cash.paparazzi.Paparazzi
 import com.android.ide.common.rendering.api.SessionParams
 import net.classcardauto.mobile.AppStyle
 import net.classcardauto.mobile.FloatingPanel
+import net.classcardauto.mobile.R
 import net.classcardauto.mobile.Screens
 import org.junit.Rule
 import org.junit.Test
@@ -170,6 +171,23 @@ class UiPreviewTest {
         override fun isBlocked() = false
         override fun onPause() {}
         override fun onPanelTouch(eventTime: Long) {}
+    }
+
+    @Test
+    fun appIcon() {
+        val ctx = paparazzi.context
+        val row = android.widget.LinearLayout(ctx)
+        row.setBackgroundColor(Color.WHITE)
+        row.setPadding(40, 40, 40, 40)
+        // the adaptive icon is previewed as its two layers (layoutlib cannot draw AdaptiveIconDrawable here)
+        val mark = android.widget.ImageView(ctx)
+        mark.setImageResource(R.drawable.app_mark)
+        row.addView(mark, android.widget.LinearLayout.LayoutParams(300, 300).also { it.rightMargin = 40 })
+        val adaptive = android.widget.ImageView(ctx)
+        adaptive.setBackgroundResource(R.drawable.ic_launcher_background)
+        adaptive.setImageResource(R.drawable.ic_launcher_foreground)
+        row.addView(adaptive, android.widget.LinearLayout.LayoutParams(300, 300))
+        paparazzi.snapshot(row, "app_icon")
     }
 
     @Test
