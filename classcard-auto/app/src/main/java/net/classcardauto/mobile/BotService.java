@@ -474,7 +474,7 @@ public final class BotService extends AccessibilityService {
                 public final void run() {
                     BotService.gesture$lambda$24(BotService.this, begin, epoch, build, after);
                 }
-            }, 32L);
+            }, (this.touchBlocker != null && this.touchBlocker.getVisibility() == View.VISIBLE) ? 90L : 32L); // the full-screen blocker needs a moment to become pass-through
         } catch (Exception e) {
             this.overlayInputGuard.finish(begin);
             this.busy = false;
@@ -1130,18 +1130,23 @@ public final class BotService extends AccessibilityService {
     }
 
     public final void tap(UiNode target, Function0<Unit> after) {
+        tap(target, after, false);
+    }
+
+    /** {@code precise}: a repeated attempt, so no human-like scatter - aim at the middle with a normal press. */
+    public final void tap(UiNode target, Function0<Unit> after, boolean precise) {
         Intrinsics.checkNotNullParameter(target, "target");
         Intrinsics.checkNotNullParameter(after, "after");
         if (!target.getBounds().getValid() || !target.getEnabled()) {
             throw new IllegalStateException("유효하지 않은 터치 위치입니다.".toString());
         }
         Bounds b = target.getBounds();
-        if (getEngine().isHuman()) {
+        if (getEngine().isHuman() && !precise) {
             java.util.Random rng = getEngine().getRng();
             float[] p = HumanTiming.tapPoint(rng, b.getLeft(), b.getTop(), b.getRight(), b.getBottom());
             gesture(p[0], p[1], p[0], p[1], HumanTiming.tapDurationMs(rng), after);
             return;
         }
-        gesture(b.getX(), b.getY(), b.getX(), b.getY(), 45L, after);
+        gesture(b.getX(), b.getY(), b.getX(), b.getY(), precise ? 70L : 45L, after);
     }
 }

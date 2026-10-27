@@ -960,7 +960,7 @@ public final class BotEngine {
                     inputAnswer$lambda$51 = BotEngine.inputAnswer$lambda$51(BotEngine.this, progress, prompt, answer, readAt, tries);
                     return inputAnswer$lambda$51;
                 }
-            });
+            }, tries > 1);
         }
     }
 
