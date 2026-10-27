@@ -228,7 +228,7 @@ public final class BotService extends AccessibilityService {
 
             @Override
             public boolean isBlocked() {
-                return BotService.this.overlayInputGuard.getBlocked() || BotService.this.busy;
+                return !BotService.this.getEngine().getActive() && (BotService.this.overlayInputGuard.getBlocked() || BotService.this.busy);
             }
 
             @Override
@@ -381,6 +381,21 @@ public final class BotService extends AccessibilityService {
     }
 
     private boolean snappedForTest;
+    private boolean panelPassThrough;
+
+    /** True when a gesture from (x1,y1) to (x2,y2) would be delivered to the floating panel instead of the app below. */
+    private final boolean pathHitsPanel(float x1, float y1, float x2, float y2) {
+        LinearLayout view = this.overlay;
+        if (view == null || view.getVisibility() != View.VISIBLE) {
+            return false;
+        }
+        int[] loc = new int[2];
+        view.getLocationOnScreen(loc);
+        float margin = 24.0f;
+        float l = Math.min(x1, x2) - margin, r = Math.max(x1, x2) + margin;
+        float t = Math.min(y1, y2) - margin, b = Math.max(y1, y2) + margin;
+        return l < loc[0] + view.getWidth() && r > loc[0] && t < loc[1] + view.getHeight() && b > loc[1];
+    }
 
     /** The narrow test strip sits against the nearest side edge so it stays out of the middle of the screen. */
     private final void snapPanelToEdge() {
@@ -416,11 +431,12 @@ public final class BotService extends AccessibilityService {
 
     /* JADX INFO: Access modifiers changed from: private */
     public static final void createOverlay$lambda$32$lambda$31(BotService botService, View view) {
-        if (botService.overlayInputGuard.getBlocked() || botService.busy) {
+        boolean running = botService.getEngine().getActive();
+        if (!running && (botService.overlayInputGuard.getBlocked() || botService.busy)) {
             return;
         }
         try {
-            if (botService.getEngine().getActive()) {
+            if (running) {
                 botService.stop("사용자 중지");
             } else if (botService.getStorage().getPrefs().getBoolean("touch_lock", true) && SystemClock.elapsedRealtime() > botService.lockConfirmUntil) {
                 // first press: explain the lock; a second press within 10 s starts
@@ -495,6 +511,7 @@ public final class BotService extends AccessibilityService {
         final long begin = this.overlayInputGuard.begin();
         this.busy = true;
         try {
+            this.panelPassThrough = pathHitsPanel(x1, y1, x2, y2);
             setOverlayTouchable(false);
             this.handler.postDelayed(new Runnable() { // from class: net.classcardauto.mobile.BotService$$ExternalSyntheticLambda10
                 @Override // java.lang.Runnable
@@ -770,6 +787,10 @@ public final class BotService extends AccessibilityService {
             } catch (Exception ignored) {
                 blockerLp.flags = bf;
             }
+        }
+        if (!touchable && !this.panelPassThrough) {
+            // the gesture does not cross the panel: keep the panel clickable so stop/pause answer at once
+            return;
         }
         int i = layoutParams.flags;
         layoutParams.flags = touchable ? i & (-17) : i | 16;
