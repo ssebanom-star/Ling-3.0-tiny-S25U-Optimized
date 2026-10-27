@@ -36,7 +36,7 @@
 - 정확도: `match_fuzzy_percent`(50–100, 80) `match_tie_percent`(0–30, 8) `match_partial_min`(1–6, 2)
 - 한계: `limit_run_seconds`(120–3600, 600) `limit_phase_seconds`(10–120, 35) `limit_scroll_steps`(40–400, 160) `limit_tap_retries`(1–5, 2) `limit_gate_ms`(300–1500, 650) `limit_touch_pause`(1–5, 2)
 - 스크롤: `scroll_range_percent` `scroll_duration_ms` `scroll_interval_ms` (플로팅 패널 슬라이더)
-- 사람모드: `human_like`, `human_mean_ms`(1000–8000, 3000) — 로그정규 응답시간·피로·망설임·탭 위치/길이 지터
+- 사람모드: `human_like`, `human_mean_ms`(500–8000, 1000) — 로그정규 응답시간·피로·망설임·탭 위치/길이 지터
 - 고의 오답: `wrong_count`(0–20) — 시험 시작 시 무작위 문항 선택. 앱 설정과 **플로팅 패널 슬라이더** 양쪽에서 조절
 - 일시정지/재개: 시험 중 사용자 터치 N회면 자동 일시정지(1×1 `FLAG_WATCH_OUTSIDE_TOUCH` 창의 `ACTION_OUTSIDE`로 감지), 재개 시 터치 수 0, **재개 후 첫 해석 불가 문항은 찍기**. 일시정지/재개는 플로팅 패널에서만(앱 화면으로 돌아가게 하지 말 것 — 사용자 요구)
 - **터치 잠금** `touch_lock`(기본 켬): 실행 중 전체 화면 투명 차단막(TYPE 2032)이 플로팅 패널 외 터치를 삼킴. 패널보다 먼저 추가돼 아래에 깔림. 봇 제스처 동안에는 `FLAG_NOT_TOUCHABLE`로 통과. 일시정지 때 해제. 시작 전 경고(앱: 대화상자, 패널: 두 번 누르기 10초 이내)

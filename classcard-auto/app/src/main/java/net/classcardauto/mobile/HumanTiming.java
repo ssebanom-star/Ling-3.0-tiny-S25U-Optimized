@@ -13,12 +13,12 @@ import java.util.Random;
  *  - Swipes vary in length of time and in the exact path.
  */
 public final class HumanTiming {
-    public static final int MEAN_MIN = 1000;
+    public static final int MEAN_MIN = 500;
     public static final int MEAN_MAX = 8000;
-    public static final int MEAN_DEFAULT = 3000;
+    public static final int MEAN_DEFAULT = 1000;
     public static final int MEAN_STEP = 500;
 
-    static final long THINK_MIN_MS = 500;
+    static final long THINK_MIN_MS = 200;
     static final long THINK_MAX_MS = 20000;
     private static final double THINK_SIGMA = 0.35;
     private static final double HESITATION_CHANCE = 0.06;
@@ -57,7 +57,7 @@ public final class HumanTiming {
     public static long advanceMillis(Random r, int meanMs) {
         double median = 0.25 * meanMs;
         double value = median * Math.exp(0.4 * gauss(r));
-        return (long) clamp(value, 250, 4000);
+        return (long) clamp(value, 120, 4000);
     }
 
     /** A touch point inside the rectangle, clustered around the middle and never within the outer ~12% of the edge. */

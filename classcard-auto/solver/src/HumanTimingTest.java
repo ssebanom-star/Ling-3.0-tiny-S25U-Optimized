@@ -67,10 +67,26 @@ public class HumanTimingTest {
         long adv = 0;
         for (int i = 0; i < 5000; i++) {
             long v = HumanTiming.advanceMillis(r, 3000);
-            ok("advance bounded", v >= 250 && v <= 4000);
+            ok("advance bounded", v >= 120 && v <= 4000);
             adv += v;
         }
         ok("advance around 0.75s", Math.abs(adv / 5000.0 - 800) < 150);
+        {
+            long[] lo = new long[3000];
+            long[] fast = new long[3000];
+            boolean bounded = true;
+            for (int i = 0; i < 3000; i++) {
+                lo[i] = HumanTiming.thinkMillis(r, 500, 8, 48, 0);
+                fast[i] = HumanTiming.thinkMillis(r, 1000, 8, 48, 0);
+                bounded &= lo[i] >= 200 && fast[i] >= 200;
+            }
+            java.util.Arrays.sort(lo);
+            java.util.Arrays.sort(fast);
+            ok("0.5s setting: median under 0.8s", lo[1500] < 800);
+            ok("1s setting: median under 1.3s", fast[1500] < 1300);
+            ok("fast settings bounded below", bounded);
+            ok("0.5s faster than 1s", lo[1500] < fast[1500]);
+        }
         System.out.println(pass + " pass / " + fail + " fail");
         System.exit(fail == 0 ? 0 : 1);
     }
