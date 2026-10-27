@@ -1469,7 +1469,8 @@ public final class BotEngine {
                 writeSummary$default(this, "result", null, str3, null, 10, null);
                 this.active = false;
                 this.epoch++;
-                this.service.setStatus(str3 + " · " + this.answered.size() + "문항 완료");
+                String wrongNote = this.wrongSet != null ? " · 의도한 오답 " + this.wrongSet.size() + "개 중 " + this.wrongPick.size() + "개 실행" : "";
+                this.service.setStatus(str3 + " · " + this.answered.size() + "문항 완료" + wrongNote);
             }
         }
     }
@@ -1934,6 +1935,16 @@ public final class BotEngine {
                 if (!Intrinsics.areEqual(node, correct.getTarget()) && solver.isWrongChoice(prompt, node)) {
                     candidates.add(Integer.valueOf(i));
                 }
+            }
+            // among the certainly-wrong choices avoid ones that look like the right one (shared words, near spelling)
+            List<Integer> distinct = new ArrayList<>();
+            for (Integer i : candidates) {
+                if (Matcher.similarity(Matcher.loose(correct.getTarget().getText()), Matcher.loose(choices.get(i.intValue()).getText())) < 0.5) {
+                    distinct.add(i);
+                }
+            }
+            if (!distinct.isEmpty()) {
+                candidates = distinct;
             }
             int index = WrongAnswers.pickWrong(this.rng, candidates);
             if (index < 0) {
