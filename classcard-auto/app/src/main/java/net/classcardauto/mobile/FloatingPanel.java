@@ -60,6 +60,13 @@ public final class FloatingPanel extends LinearLayout {
     private final TextView touchText;
     private final Host hostRef;
     private long remainingSeconds = -1;
+    private final LinearLayout mini;
+    private final LinearLayout full;
+    private final TextView miniTime;
+    private final TextView miniInfo;
+    private final ImageView miniPauseIcon;
+    private boolean compact;
+    private final int padL, padT, padR, padB;
 
     public FloatingPanel(final Context context, SharedPreferences prefs, final Host host) {
         super(context);
@@ -193,6 +200,75 @@ public final class FloatingPanel extends LinearLayout {
         toolsParams.topMargin = s.dp(context, 6);
         addView(tools, toolsParams);
 
+        // compact strip used during the test so the panel covers as little of the questions as possible
+        mini = new LinearLayout(context);
+        mini.setOrientation(VERTICAL);
+        mini.setGravity(Gravity.CENTER_HORIZONTAL);
+        mini.setVisibility(GONE);
+        ImageView miniHandle = new ImageView(context);
+        miniHandle.setImageResource(R.drawable.ic_drag);
+        miniHandle.setColorFilter(ON_PANEL_DIM);
+        miniHandle.setContentDescription("패널 이동");
+        miniHandle.setRotation(90);
+        miniHandle.setOnTouchListener(dragListener(host));
+        mini.addView(miniHandle, new LayoutParams(s.dp(context, 40), s.dp(context, 22)));
+        miniTime = s.label(context, "", 12.0f, ON_PANEL, true);
+        miniTime.setGravity(Gravity.CENTER);
+        mini.addView(miniTime, new LayoutParams(-2, -2));
+        LinearLayout miniPause = new LinearLayout(context);
+        miniPause.setGravity(Gravity.CENTER);
+        GradientDrawable pauseBg = s.roundRect(context, CHIP, 999, 0);
+        miniPause.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(60, 255, 255, 255)), pauseBg, null));
+        miniPause.setClickable(true);
+        miniPauseIcon = new ImageView(context);
+        miniPauseIcon.setImageResource(R.drawable.ic_pause);
+        miniPauseIcon.setColorFilter(ON_PANEL);
+        miniPause.addView(miniPauseIcon, new LayoutParams(s.dp(context, 18), s.dp(context, 18)));
+        miniPause.setContentDescription("일시정지");
+        miniPause.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!host.isBlocked()) {
+                    host.onPause();
+                }
+            }
+        });
+        LayoutParams mpp = new LayoutParams(s.dp(context, 40), s.dp(context, 32));
+        mpp.topMargin = s.dp(context, 4);
+        mini.addView(miniPause, mpp);
+        Button miniStop = new Button(context);
+        miniStop.setAllCaps(false);
+        miniStop.setText("중지");
+        miniStop.setTextSize(11.0f);
+        miniStop.setTextColor(-1);
+        miniStop.setStateListAnimator(null);
+        miniStop.setElevation(0);
+        miniStop.setMinWidth(0);
+        miniStop.setMinimumWidth(0);
+        miniStop.setMinHeight(0);
+        miniStop.setMinimumHeight(0);
+        miniStop.setPadding(0, 0, 0, 0);
+        miniStop.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(70, 255, 255, 255)), s.roundRect(context, s.getDanger(), 999, 0), null));
+        miniStop.setContentDescription("자동 풀이 중지");
+        miniStop.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!host.isBlocked()) {
+                    host.onPrimary();
+                }
+            }
+        });
+        LayoutParams msp = new LayoutParams(s.dp(context, 40), s.dp(context, 28));
+        msp.topMargin = s.dp(context, 4);
+        mini.addView(miniStop, msp);
+        miniInfo = s.label(context, "", 10.0f, ON_PANEL_DIM, true);
+        miniInfo.setGravity(Gravity.CENTER);
+        LayoutParams mip = new LayoutParams(-2, -2);
+        mip.topMargin = s.dp(context, 4);
+        mini.addView(miniInfo, mip);
+        addView(mini, new LayoutParams(-2, -2));
+        padL = s.dp(context, 8); padT = s.dp(context, 8); padR = s.dp(context, 10); padB = s.dp(context, 8);
+
         panelPrefs = prefs;
         sliders = new LinearLayout(context);
         sliders.setOrientation(VERTICAL);
@@ -215,6 +291,22 @@ public final class FloatingPanel extends LinearLayout {
                 sliders.setVisibility(sliders.getVisibility() == VISIBLE ? GONE : VISIBLE);
             }
         });
+
+        // everything except the compact strip goes into one container so the two layouts can be swapped
+        full = new LinearLayout(context);
+        full.setOrientation(VERTICAL);
+        java.util.List<View> kids = new java.util.ArrayList<>();
+        for (int i = 0; i < getChildCount(); i++) {
+            if (getChildAt(i) != mini) {
+                kids.add(getChildAt(i));
+            }
+        }
+        for (View kid : kids) {
+            android.view.ViewGroup.LayoutParams kp = kid.getLayoutParams();
+            removeView(kid);
+            full.addView(kid, kp);
+        }
+        addView(full, 0, new LayoutParams(-2, -2));
     }
 
     @Override
@@ -265,6 +357,61 @@ public final class FloatingPanel extends LinearLayout {
         }
         s.setDotColor(dot, !running ? s.getAccent() : (pausedNow ? s.getWarn() : s.getInfo()));
         updateCaption();
+        applyCompact(running && inTest, locked, blocked, touches, limit);
+    }
+
+    private OnTouchListener dragListener(final Host host) {
+        return new OnTouchListener() {
+            private float downX;
+            private float downY;
+
+            @Override
+            public boolean onTouch(View v, MotionEvent e) {
+                switch (e.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        downX = e.getRawX();
+                        downY = e.getRawY();
+                        return true;
+                    case MotionEvent.ACTION_MOVE:
+                        host.onDrag(e.getRawX() - downX, e.getRawY() - downY, false);
+                        return true;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        host.onDrag(e.getRawX() - downX, e.getRawY() - downY, true);
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+        };
+    }
+
+    /** During the test only the narrow strip is shown; otherwise the full card. */
+    private void applyCompact(boolean on, boolean locked, int blocked, int touches, int limit) {
+        if (on != compact) {
+            compact = on;
+            full.setVisibility(on ? GONE : VISIBLE);
+            mini.setVisibility(on ? VISIBLE : GONE);
+            if (on) {
+                setPadding(AppStyle.INSTANCE.dp(getContext(), 4), AppStyle.INSTANCE.dp(getContext(), 4), AppStyle.INSTANCE.dp(getContext(), 4), AppStyle.INSTANCE.dp(getContext(), 6));
+            } else {
+                setPadding(padL, padT, padR, padB);
+            }
+        }
+        if (on) {
+            miniPauseIcon.setImageResource(pausedNow ? R.drawable.ic_play : R.drawable.ic_pause);
+            ((View) miniPauseIcon.getParent()).setContentDescription(pausedNow ? "재개" : "일시정지");
+            miniTime.setText(remainingSeconds < 0 ? "" : AppStyle.formatClock(remainingSeconds));
+            miniTime.setTextColor(pausedNow || (remainingSeconds >= 0 && remainingSeconds <= 60) ? Color.rgb(255, 196, 92) : ON_PANEL);
+            if (pausedNow) {
+                miniInfo.setText("정지\n터치 " + touches);
+            } else if (locked) {
+                miniInfo.setText("잠금\n막음 " + blocked);
+            } else {
+                miniInfo.setText("터치\n" + touches + "/" + limit);
+            }
+            miniInfo.setTextColor((pausedNow || touches > 0 || blocked > 0) ? Color.rgb(255, 196, 92) : ON_PANEL_DIM);
+        }
     }
 
     private LinearLayout chip(Context context, int iconRes, String label, TextView labelView) {
@@ -301,6 +448,10 @@ public final class FloatingPanel extends LinearLayout {
         remainingSeconds = seconds;
         if (running) {
             updateCaption();
+            if (compact) {
+                miniTime.setText(seconds < 0 ? "" : AppStyle.formatClock(seconds));
+                miniTime.setTextColor(pausedNow || (seconds >= 0 && seconds <= 60) ? Color.rgb(255, 196, 92) : ON_PANEL);
+            }
         }
     }
 

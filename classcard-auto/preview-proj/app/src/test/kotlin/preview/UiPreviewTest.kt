@@ -216,6 +216,24 @@ class UiPreviewTest {
     }
 
     @Test
+    fun overlayCompact() {
+        val p = FloatingPanel(paparazzi.context, MemoryPrefs(), host())
+        p.render(true, "3/20 · 2개 입력", false, false)
+        p.setRemaining(300)
+        p.renderRun(false, 0, 2, true, true, 3)
+        paparazzi.snapshot(overBackdrop(p), "overlay_compact")
+    }
+
+    @Test
+    fun overlayCompactPaused() {
+        val p = FloatingPanel(paparazzi.context, MemoryPrefs(), host())
+        p.render(true, "일시정지", false, false)
+        p.setRemaining(45)
+        p.renderRun(true, 2, 2, true, false, 0)
+        paparazzi.snapshot(overBackdrop(p), "overlay_compact_paused")
+    }
+
+    @Test
     fun overlayPaused() {
         val p = FloatingPanel(paparazzi.context, MemoryPrefs(), host())
         p.render(true, "일시정지됨 · 직접 터치 2회", false, false)
