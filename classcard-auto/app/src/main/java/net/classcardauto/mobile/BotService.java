@@ -374,7 +374,34 @@ public final class BotService extends AccessibilityService {
         ((WindowManager) systemService).updateViewLayout(view, layoutParams);
         if (finished) {
             this.dragging = false;
+            if (this.engine != null && getEngine().isInTest()) {
+                snapPanelToEdge();
+            }
         }
+    }
+
+    private boolean snappedForTest;
+
+    /** The narrow test strip sits against the nearest side edge so it stays out of the middle of the screen. */
+    private final void snapPanelToEdge() {
+        final LinearLayout view = this.overlay;
+        final WindowManager.LayoutParams lp = this.overlayParams;
+        if (view == null || lp == null) {
+            return;
+        }
+        view.postDelayed(new Runnable() { // after the panel has re-laid out at its compact size
+            @Override
+            public void run() {
+                android.util.DisplayMetrics metrics = BotService.this.getResources().getDisplayMetrics();
+                int maxX = Math.max(0, metrics.widthPixels - view.getWidth());
+                // gravity is top|end, so x counts from the right edge
+                lp.x = lp.x <= maxX / 2 ? 0 : maxX;
+                try {
+                    ((WindowManager) BotService.this.getSystemService("window")).updateViewLayout(view, lp);
+                } catch (Exception ignored) {
+                }
+            }
+        }, 200L);
     }
 
 
@@ -666,6 +693,13 @@ public final class BotService extends AccessibilityService {
             this.overlayDismissed = false;
         }
         updateTouchLock();
+        boolean inTestNow = active && getEngine().isInTest();
+        if (inTestNow && !this.snappedForTest) {
+            this.snappedForTest = true;
+            snapPanelToEdge();
+        } else if (!inTestNow) {
+            this.snappedForTest = false;
+        }
         FloatingPanel panel = this.floating;
         if (panel != null) {
             panel.render(active, this.status, !active || collecting, beforeTest);
