@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/accessibility_description"
+    android:settingsActivity="net.classcardauto.mobile.MainActivity"
+    android:accessibilityEventTypes="typeWindowsChanged|typeViewScrolled|typeWindowContentChanged|typeWindowStateChanged"
+    android:packageNames="classcard.net"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:notificationTimeout="30"
+    android:accessibilityFlags="flagRetrieveInteractiveWindows|flagReportViewIds|flagIncludeNotImportantViews"
+    android:canRetrieveWindowContent="true"
+    android:canPerformGestures="true"
+    android:canTakeScreenshot="true"
+    android:isAccessibilityTool="false"/>

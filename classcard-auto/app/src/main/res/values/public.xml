@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <public type="drawable" name="app_mark" id="0x7f010000" />
+    <public type="string" name="accessibility_description" id="0x7f020000" />
+    <public type="style" name="AppTheme" id="0x7f030000" />
+    <public type="xml" name="bot_accessibility" id="0x7f040000" />
+</resources>

@@ -1,0 +1,900 @@
+package net.classcardauto.mobile;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.text.InputType;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.Button;
+import android.widget.CompoundButton;
+import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import java.util.ArrayList;
+import java.util.List;
+import kotlin.Unit;
+import kotlin.jvm.functions.Function0;
+import kotlin.jvm.functions.Function1;
+
+/**
+ * Pure view builders for the app's screens. They hold no business logic: callers pass callbacks in and push state
+ * through the returned holders, which keeps the layouts renderable on their own for previews.
+ */
+public final class Screens {
+    private Screens() {
+    }
+
+    private static int dp(Context c, int v) {
+        return AppStyle.INSTANCE.dp(c, v);
+    }
+
+    private static LinearLayout.LayoutParams lp(Context c, int topDp) {
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
+        p.topMargin = dp(c, topDp);
+        return p;
+    }
+
+    private static void add(LinearLayout parent, View child, int topDp) {
+        parent.addView(child, lp(parent.getContext(), topDp));
+    }
+
+    /** Full-screen vertical page: top bar (fixed) + scrolling content. */
+    public static final class Page {
+        public final LinearLayout root;
+        public final LinearLayout content;
+        public final ScrollView scroll;
+
+        Page(LinearLayout root, LinearLayout content, ScrollView scroll) {
+            this.root = root;
+            this.content = content;
+            this.scroll = scroll;
+        }
+    }
+
+    static Page page(Context c, View topBar) {
+        AppStyle s = AppStyle.INSTANCE;
+        LinearLayout root = new LinearLayout(c);
+        root.setOrientation(1);
+        root.setBackgroundColor(s.getBackground());
+        root.setFocusableInTouchMode(true);
+        if (topBar != null) {
+            root.addView(topBar, new LinearLayout.LayoutParams(-1, -2));
+        }
+        ScrollView scroll = new ScrollView(c);
+        scroll.setOverScrollMode(2);
+        scroll.setFillViewport(false);
+        scroll.setVerticalScrollBarEnabled(false);
+        LinearLayout content = new LinearLayout(c);
+        content.setOrientation(1);
+        content.setPadding(dp(c, 20), dp(c, 8), dp(c, 20), dp(c, 28));
+        scroll.addView(content, new FrameLayout.LayoutParams(-1, -2));
+        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1.0f));
+        return new Page(root, content, scroll);
+    }
+
+    static LinearLayout brandBar(Context c, Function0<Unit> onSettings) {
+        AppStyle s = AppStyle.INSTANCE;
+        LinearLayout bar = new LinearLayout(c);
+        bar.setOrientation(0);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(dp(c, 20), dp(c, 12), dp(c, 12), dp(c, 4));
+        ImageView mark = new ImageView(c);
+        mark.setImageResource(R.drawable.app_mark);
+        mark.setImportantForAccessibility(2);
+        bar.addView(mark, new LinearLayout.LayoutParams(dp(c, 36), dp(c, 36)));
+        TextView name = s.label(c, "단어 도우미", 17.0f, s.getInk(), true);
+        LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(0, -2, 1.0f);
+        np.leftMargin = dp(c, 12);
+        bar.addView(name, np);
+        if (onSettings != null) {
+            bar.addView(s.iconButton(c, R.drawable.ic_settings, "설정 및 안내", s.getInk(), onSettings));
+        }
+        return bar;
+    }
+
+    static LinearLayout titleBar(Context c, String title, Function0<Unit> onBack) {
+        AppStyle s = AppStyle.INSTANCE;
+        LinearLayout bar = new LinearLayout(c);
+        bar.setOrientation(0);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(dp(c, 8), dp(c, 8), dp(c, 20), dp(c, 4));
+        bar.addView(s.iconButton(c, R.drawable.ic_back, "뒤로", s.getInk(), onBack));
+        TextView t = s.label(c, title, 19.0f, s.getInk(), true);
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(0, -2, 1.0f);
+        tp.leftMargin = dp(c, 8);
+        bar.addView(t, tp);
+        return bar;
+    }
+
+    // ---------------------------------------------------------------- home
+
+    public enum Link { NO_SERVICE, READY, RUNNING, PAUSED }
+
+    public static final class Home {
+        public final LinearLayout root;
+        public final View dot;
+        public final TextView chip;
+        public final TextView statusTitle;
+        public final TextView statusBody;
+        public final Button primary;
+        public final Button stop;
+        public final Button accessibility;
+        public final LinearLayout banner;
+        public final TextView bannerText;
+
+        Home(LinearLayout root, View dot, TextView chip, TextView statusTitle, TextView statusBody, Button primary, Button stop, Button accessibility, LinearLayout banner, TextView bannerText) {
+            this.banner = banner;
+            this.bannerText = bannerText;
+            this.root = root;
+            this.dot = dot;
+            this.chip = chip;
+            this.statusTitle = statusTitle;
+            this.statusBody = statusBody;
+            this.primary = primary;
+            this.stop = stop;
+            this.accessibility = accessibility;
+        }
+
+        /** Shows the "last run stopped" notice above the status card; pass null to hide it. */
+        public void showFailure(String text) {
+            if (text == null) {
+                banner.setVisibility(View.GONE);
+                return;
+            }
+            bannerText.setText(AppStyle.keepWords(text));
+            banner.setVisibility(View.VISIBLE);
+        }
+
+        public void render(Link link, String detail) {
+            render(link, detail, -1L, null);
+        }
+
+        public void render(Link link, String detail, long remainingSeconds) {
+            render(link, detail, remainingSeconds, null);
+        }
+
+        /**
+         * Updates the status card and which buttons are usable. {@code detail} is the live status while running and
+         * {@code remainingSeconds} the time left before the run limit (-1 = unknown).
+         */
+        public void render(Link link, String detail, long remainingSeconds, String note) {
+            AppStyle s = AppStyle.INSTANCE;
+            Context c = root.getContext();
+            int dotColor;
+            String chipText;
+            int chipFg;
+            int chipBg;
+            switch (link) {
+                case NO_SERVICE:
+                    dotColor = s.getWarn();
+                    chipText = "연결 필요";
+                    chipFg = s.getWarn();
+                    chipBg = s.getSoftWarn();
+                    statusTitle.setText(AppStyle.keepWords("접근성 연결이 필요해요"));
+                    statusBody.setText(AppStyle.keepWords("접근성 설정에서 ‘단어 테스트 도우미’를 켜 주세요."));
+                    break;
+                case RUNNING:
+                    dotColor = s.getInfo();
+                    chipText = remainingSeconds < 0 ? "실행 중" : "실행 중 · 남은 " + AppStyle.formatClock(remainingSeconds);
+                    chipFg = s.getInfo();
+                    chipBg = s.getSoftInfo();
+                    if (remainingSeconds >= 0 && remainingSeconds <= 60) {
+                        chipFg = s.getWarn();
+                        chipBg = s.getSoftWarn();
+                    }
+                    statusTitle.setText(AppStyle.keepWords(detail == null || detail.isEmpty() ? "실행 중" : detail));
+                    statusBody.setText(AppStyle.keepWords(note != null ? note : "일시정지와 재개는 클래스카드 위의 플로팅 버튼에서 해요. 중지는 아래 버튼으로도 할 수 있어요."));
+                    break;
+                case PAUSED:
+                    dotColor = s.getWarn();
+                    chipText = remainingSeconds < 0 ? "일시정지" : "일시정지 · 남은 " + AppStyle.formatClock(remainingSeconds);
+                    chipFg = s.getWarn();
+                    chipBg = s.getSoftWarn();
+                    statusTitle.setText(AppStyle.keepWords(detail == null || detail.isEmpty() ? "일시정지됨" : detail));
+                    statusBody.setText(AppStyle.keepWords(note != null ? note : "클래스카드에서 직접 조작한 뒤 화면의 플로팅 버튼 ‘재개’를 누르면 이어서 진행해요. 앱 화면으로 돌아올 필요는 없어요."));
+                    break;
+                default:
+                    dotColor = s.getAccent();
+                    chipText = "준비됨";
+                    chipFg = s.getAccentDark();
+                    chipBg = s.getSoftAccent();
+                    statusTitle.setText(AppStyle.keepWords("시작할 준비가 됐어요"));
+                    statusBody.setText(AppStyle.keepWords("클래스카드 단어장이나 테스트 시작 전 화면에서 시작하세요."));
+                    break;
+            }
+            s.setDotColor(dot, dotColor);
+            chip.setText(chipText);
+            chip.setTextColor(chipFg);
+            chip.setBackground(s.roundRect(c, chipBg, 999, 0));
+            boolean running = link == Link.RUNNING;
+            boolean paused = link == Link.PAUSED;
+            boolean ready = link == Link.READY;
+            primary.setEnabled(ready);
+            primary.setAlpha(ready ? 1.0f : 0.45f);
+            primary.setVisibility((running || paused) ? View.GONE : View.VISIBLE);
+            stop.setVisibility((running || paused) ? View.VISIBLE : View.GONE);
+            accessibility.setVisibility(link == Link.NO_SERVICE ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    public static Home home(Context c, SharedPreferences prefs, Function0<Unit> onSettings, Function0<Unit> onStart, Function0<Unit> onStop, Function0<Unit> onAccessibility, Function0<Unit> onFailures) {
+        AppStyle s = AppStyle.INSTANCE;
+        Page page = page(c, brandBar(c, onSettings));
+        LinearLayout content = page.content;
+
+        TextView headline = s.label(c, "단어 학습을\n가볍게", 30.0f, s.getInk(), true);
+        headline.setLineSpacing(dp(c, 2), 1.0f);
+        add(content, headline, 20);
+        add(content, s.label(c, "연습·허용된 테스트 화면에서 시작하세요.", 15.0f, s.getMuted(), false), 10);
+
+        // notice about the previous run (hidden until MainActivity finds a recent failure)
+        LinearLayout banner = new LinearLayout(c);
+        banner.setOrientation(0);
+        banner.setGravity(Gravity.CENTER_VERTICAL);
+        banner.setBackground(s.roundRect(c, s.getSoftDanger(), 16, 0));
+        banner.setPadding(dp(c, 16), dp(c, 8), dp(c, 8), dp(c, 8));
+        TextView bannerText = s.label(c, "", 14.0f, s.getDanger(), true);
+        banner.addView(bannerText, new LinearLayout.LayoutParams(0, -2, 1.0f));
+        Button bannerButton = s.button(c, "보기", AppStyle.Tone.TEXT, onFailures);
+        bannerButton.setTextColor(s.getDanger());
+        bannerButton.setMinHeight(dp(c, 40));
+        bannerButton.setMinimumHeight(dp(c, 40));
+        banner.addView(bannerButton, new LinearLayout.LayoutParams(-2, -2));
+        banner.setVisibility(View.GONE);
+        add(content, banner, 18);
+
+        // status card
+        LinearLayout card = s.card(c);
+        LinearLayout head = new LinearLayout(c);
+        head.setOrientation(0);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        View dot = s.dot(c, s.getAccent(), 10);
+        head.addView(dot);
+        TextView chip = s.chip(c, "준비됨", s.getAccentDark(), s.getSoftAccent());
+        LinearLayout.LayoutParams chp = new LinearLayout.LayoutParams(-2, -2);
+        chp.leftMargin = dp(c, 10);
+        head.addView(chip, chp);
+        card.addView(head);
+        TextView statusTitle = s.label(c, "연결 상태를 확인하고 있어요", 21.0f, s.getInk(), true);
+        add(card, statusTitle, 14);
+        TextView statusBody = s.caption(c, "");
+        add(card, statusBody, 6);
+        Button accessibility = s.button(c, "접근성 켜기", AppStyle.Tone.TONAL, onAccessibility);
+        accessibility.setVisibility(View.GONE);
+        add(card, accessibility, 16);
+        add(card, s.divider(c), 18);
+        add(card, s.caption(c, "수집한 단어장은 이번 실행에만 사용하고 끝나면 지웁니다."), 14);
+        add(content, card, 24);
+
+        // primary actions
+        Button primary = s.button(c, "클래스카드에서 시작", AppStyle.Tone.PRIMARY, onStart);
+        primary.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_play, 0, 0, 0);
+        primary.getCompoundDrawablesRelative()[0].setTint(-1);
+        primary.setCompoundDrawablePadding(dp(c, 8));
+        primary.setMinHeight(dp(c, 58));
+        primary.setMinimumHeight(dp(c, 58));
+        primary.setTextSize(16.0f);
+        add(content, primary, 20);
+        Button stop = s.button(c, "실행 중지", AppStyle.Tone.DANGER, onStop);
+        stop.setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_stop, 0, 0, 0);
+        stop.getCompoundDrawablesRelative()[0].setTint(s.getDanger());
+        stop.setCompoundDrawablePadding(dp(c, 8));
+        stop.setVisibility(View.GONE);
+        add(content, stop, 10);
+
+        // scrolling controls for the first word collection
+        add(content, scrollCard(c, prefs), 20);
+
+        TextView foot = s.caption(c, "기기 내부 처리  ·  혼합 언어 OCR  ·  파일 가져오기·내보내기 없음");
+        foot.setGravity(Gravity.CENTER);
+        foot.setTextSize(12.0f);
+        add(content, foot, 24);
+
+        Home h = new Home(page.root, dot, chip, statusTitle, statusBody, primary, stop, accessibility, banner, bannerText);
+        h.render(Link.READY, null);
+        return h;
+    }
+
+    /** Card with the three scroll sliders used while the word list is being collected. */
+    public static LinearLayout scrollCard(final Context c, final SharedPreferences prefs) {
+        AppStyle s = AppStyle.INSTANCE;
+        final LinearLayout card = s.card(c);
+        LinearLayout head = new LinearLayout(c);
+        head.setOrientation(0);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.addView(s.icon(c, R.drawable.ic_tune, s.getAccent(), 22));
+        TextView t = s.title(c, "단어 수집 스크롤");
+        t.setTextSize(17.0f);
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(0, -2, 1.0f);
+        tp.leftMargin = dp(c, 10);
+        head.addView(t, tp);
+        card.addView(head);
+        add(card, s.caption(c, "처음 단어를 모을 때 목록을 넘기는 방식입니다. 범위가 너무 크면 단어를 놓칠 수 있어요."), 8);
+        addSliders(c, card, prefs, false);
+        Button reset = s.button(c, "기본값으로", AppStyle.Tone.TEXT, new Function0<Unit>() {
+            @Override
+            public Unit invoke() {
+                ScrollSettings.reset(prefs);
+                // rebuild the card in place so the sliders jump back to the defaults
+                android.view.ViewGroup parent = (android.view.ViewGroup) card.getParent();
+                if (parent != null) {
+                    int index = parent.indexOfChild(card);
+                    android.view.ViewGroup.LayoutParams params = card.getLayoutParams();
+                    parent.removeViewAt(index);
+                    parent.addView(scrollCard(c, prefs), index, params);
+                }
+                return Unit.INSTANCE;
+            }
+        });
+        LinearLayout.LayoutParams rp = lp(c, 8);
+        rp.width = -2;
+        rp.gravity = Gravity.END;
+        card.addView(reset, rp);
+        return card;
+    }
+
+    /**
+     * Sliders for the formerly fixed numbers. {@code kind} 0 = answer matching, 1 = run limits. Seconds are shown for
+     * every time value. A "기본값으로" button restores the built-in defaults.
+     */
+    public static LinearLayout advancedCard(final Context c, final SharedPreferences p, final int kind) {
+        AppStyle s = AppStyle.INSTANCE;
+        final LinearLayout card = s.card(c);
+        if (kind == 0) {
+            card.addView(s.caption(c, "화면 글자가 조금 틀리게 읽혔거나 보기가 잘렸을 때 얼마나 너그럽게 정답으로 볼지 정합니다. 너그러울수록 완주는 잘 되지만 오답이 늘 수 있어요. 다음 실행부터 적용됩니다."));
+            card.addView(s.sliderRow(c, "글자 인식 오차 허용(유사도 하한)", "%", AdvancedSettings.FUZZY_MIN, AdvancedSettings.FUZZY_MAX, AdvancedSettings.FUZZY_STEP, AdvancedSettings.fuzzyPercent(p), new Function1<Integer, Unit>() {
+                @Override
+                public Unit invoke(Integer v) {
+                    AdvancedSettings.setFuzzyPercent(p, v.intValue());
+                    return Unit.INSTANCE;
+                }
+            }, false), lp(c, 16));
+            card.addView(s.sliderRow(c, "동점일 때 필요한 격차", "%", AdvancedSettings.TIE_MIN, AdvancedSettings.TIE_MAX, AdvancedSettings.TIE_STEP, AdvancedSettings.tiePercent(p), new Function1<Integer, Unit>() {
+                @Override
+                public Unit invoke(Integer v) {
+                    AdvancedSettings.setTiePercent(p, v.intValue());
+                    return Unit.INSTANCE;
+                }
+            }, false), lp(c, 16));
+            card.addView(s.sliderRow(c, "잘린 보기 최소 일치 글자", "글자", AdvancedSettings.PARTIAL_MIN, AdvancedSettings.PARTIAL_MAX, AdvancedSettings.PARTIAL_STEP, AdvancedSettings.partialMin(p), new Function1<Integer, Unit>() {
+                @Override
+                public Unit invoke(Integer v) {
+                    AdvancedSettings.setPartialMin(p, v.intValue());
+                    return Unit.INSTANCE;
+                }
+            }, false), lp(c, 16));
+        } else {
+            card.addView(s.caption(c, "실행이 너무 오래 걸리거나 화면이 멈춘 것처럼 보일 때 언제 포기할지 정합니다. 다음 실행부터 적용됩니다."));
+            card.addView(s.sliderRow(c, "실행 제한 시간", "초", AdvancedSettings.RUN_MIN, AdvancedSettings.RUN_MAX, AdvancedSettings.RUN_STEP, AdvancedSettings.runLimitSeconds(p), new Function1<Integer, Unit>() {
+                @Override
+                public Unit invoke(Integer v) {
+                    AdvancedSettings.setRunLimitSeconds(p, v.intValue());
+                    return Unit.INSTANCE;
+                }
+            }, false), lp(c, 16));
+            card.addView(s.sliderRow(c, "화면 전환 대기 한도", "초", AdvancedSettings.PHASE_MIN, AdvancedSettings.PHASE_MAX, AdvancedSettings.PHASE_STEP, AdvancedSettings.phaseSeconds(p), new Function1<Integer, Unit>() {
+                @Override
+                public Unit invoke(Integer v) {
+                    AdvancedSettings.setPhaseSeconds(p, v.intValue());
+                    return Unit.INSTANCE;
+                }
+            }, false), lp(c, 16));
+            card.addView(s.sliderRow(c, "카드가 멈춰 있어야 하는 시간", "ms", AdvancedSettings.GATE_MIN, AdvancedSettings.GATE_MAX, AdvancedSettings.GATE_STEP, AdvancedSettings.gateMs(p), new Function1<Integer, Unit>() {
+                @Override
+                public Unit invoke(Integer v) {
+                    AdvancedSettings.setGateMs(p, v.intValue());
+                    return Unit.INSTANCE;
+                }
+            }, false), lp(c, 16));
+            card.addView(s.sliderRow(c, "단어 수집 스크롤 최대 횟수", "회", AdvancedSettings.SCROLL_MIN, AdvancedSettings.SCROLL_MAX, AdvancedSettings.SCROLL_STEP, AdvancedSettings.scrollSteps(p), new Function1<Integer, Unit>() {
+                @Override
+                public Unit invoke(Integer v) {
+                    AdvancedSettings.setScrollSteps(p, v.intValue());
+                    return Unit.INSTANCE;
+                }
+            }, false), lp(c, 16));
+            card.addView(s.sliderRow(c, "직접 터치로 일시정지되는 횟수", "회", AdvancedSettings.TOUCH_MIN, AdvancedSettings.TOUCH_MAX, AdvancedSettings.TOUCH_STEP, AdvancedSettings.touchPauseCount(p), new Function1<Integer, Unit>() {
+                @Override
+                public Unit invoke(Integer v) {
+                    AdvancedSettings.setTouchPauseCount(p, v.intValue());
+                    return Unit.INSTANCE;
+                }
+            }, false), lp(c, 16));
+            card.addView(s.sliderRow(c, "안 눌린 터치 재시도 횟수", "회", AdvancedSettings.RETRY_MIN, AdvancedSettings.RETRY_MAX, AdvancedSettings.RETRY_STEP, AdvancedSettings.tapRetries(p), new Function1<Integer, Unit>() {
+                @Override
+                public Unit invoke(Integer v) {
+                    AdvancedSettings.setTapRetries(p, v.intValue());
+                    return Unit.INSTANCE;
+                }
+            }, false), lp(c, 16));
+        }
+        Button reset = s.button(c, "기본값으로", AppStyle.Tone.TEXT, new Function0<Unit>() {
+            @Override
+            public Unit invoke() {
+                if (kind == 0) {
+                    AdvancedSettings.resetMatching(p);
+                } else {
+                    AdvancedSettings.resetLimits(p);
+                }
+                android.view.ViewGroup parent = (android.view.ViewGroup) card.getParent();
+                if (parent != null) {
+                    int index = parent.indexOfChild(card);
+                    android.view.ViewGroup.LayoutParams params = card.getLayoutParams();
+                    parent.removeViewAt(index);
+                    parent.addView(advancedCard(c, p, kind), index, params);
+                }
+                return Unit.INSTANCE;
+            }
+        });
+        LinearLayout.LayoutParams rp = lp(c, 8);
+        rp.width = -2;
+        rp.gravity = Gravity.END;
+        card.addView(reset, rp);
+        return card;
+    }
+
+    /** Appends the range / duration / interval sliders to {@code parent}. */
+    public static void addSliders(Context c, LinearLayout parent, final SharedPreferences prefs, boolean compact) {
+        AppStyle s = AppStyle.INSTANCE;
+        int top = compact ? 4 : 16;
+        parent.addView(s.sliderRow(c, "한 번에 넘기는 범위", "%", ScrollSettings.RANGE_MIN, ScrollSettings.RANGE_MAX, ScrollSettings.RANGE_STEP, ScrollSettings.rangePercent(prefs), new Function1<Integer, Unit>() {
+            @Override
+            public Unit invoke(Integer v) {
+                ScrollSettings.setRangePercent(prefs, v.intValue());
+                return Unit.INSTANCE;
+            }
+        }, compact), lp(c, top));
+        parent.addView(s.sliderRow(c, "스와이프 시간", "ms", ScrollSettings.DURATION_MIN, ScrollSettings.DURATION_MAX, ScrollSettings.DURATION_STEP, ScrollSettings.durationMs(prefs), new Function1<Integer, Unit>() {
+            @Override
+            public Unit invoke(Integer v) {
+                ScrollSettings.setDurationMs(prefs, v.intValue());
+                return Unit.INSTANCE;
+            }
+        }, compact), lp(c, top));
+        parent.addView(s.sliderRow(c, "스크롤 사이 대기", "ms", ScrollSettings.INTERVAL_MIN, ScrollSettings.INTERVAL_MAX, ScrollSettings.INTERVAL_STEP, ScrollSettings.intervalMs(prefs), new Function1<Integer, Unit>() {
+            @Override
+            public Unit invoke(Integer v) {
+                ScrollSettings.setIntervalMs(prefs, v.intValue());
+                return Unit.INSTANCE;
+            }
+        }, compact), lp(c, top));
+        if (compact) {
+            // the floating panel also carries the deliberate-mistake count; the app's scroll card does not
+            parent.addView(s.sliderRow(c, "일부러 틀릴 문항 수", "개", AdvancedSettings.WRONG_MIN, AdvancedSettings.WRONG_MAX, AdvancedSettings.WRONG_STEP, AdvancedSettings.wrongCount(prefs), new Function1<Integer, Unit>() {
+                @Override
+                public Unit invoke(Integer v) {
+                    AdvancedSettings.setWrongCount(prefs, v.intValue());
+                    return Unit.INSTANCE;
+                }
+            }, true), lp(c, top));
+        }
+    }
+
+    // ------------------------------------------------------------ settings
+
+    public static final class Nav {
+        public final String title;
+        public final String description;
+        public final Function0<Unit> action;
+
+        public Nav(String title, String description, Function0<Unit> action) {
+            this.title = title;
+            this.description = description;
+            this.action = action;
+        }
+    }
+
+    public static LinearLayout settings(Context c, SharedPreferences prefs, String versionName, Function0<Unit> onBack, List<Nav> help) {
+        AppStyle s = AppStyle.INSTANCE;
+        Page page = page(c, titleBar(c, "설정", onBack));
+        LinearLayout content = page.content;
+        final SharedPreferences p = prefs;
+
+        add(content, s.sectionLabel(c, "단어 읽기"), 12);
+        LinearLayout reading = s.card(c);
+        reading.addView(s.switchRow(c, "화면 이미지로 읽기", "한국어·한자·중국어·일본어·영어를 함께 인식합니다. 기본은 화면 글자를 우선합니다.", p.getBoolean("image_collection", false), new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton b, boolean checked) {
+                p.edit().putBoolean("image_collection", checked).putBoolean("ocr_only", checked).apply();
+            }
+        }));
+        add(reading, s.divider(c), 16);
+        add(reading, s.switchRow(c, "잘린 선택지 보조 매칭", "정확히 일치하는 보기가 없으면 일치하는 글자 수가 가장 많은 보기를 고릅니다. 추정이라 오답이 날 수 있고, 동점이거나 2글자 미만이면 멈춰요. 다음 실행부터 적용됩니다.", p.getBoolean("partial_choices", false), new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton b, boolean checked) {
+                p.edit().putBoolean("partial_choices", checked).apply();
+            }
+        }), 16);
+        add(content, reading, 8);
+
+        add(content, scrollCard(c, prefs), 20);
+
+        add(content, s.sectionLabel(c, "입력 방식"), 24);
+        LinearLayout lockCard = s.card(c);
+        lockCard.addView(s.switchRow(c, "실행 중 화면 터치 잠금", "실행 중에는 플로팅 패널 외의 화면 터치를 막습니다. 일시정지하면 풀립니다. 상태바 내리기·홈/뒤로 제스처·전원/볼륨 버튼은 앱이 막을 수 없습니다. 다음 실행부터 적용됩니다.", p.getBoolean("touch_lock", true), new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton b, boolean checked) {
+                p.edit().putBoolean("touch_lock", checked).apply();
+            }
+        }));
+        add(content, lockCard, 8);
+        LinearLayout humanCard = s.card(c);
+        humanCard.addView(s.switchRow(c, "사람처럼 입력", "문제를 읽는 시간, 터치 위치와 길이, 카드를 넘기는 간격을 사람처럼 무작위로 흔듭니다. 켜면 실행 기록의 pace가 human으로 남습니다. 다음 실행부터 적용됩니다.", p.getBoolean("human_like", false), new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton b, boolean checked) {
+                p.edit().putBoolean("human_like", checked).apply();
+            }
+        }));
+        add(humanCard, s.sliderRow(c, "평균 응답 시간", "ms", HumanTiming.MEAN_MIN, HumanTiming.MEAN_MAX, HumanTiming.MEAN_STEP, p.getInt("human_mean_ms", HumanTiming.MEAN_DEFAULT), new Function1<Integer, Unit>() {
+            @Override
+            public Unit invoke(Integer v) {
+                p.edit().putInt("human_mean_ms", v.intValue()).apply();
+                return Unit.INSTANCE;
+            }
+        }, false), 16);
+        add(humanCard, s.caption(c, "보통 길이의 문제 기준 값이며, 글이 길수록 오래 걸리고 가끔 더 망설입니다."), 8);
+        add(humanCard, s.divider(c), 18);
+        add(humanCard, s.sliderRow(c, "일부러 틀릴 문항 수", "개", AdvancedSettings.WRONG_MIN, AdvancedSettings.WRONG_MAX, AdvancedSettings.WRONG_STEP, AdvancedSettings.wrongCount(p), new Function1<Integer, Unit>() {
+            @Override
+            public Unit invoke(Integer v) {
+                AdvancedSettings.setWrongCount(p, v.intValue());
+                return Unit.INSTANCE;
+            }
+        }, false), 16);
+        add(humanCard, s.caption(c, "한 번 실행에서 이 개수만큼의 문항을 무작위로 골라 정답이 아닌 보기를 누릅니다. 0이면 모두 맞힙니다. 문항 수보다 크면 전체가 오답이 됩니다."), 8);
+        add(content, humanCard, 8);
+
+        add(content, s.sectionLabel(c, "고급 · 정답 매칭"), 24);
+        add(content, advancedCard(c, p, 0), 8);
+        add(content, s.sectionLabel(c, "고급 · 실행 한도"), 24);
+        add(content, advancedCard(c, p, 1), 8);
+
+        add(content, s.sectionLabel(c, "안내 및 기록"), 24);
+        LinearLayout list = s.card(c);
+        list.setPadding(dp(c, 20), dp(c, 6), dp(c, 12), dp(c, 6));
+        for (int i = 0; i < help.size(); i++) {
+            Nav n = help.get(i);
+            if (i > 0) {
+                list.addView(s.divider(c));
+            }
+            list.addView(s.navRow(c, n.title, n.description, n.action));
+        }
+        add(content, list, 8);
+
+        TextView ver = s.caption(c, "버전 " + versionName);
+        ver.setGravity(Gravity.CENTER);
+        add(content, ver, 24);
+        return page.root;
+    }
+
+    // ------------------------------------------------------ password / consent
+
+    public static final class Password {
+        public final LinearLayout root;
+        public final EditText input;
+        public final TextView error;
+
+        Password(LinearLayout root, EditText input, TextView error) {
+            this.root = root;
+            this.input = input;
+            this.error = error;
+        }
+    }
+
+    public static Password password(Context c, Function0<Unit> onUnlock, Function0<Unit> onClose) {
+        AppStyle s = AppStyle.INSTANCE;
+        Page page = page(c, brandBar(c, null));
+        LinearLayout content = page.content;
+        add(content, s.label(c, "앱 잠금", 30.0f, s.getInk(), true), 28);
+        add(content, s.label(c, "비밀번호를 입력해 앱을 열어주세요.", 15.0f, s.getMuted(), false), 10);
+
+        EditText input = new EditText(c);
+        input.setHint("비밀번호");
+        input.setHintTextColor(s.getMuted());
+        input.setTextColor(s.getInk());
+        input.setTextSize(17.0f);
+        input.setSingleLine(true);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        input.setImeOptions(6);
+        input.setSaveEnabled(false);
+        input.setImportantForAutofill(2);
+        input.setBackground(s.roundRect(c, s.getSurface(), 16, s.getBorder()));
+        input.setPadding(dp(c, 18), dp(c, 16), dp(c, 18), dp(c, 16));
+        add(content, input, 28);
+        TextView error = s.label(c, "", 14.0f, s.getDanger(), false);
+        add(content, error, 10);
+        Button unlock = s.button(c, "잠금 해제", AppStyle.Tone.PRIMARY, onUnlock);
+        unlock.setMinHeight(dp(c, 56));
+        add(content, unlock, 14);
+        add(content, s.button(c, "닫기", AppStyle.Tone.TEXT, onClose), 6);
+        return new Password(page.root, input, error);
+    }
+
+    public static final class Consent {
+        public final LinearLayout root;
+
+        Consent(LinearLayout root) {
+            this.root = root;
+        }
+    }
+
+    /** Two-step consent screen. {@code second} selects step 2/2. */
+    public static Consent consent(Context c, boolean second, String noticeText, String disclosureText, Function0<Unit> onPrivacy, Function0<Unit> onAgree, Function0<Unit> onDecline) {
+        AppStyle s = AppStyle.INSTANCE;
+        LinearLayout root = new LinearLayout(c);
+        root.setOrientation(1);
+        root.setBackgroundColor(s.getBackground());
+        root.setFocusableInTouchMode(true);
+        root.addView(brandBar(c, null), new LinearLayout.LayoutParams(-1, -2));
+
+        LinearLayout header = new LinearLayout(c);
+        header.setOrientation(1);
+        header.setPadding(dp(c, 20), dp(c, 8), dp(c, 20), 0);
+        header.addView(s.label(c, second ? "마지막으로 확인해주세요" : "사용 안내", 27.0f, s.getInk(), true));
+        add(header, s.caption(c, second ? "2 / 2  ·  이용 조건 확인" : "1 / 2  ·  안내 확인"), 8);
+        LinearLayout steps = new LinearLayout(c);
+        for (int i = 0; i < 2; i++) {
+            View bar = new View(c);
+            bar.setBackground(s.roundRect(c, (i == 0 || second) ? s.getAccent() : s.getBorder(), 3, 0));
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(c, 5), 1.0f);
+            if (i == 1) {
+                p.leftMargin = dp(c, 6);
+            }
+            steps.addView(bar, p);
+        }
+        add(header, steps, 16);
+        root.addView(header, new LinearLayout.LayoutParams(-1, -2));
+
+        ScrollView scroll = new ScrollView(c);
+        scroll.setOverScrollMode(2);
+        LinearLayout card = s.card(c);
+        if (second) {
+            card.addView(s.title(c, "사용 안내를 확인했습니다"));
+            add(card, s.body(c, "앞 화면의 사용 안내를 읽고 이해했으며, 해당 안내에 동의합니다."), 12);
+            TextView sub = s.title(c, "접근성 권한과 자동 조작");
+            sub.setTextSize(17.0f);
+            add(card, sub, 22);
+            add(card, s.body(c, disclosureText), 10);
+            add(card, s.caption(c, "동의 시각과 약관 버전을 이 휴대폰에 저장합니다. 같은 약관에는 다시 동의하지 않아도 됩니다."), 20);
+        } else {
+            card.addView(s.body(c, noticeText));
+        }
+        scroll.addView(card, new FrameLayout.LayoutParams(-1, -2));
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, 0, 1.0f);
+        sp.leftMargin = dp(c, 20);
+        sp.rightMargin = dp(c, 20);
+        sp.topMargin = dp(c, 18);
+        root.addView(scroll, sp);
+
+        LinearLayout actions = new LinearLayout(c);
+        actions.setOrientation(1);
+        actions.setPadding(dp(c, 20), dp(c, 14), dp(c, 20), dp(c, 14));
+        Button agree = s.button(c, second ? "동의하고 시작하기 · 2/2" : "안내에 동의합니다 · 1/2", AppStyle.Tone.PRIMARY, onAgree);
+        agree.setMinHeight(dp(c, 56));
+        actions.addView(agree, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout second2 = new LinearLayout(c);
+        second2.setOrientation(0);
+        Button privacy = s.button(c, "개인정보처리방침", AppStyle.Tone.OUTLINE, onPrivacy);
+        Button decline = s.button(c, "동의하지 않고 닫기", AppStyle.Tone.TEXT, onDecline);
+        second2.addView(privacy, new LinearLayout.LayoutParams(0, -2, 1.0f));
+        LinearLayout.LayoutParams dp2 = new LinearLayout.LayoutParams(0, -2, 1.0f);
+        dp2.leftMargin = dp(c, 8);
+        second2.addView(decline, dp2);
+        add(actions, second2, 10);
+        root.addView(actions, new LinearLayout.LayoutParams(-1, -2));
+        return new Consent(root);
+    }
+
+    private static String formatTime(long millis) {
+        return new java.text.SimpleDateFormat("M월 d일 HH:mm:ss", java.util.Locale.KOREA).format(new java.util.Date(millis));
+    }
+
+    private static int codeColor(String code) {
+        AppStyle s = AppStyle.INSTANCE;
+        switch (code) {
+            case "PROMPT_NOT_FOUND":
+            case "CHOICE_NOT_FOUND":
+                return s.getDanger();
+            case "UNCLASSIFIED":
+                return s.getWarn();
+            default:
+                return s.getInfo();
+        }
+    }
+
+    private static int codeSoft(String code) {
+        AppStyle s = AppStyle.INSTANCE;
+        switch (code) {
+            case "PROMPT_NOT_FOUND":
+            case "CHOICE_NOT_FOUND":
+                return s.getSoftDanger();
+            case "UNCLASSIFIED":
+                return s.getSoftWarn();
+            default:
+                return s.getSoftInfo();
+        }
+    }
+
+    /** One failure as a card: reason chip + time, explanation, progress and, when stored, the question's text. */
+    public static LinearLayout failureCard(Context c, FailureLog.Record r) {
+        AppStyle s = AppStyle.INSTANCE;
+        LinearLayout card = s.card(c);
+        LinearLayout head = new LinearLayout(c);
+        head.setOrientation(0);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.addView(s.chip(c, FailureLog.label(r.code), codeColor(r.code), codeSoft(r.code)));
+        View spacer = new View(c);
+        head.addView(spacer, new LinearLayout.LayoutParams(0, 1, 1.0f));
+        head.addView(s.caption(c, formatTime(r.time)));
+        card.addView(head);
+
+        String meta = r.progress.isEmpty() ? "" : "문항 " + r.progress.replace(" | ", " / ");
+        if (r.cards > 0) {
+            meta += (meta.isEmpty() ? "" : "  ·  ") + "수집한 단어 " + r.cards + "개";
+        }
+        if (!r.pace.isEmpty()) {
+            meta += (meta.isEmpty() ? "" : "  ·  ") + (r.pace.equals("human") ? "사람처럼" : r.pace.equals("natural") ? "자연 모드" : "빠른 모드");
+        }
+        if (!meta.isEmpty()) {
+            add(card, s.label(c, meta, 15.0f, s.getInk(), true), 12);
+        }
+        add(card, s.caption(c, FailureLog.hint(r.code)), 6);
+
+        return card;
+    }
+
+    /** The failure history screen. Records are given newest first. */
+    public static LinearLayout failures(Context c, java.util.List<FailureLog.Record> records, Function0<Unit> onBack, Function0<Unit> onCopy, Function0<Unit> onClear) {
+        AppStyle s = AppStyle.INSTANCE;
+        Page page = page(c, titleBar(c, "실패 기록", onBack));
+        LinearLayout content = page.content;
+        if (records.isEmpty()) {
+            LinearLayout empty = s.card(c);
+            empty.setGravity(Gravity.CENTER_HORIZONTAL);
+            empty.addView(s.icon(c, R.drawable.ic_check, s.getAccent(), 36));
+            TextView t = s.title(c, "기록된 실패가 없어요");
+            t.setGravity(Gravity.CENTER);
+            add(empty, t, 12);
+            TextView d = s.caption(c, "실행이 멈추면 멈춘 시각과 이유가 여기에 쌓여요. 문제나 단어의 글은 저장하지 않아요.");
+            d.setGravity(Gravity.CENTER);
+            add(empty, d, 8);
+            add(content, empty, 16);
+            return page.root;
+        }
+        add(content, s.caption(c, "최근 " + records.size() + "건 · 최신순 · 멈춘 시각과 이유만 저장해요"), 8);
+        for (FailureLog.Record r : records) {
+            add(content, failureCard(c, r), 12);
+        }
+        add(content, s.button(c, "개발자용으로 기록 복사", AppStyle.Tone.TONAL, onCopy), 20);
+        add(content, s.button(c, "기록 모두 지우기", AppStyle.Tone.DANGER, onClear), 10);
+        return page.root;
+    }
+
+    public static final class Activation {
+        public final LinearLayout root;
+        public final TextView status;
+
+        Activation(LinearLayout root, TextView status) {
+            this.root = root;
+            this.status = status;
+        }
+    }
+
+    private static String grouped(String code) {
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < code.length(); i++) {
+            if (i > 0 && i % 4 == 0) {
+                out.append(' ');
+            }
+            out.append(code.charAt(i));
+        }
+        return out.toString();
+    }
+
+    private static LinearLayout stepRow(Context c, String number, String title, String body, View extra) {
+        AppStyle s = AppStyle.INSTANCE;
+        LinearLayout row = new LinearLayout(c);
+        row.setOrientation(0);
+        TextView badge = s.label(c, number, 14.0f, s.getAccentDark(), true);
+        badge.setGravity(Gravity.CENTER);
+        badge.setBackground(s.roundRect(c, s.getSoftAccent(), 999, 0));
+        row.addView(badge, new LinearLayout.LayoutParams(dp(c, 28), dp(c, 28)));
+        LinearLayout text = new LinearLayout(c);
+        text.setOrientation(1);
+        text.addView(s.label(c, title, 16.0f, s.getInk(), true));
+        if (body != null) {
+            add(text, s.caption(c, body), 4);
+        }
+        if (extra != null) {
+            add(text, extra, 10);
+        }
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(0, -2, 1.0f);
+        tp.leftMargin = dp(c, 12);
+        row.addView(text, tp);
+        return row;
+    }
+
+    private static TextView codeBox(Context c, String text, float size) {
+        AppStyle s = AppStyle.INSTANCE;
+        TextView t = new TextView(c);
+        t.setText(text);
+        t.setTextSize(size);
+        t.setTypeface(android.graphics.Typeface.MONOSPACE, android.graphics.Typeface.BOLD);
+        t.setTextColor(s.getInk());
+        t.setTextIsSelectable(true);
+        t.setBackground(s.roundRect(c, s.getBackground(), 12, s.getBorder()));
+        t.setPadding(dp(c, 14), dp(c, 12), dp(c, 14), dp(c, 12));
+        return t;
+    }
+
+    /**
+     * First-run screen shown until an authorisation file issued for this phone has been dropped into the app folder.
+     * {@code code} is this phone's device code, {@code folder} the folder to copy the key file into.
+     */
+    public static Activation activation(Context c, String code, String folder, Function0<Unit> onCheck, Function0<Unit> onCopyCode, Function0<Unit> onCopyFolder, Function0<Unit> onClose) {
+        AppStyle s = AppStyle.INSTANCE;
+        Page page = page(c, brandBar(c, null));
+        LinearLayout content = page.content;
+        add(content, s.label(c, "인증이 필요해요", 28.0f, s.getInk(), true), 22);
+        add(content, s.label(c, "이 휴대폰은 아직 인증되지 않았어요. 컴퓨터에서 인증 키 파일을 만들어 아래 폴더에 넣어 주세요.", 15.0f, s.getMuted(), false), 10);
+
+        LinearLayout card = s.card(c);
+        LinearLayout codeBlock = new LinearLayout(c);
+        codeBlock.setOrientation(0);
+        codeBlock.setGravity(Gravity.CENTER_VERTICAL);
+        TextView codeView = codeBox(c, grouped(code), 15.0f);
+        codeBlock.addView(codeView, new LinearLayout.LayoutParams(0, -2, 1.0f));
+        Button copyCode = s.button(c, "복사", AppStyle.Tone.TONAL, onCopyCode);
+        copyCode.setMinHeight(dp(c, 44));
+        copyCode.setMinimumHeight(dp(c, 44));
+        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-2, -2);
+        cp.leftMargin = dp(c, 8);
+        codeBlock.addView(copyCode, cp);
+        card.addView(stepRow(c, "1", "기기 코드 확인", "이 코드는 이 휴대폰에만 해당돼요.", codeBlock));
+
+        add(card, stepRow(c, "2", "컴퓨터에서 키 파일 만들기", "issuer 폴더에서 아래처럼 실행하면 classcard-auth.key 가 만들어져요.", codeBox(c, "python issue.py --device " + code, 12.5f)), 22);
+
+        LinearLayout folderBlock = new LinearLayout(c);
+        folderBlock.setOrientation(1);
+        folderBlock.addView(codeBox(c, folder, 12.5f));
+        Button copyFolder = s.button(c, "경로 복사", AppStyle.Tone.TEXT, onCopyFolder);
+        copyFolder.setMinHeight(dp(c, 40));
+        copyFolder.setMinimumHeight(dp(c, 40));
+        LinearLayout.LayoutParams fp = new LinearLayout.LayoutParams(-2, -2);
+        fp.gravity = Gravity.END;
+        folderBlock.addView(copyFolder, fp);
+        add(card, stepRow(c, "3", "휴대폰에 넣기", "USB로 컴퓨터에 연결하고 파일 관리자에서 이 폴더를 열어 키 파일을 넣으세요. 폴더가 보이지 않으면 휴대폰을 다시 연결해 보세요.", folderBlock), 22);
+        add(content, card, 22);
+
+        TextView status = s.label(c, "", 14.0f, s.getDanger(), false);
+        add(content, status, 16);
+        Button check = s.button(c, "확인", AppStyle.Tone.PRIMARY, onCheck);
+        check.setMinHeight(dp(c, 56));
+        add(content, check, 12);
+        add(content, s.button(c, "닫기", AppStyle.Tone.TEXT, onClose), 6);
+        add(content, s.caption(c, "키 파일을 넣으면 몇 초 안에 자동으로 확인해요. 확인이 끝나면 파일은 지워져요."), 12);
+        return new Activation(page.root, status);
+    }
+
+    /** Simple text body for sheets (privacy policy, notices, last run). */
+    public static View textBody(Context c, String text) {
+        AppStyle s = AppStyle.INSTANCE;
+        TextView t = s.body(c, text);
+        t.setTextSize(14.5f);
+        t.setTextIsSelectable(true);
+        return t;
+    }
+
+    static List<Nav> navs(Nav... items) {
+        List<Nav> out = new ArrayList<>();
+        for (Nav n : items) {
+            if (n != null) {
+                out.add(n);
+            }
+        }
+        return out;
+    }
+}

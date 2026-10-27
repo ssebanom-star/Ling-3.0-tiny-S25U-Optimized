@@ -1,0 +1,32 @@
+{
+  "name": "classcard-native-six-choice",
+  "package": "classcard.net",
+  "choice_count": 6,
+  "ready_message": "정답을 선택하세요",
+  "feedback_message": "즉시 이동하려면 카드 밀기",
+  "ids": {
+    "btn_cancel": "btn_cancel",
+    "btn_code": "btn_code",
+    "btn_positive": "btn_positive",
+    "btn_test_start": "btn_test_start",
+    "card_root": "card_root",
+    "ly_bottom_test": "ly_bottom_test",
+    "recycler_view": "recycler_view",
+    "set_code": "set_code",
+    "set_name": "set_name",
+    "term": "term",
+    "titleopenstatus": "titleopenstatus",
+    "txt_back": "txt_back",
+    "txt_bottom_msg": "txt_bottom_msg",
+    "txt_current_num": "txt_current_num",
+    "txt_front": "txt_front",
+    "txt_inline_back": "txt_front_desc",
+    "txt_opt": "txt_opt",
+    "txt_quest": "txt_quest",
+    "txt_set_name": "txt_set_name",
+    "txt_test_score": "txt_test_score",
+    "txt_time_over": "txt_time_over",
+    "txt_title": "txt_title",
+    "txt_total_cnt": "txt_total_cnt"
+  }
+}

@@ -1,0 +1,31 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'net.classcardauto.mobile'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'net.classcardauto.mobile.nocert'
+        minSdk 26
+        targetSdk 35
+        versionCode 35
+        versionName '0.6.26-dev'
+    }
+    buildTypes { release { minifyEnabled false } }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = '17' }
+    lint { abortOnError false }
+    packaging { jniLibs { useLegacyPackaging = false } }
+}
+
+dependencies {
+    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.31.0'
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:2.1.0'
+}
+
+tasks.withType(JavaCompile).configureEach { options.compilerArgs += ['-Xmaxerrs', '3000', '-Xmaxwarns', '1'] }

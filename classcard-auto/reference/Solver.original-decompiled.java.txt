@@ -1,0 +1,300 @@
+package net.classcardauto.mobile;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
+import kotlin.Metadata;
+import kotlin.Pair;
+import kotlin.TuplesKt;
+import kotlin.collections.CollectionsKt;
+import kotlin.jvm.internal.DefaultConstructorMarker;
+import kotlin.jvm.internal.Intrinsics;
+
+/* compiled from: Core.kt */
+/* loaded from: classes.dex */
+public final class Solver {
+    private final boolean allowPartialChoices;
+    private final Vocabulary vocabulary;
+
+    /* JADX INFO: Access modifiers changed from: private */
+    /* compiled from: Core.kt */
+    @Metadata(d1 = {"\u0000$\n\u0002\u0018\u0002\n\u0002\u0010\u0000\n\u0000\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u000b\n\u0000\n\u0002\u0010\b\n\u0002\b\u0010\n\u0002\u0010\u000e\n\u0000\b\u0082\b\u0018\u00002\u00020\u0001B\u001f\u0012\u0006\u0010\u0002\u001a\u00020\u0003\u0012\u0006\u0010\u0004\u001a\u00020\u0005\u0012\u0006\u0010\u0006\u001a\u00020\u0007¢\u0006\u0004\b\b\u0010\tJ\t\u0010\u0010\u001a\u00020\u0003HÆ\u0003J\t\u0010\u0011\u001a\u00020\u0005HÆ\u0003J\t\u0010\u0012\u001a\u00020\u0007HÆ\u0003J'\u0010\u0013\u001a\u00020\u00002\b\b\u0002\u0010\u0002\u001a\u00020\u00032\b\b\u0002\u0010\u0004\u001a\u00020\u00052\b\b\u0002\u0010\u0006\u001a\u00020\u0007HÆ\u0001J\u0013\u0010\u0014\u001a\u00020\u00052\b\u0010\u0015\u001a\u0004\u0018\u00010\u0001HÖ\u0003J\t\u0010\u0016\u001a\u00020\u0007HÖ\u0001J\t\u0010\u0017\u001a\u00020\u0018HÖ\u0001R\u0011\u0010\u0002\u001a\u00020\u0003¢\u0006\b\n\u0000\u001a\u0004\b\n\u0010\u000bR\u0011\u0010\u0004\u001a\u00020\u0005¢\u0006\b\n\u0000\u001a\u0004\b\f\u0010\rR\u0011\u0010\u0006\u001a\u00020\u0007¢\u0006\b\n\u0000\u001a\u0004\b\u000e\u0010\u000f¨\u0006\u0019"}, d2 = {"Lnet/classcardauto/mobile/Solver$Match;", "", "card", "Lnet/classcardauto/mobile/Card;", "wordToMeaning", "", "strength", "", "<init>", "(Lnet/classcardauto/mobile/Card;ZI)V", "getCard", "()Lnet/classcardauto/mobile/Card;", "getWordToMeaning", "()Z", "getStrength", "()I", "component1", "component2", "component3", "copy", "equals", "other", "hashCode", "toString", "", "app_release"}, k = 1, mv = {2, 1, 0}, xi = 48)
+    /* loaded from: classes.dex */
+    public static final /* data */ class Match {
+        private final Card card;
+        private final int strength;
+        private final boolean wordToMeaning;
+
+        public Match(Card card, boolean z, int i) {
+            Intrinsics.checkNotNullParameter(card, "card");
+            this.card = card;
+            this.wordToMeaning = z;
+            this.strength = i;
+        }
+
+        public static /* synthetic */ Match copy$default(Match match, Card card, boolean z, int i, int i2, Object obj) {
+            if ((i2 & 1) != 0) {
+                card = match.card;
+            }
+            if ((i2 & 2) != 0) {
+                z = match.wordToMeaning;
+            }
+            if ((i2 & 4) != 0) {
+                i = match.strength;
+            }
+            return match.copy(card, z, i);
+        }
+
+
+
+
+        public final Match copy(Card card, boolean wordToMeaning, int strength) {
+            Intrinsics.checkNotNullParameter(card, "card");
+            return new Match(card, wordToMeaning, strength);
+        }
+
+        public boolean equals(Object other) {
+            if (this == other) {
+                return true;
+            }
+            if (!(other instanceof Match)) {
+                return false;
+            }
+            Match match = (Match) other;
+            return Intrinsics.areEqual(this.card, match.card) && this.wordToMeaning == match.wordToMeaning && this.strength == match.strength;
+        }
+
+        public final Card getCard() {
+            return this.card;
+        }
+
+        public final int getStrength() {
+            return this.strength;
+        }
+
+        public final boolean getWordToMeaning() {
+            return this.wordToMeaning;
+        }
+
+        public int hashCode() {
+            return (((this.card.hashCode() * 31) + Boolean.hashCode(this.wordToMeaning)) * 31) + Integer.hashCode(this.strength);
+        }
+
+        public String toString() {
+            return "Match(card=" + this.card + ", wordToMeaning=" + this.wordToMeaning + ", strength=" + this.strength + ")";
+        }
+    }
+
+    public Solver(Vocabulary vocabulary, boolean z) {
+        Intrinsics.checkNotNullParameter(vocabulary, "vocabulary");
+        this.vocabulary = vocabulary;
+        this.allowPartialChoices = z;
+    }
+
+    public /* synthetic */ Solver(Vocabulary vocabulary, boolean z, int i, DefaultConstructorMarker defaultConstructorMarker) {
+        this(vocabulary, (i & 2) != 0 ? false : z);
+    }
+
+    private final ChoiceAnswer partialAnswer(List<Match> matches, List<UiNode> choices) {
+        Integer num;
+        List<UiNode> list = choices;
+        ArrayList arrayList = new ArrayList(CollectionsKt.collectionSizeOrDefault(list, 10));
+        for (UiNode uiNode : list) {
+            List<Match> list2 = matches;
+            ArrayList arrayList2 = new ArrayList(CollectionsKt.collectionSizeOrDefault(list2, 10));
+            for (Match match : list2) {
+                List<String> plus = match.getWordToMeaning() ? CollectionsKt.plus((Collection) CollectionsKt.listOf(match.getCard().getMeaning()), (Iterable) match.getCard().getAliases()) : match.getCard().getWords();
+                Card card = match.getCard();
+                Iterator<?> it = plus.iterator();
+                if (!it.hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                Integer valueOf = Integer.valueOf(ChoiceOverlap.INSTANCE.count(uiNode.getText(), (String) it.next()));
+                while (it.hasNext()) {
+                    Integer valueOf2 = Integer.valueOf(ChoiceOverlap.INSTANCE.count(uiNode.getText(), (String) it.next()));
+                    if (valueOf.compareTo(valueOf2) < 0) {
+                        valueOf = valueOf2;
+                    }
+                }
+                arrayList2.add(TuplesKt.to(card, valueOf));
+            }
+            ArrayList arrayList3 = arrayList2;
+            Iterator it2 = arrayList3.iterator();
+            if (!it2.hasNext()) {
+                throw new NoSuchElementException();
+            }
+            int intValue = ((Number) ((Pair) it2.next()).getSecond()).intValue();
+            while (it2.hasNext()) {
+                int intValue2 = ((Number) ((Pair) it2.next()).getSecond()).intValue();
+                if (intValue < intValue2) {
+                    intValue = intValue2;
+                }
+            }
+            ArrayList arrayList4 = new ArrayList();
+            for (Object obj : arrayList3) {
+                if (((Number) ((Pair) obj).getSecond()).intValue() == intValue) {
+                    arrayList4.add(obj);
+                }
+            }
+            ArrayList arrayList5 = arrayList4;
+            ArrayList arrayList6 = new ArrayList(CollectionsKt.collectionSizeOrDefault(arrayList5, 10));
+            Iterator it3 = arrayList5.iterator();
+            while (it3.hasNext()) {
+                arrayList6.add((Card) ((Pair) it3.next()).getFirst());
+            }
+            arrayList.add(TuplesKt.to(new ChoiceAnswer(uiNode, CollectionsKt.distinct(arrayList6), 1), Integer.valueOf(intValue)));
+        }
+        ArrayList arrayList7 = arrayList;
+        Iterator it4 = arrayList7.iterator();
+        if (it4.hasNext()) {
+            Integer valueOf3 = Integer.valueOf(((Number) ((Pair) it4.next()).getSecond()).intValue());
+            while (it4.hasNext()) {
+                Integer valueOf4 = Integer.valueOf(((Number) ((Pair) it4.next()).getSecond()).intValue());
+                if (valueOf3.compareTo(valueOf4) < 0) {
+                    valueOf3 = valueOf4;
+                }
+            }
+            num = valueOf3;
+        } else {
+            num = null;
+        }
+        Integer num2 = num;
+        int intValue3 = num2 != null ? num2.intValue() : 0;
+        if (intValue3 < 2) {
+            throw new AnswerResolutionException(AnswerFailure.PARTIAL_TOO_SHORT);
+        }
+        ArrayList arrayList8 = new ArrayList();
+        for (Object obj2 : arrayList7) {
+            if (((Number) ((Pair) obj2).getSecond()).intValue() == intValue3) {
+                arrayList8.add(obj2);
+            }
+        }
+        ArrayList arrayList9 = arrayList8;
+        if (arrayList9.size() == 1) {
+            return (ChoiceAnswer) ((Pair) CollectionsKt.single((List) arrayList9)).getFirst();
+        }
+        throw new AnswerResolutionException(AnswerFailure.PARTIAL_TIE);
+    }
+
+    public final ChoiceAnswer answer(String prompt, List<UiNode> choices) {
+        Object obj;
+        int i;
+        Intrinsics.checkNotNullParameter(prompt, "prompt");
+        Intrinsics.checkNotNullParameter(choices, "choices");
+        String normalize = TextRules.INSTANCE.normalize(prompt);
+        List<Card> cards = this.vocabulary.getCards();
+        ArrayList arrayList = new ArrayList();
+        for (Card card : cards) {
+            List createListBuilder = CollectionsKt.createListBuilder();
+            List<String> words = card.getWords();
+            if (!(words instanceof Collection) || !words.isEmpty()) {
+                Iterator<?> it = words.iterator();
+                while (true) {
+                    if (!it.hasNext()) {
+                        break;
+                    }
+                    if (Intrinsics.areEqual(normalize, TextRules.INSTANCE.normalize((String) it.next()))) {
+                        createListBuilder.add(new Match(card, true, 3));
+                        break;
+                    }
+                }
+            }
+            int strength = TextRules.INSTANCE.strength(prompt, card);
+            if (strength > 0) {
+                createListBuilder.add(new Match(card, false, strength));
+            }
+            CollectionsKt.addAll(arrayList, CollectionsKt.build(createListBuilder));
+        }
+        ArrayList arrayList2 = arrayList;
+        if (arrayList2.isEmpty()) {
+            throw new AnswerResolutionException(AnswerFailure.PROMPT_NOT_FOUND);
+        }
+        ArrayList arrayList3 = new ArrayList();
+        for (UiNode uiNode : choices) {
+            ArrayList arrayList4 = new ArrayList();
+            Iterator it2 = arrayList2.iterator();
+            while (true) {
+                if (!it2.hasNext()) {
+                    break;
+                }
+                Match match = (Match) it2.next();
+                if (match.getWordToMeaning()) {
+                    i = TextRules.INSTANCE.strength(uiNode.getText(), match.getCard());
+                } else {
+                    List<String> words2 = match.getCard().getWords();
+                    if (!(words2 instanceof Collection) || !words2.isEmpty()) {
+                        Iterator<?> it3 = words2.iterator();
+                        while (it3.hasNext()) {
+                            if (Intrinsics.areEqual(TextRules.INSTANCE.normalize(uiNode.getText()), TextRules.INSTANCE.normalize((String) it3.next()))) {
+                                i = 3;
+                                break;
+                            }
+                        }
+                    }
+                    i = 0;
+                }
+                obj = i > 0 ? new Pair(match.getCard(), Integer.valueOf(Math.min(i, match.getStrength()))) : null;
+                if (obj != null) {
+                    arrayList4.add(obj);
+                }
+            }
+            ArrayList arrayList5 = arrayList4;
+            if (!arrayList5.isEmpty()) {
+                ArrayList arrayList6 = arrayList5;
+                ArrayList arrayList7 = new ArrayList(CollectionsKt.collectionSizeOrDefault(arrayList6, 10));
+                Iterator it4 = arrayList6.iterator();
+                while (it4.hasNext()) {
+                    arrayList7.add((Card) ((Pair) it4.next()).getFirst());
+                }
+                ArrayList arrayList8 = arrayList7;
+                Iterator it5 = arrayList6.iterator();
+                if (!it5.hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                int intValue = ((Number) ((Pair) it5.next()).getSecond()).intValue();
+                while (it5.hasNext()) {
+                    int intValue2 = ((Number) ((Pair) it5.next()).getSecond()).intValue();
+                    if (intValue < intValue2) {
+                        intValue = intValue2;
+                    }
+                }
+                obj = new ChoiceAnswer(uiNode, arrayList8, intValue);
+            }
+            if (obj != null) {
+                arrayList3.add(obj);
+            }
+        }
+        ArrayList arrayList9 = arrayList3;
+        if (arrayList9.isEmpty() && this.allowPartialChoices) {
+            return partialAnswer(arrayList2, choices);
+        }
+        if (arrayList9.isEmpty()) {
+            throw new AnswerResolutionException(AnswerFailure.CHOICE_NOT_FOUND);
+        }
+        ArrayList arrayList10 = arrayList9;
+        Iterator it6 = arrayList10.iterator();
+        if (!it6.hasNext()) {
+            throw new NoSuchElementException();
+        }
+        int strength2 = ((ChoiceAnswer) it6.next()).getStrength();
+        while (it6.hasNext()) {
+            int strength3 = ((ChoiceAnswer) it6.next()).getStrength();
+            if (strength2 < strength3) {
+                strength2 = strength3;
+            }
+        }
+        ArrayList arrayList11 = new ArrayList();
+        for (Object obj2 : arrayList10) {
+            if (((ChoiceAnswer) obj2).getStrength() == strength2) {
+                arrayList11.add(obj2);
+            }
+        }
+        ArrayList arrayList12 = arrayList11;
+        if (arrayList12.size() == 1) {
+            return (ChoiceAnswer) CollectionsKt.single((List) arrayList12);
+        }
+        throw new AnswerResolutionException(AnswerFailure.CHOICE_AMBIGUOUS);
+    }
+}
