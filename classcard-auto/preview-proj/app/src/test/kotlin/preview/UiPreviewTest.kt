@@ -188,16 +188,6 @@ class UiPreviewTest {
     }
 
     @Test
-    fun overlayWithSettingsOpen() {
-        val p = FloatingPanel(paparazzi.context, MemoryPrefs(), host())
-        p.render(false, "", true, false)
-        // find the collapsed slider container and open it, as the settings chip would
-        val sliders = (0 until p.childCount).map { p.getChildAt(it) }.filterIsInstance<android.widget.LinearLayout>().last()
-        sliders.visibility = View.VISIBLE
-        paparazzi.snapshot(overBackdrop(p), "overlay_settings_open")
-    }
-
-    @Test
     fun overlayTestingWithTouches() {
         val p = FloatingPanel(paparazzi.context, MemoryPrefs(), host())
         p.render(true, "3/20 · 2개 입력", false, false)

@@ -36,6 +36,7 @@
 - 정확도: `match_fuzzy_percent`(50–100, 80) `match_tie_percent`(0–30, 8) `match_partial_min`(1–6, 2)
 - 한계: `limit_run_seconds`(120–3600, 600) `limit_phase_seconds`(10–120, 35) `limit_scroll_steps`(40–400, 160) `limit_tap_retries`(1–5, 2) `limit_gate_ms`(300–1500, 650) `limit_touch_pause`(1–5, 2)
 - 스크롤: `scroll_range_percent` `scroll_duration_ms` `scroll_interval_ms` (플로팅 패널 슬라이더)
+- 시작 전 큰 패널은 기본으로 설정 전체(스위치 2개 + 슬라이더 8개, 스크롤 영역)를 펼쳐 보여줌. 실행 중에는 가장자리 세로 막대(시험·수집 모두).
 - 사람모드: `human_like`, `human_mean_ms`(500–8000, 1000) — 로그정규 응답시간·피로·망설임·탭 위치/길이 지터
 - 고의 오답: `wrong_count`(0–20) — 시험 시작 시 무작위 문항 선택. 앱 설정과 **플로팅 패널 슬라이더** 양쪽에서 조절
 - 일시정지/재개: 시험 중 사용자 터치 N회면 자동 일시정지(1×1 `FLAG_WATCH_OUTSIDE_TOUCH` 창의 `ACTION_OUTSIDE`로 감지), 재개 시 터치 수 0, **재개 후 첫 해석 불가 문항은 찍기**. 일시정지/재개는 플로팅 패널에서만(앱 화면으로 돌아가게 하지 말 것 — 사용자 요구)

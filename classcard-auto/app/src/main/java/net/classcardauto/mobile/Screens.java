@@ -461,16 +461,69 @@ public final class Screens {
                 return Unit.INSTANCE;
             }
         }, compact), lp(c, top));
-        if (compact) {
-            // the floating panel also carries the deliberate-mistake count; the app's scroll card does not
-            parent.addView(s.sliderRow(c, "일부러 틀릴 문항 수", "개", AdvancedSettings.WRONG_MIN, AdvancedSettings.WRONG_MAX, AdvancedSettings.WRONG_STEP, AdvancedSettings.wrongCount(prefs), new Function1<Integer, Unit>() {
-                @Override
-                public Unit invoke(Integer v) {
-                    AdvancedSettings.setWrongCount(prefs, v.intValue());
-                    return Unit.INSTANCE;
-                }
-            }, true), lp(c, top));
-        }
+    }
+
+    /**
+     * Everything that can be set before a run, in the dark floating panel: two switches and the sliders. The values
+     * live in the same preferences as the app's own settings screens.
+     */
+    public static void addPanelSettings(final Context c, LinearLayout parent, final SharedPreferences p) {
+        AppStyle s = AppStyle.INSTANCE;
+        parent.addView(panelSwitch(c, "사람처럼 입력", p.getBoolean("human_like", false), "human_like", p), lp(c, 2));
+        parent.addView(panelSwitch(c, "실행 중 화면 터치 잠금", p.getBoolean("touch_lock", true), "touch_lock", p), lp(c, 2));
+        parent.addView(s.sliderRow(c, "평균 응답 시간", "ms", HumanTiming.MEAN_MIN, HumanTiming.MEAN_MAX, HumanTiming.MEAN_STEP, p.getInt("human_mean_ms", HumanTiming.MEAN_DEFAULT), new Function1<Integer, Unit>() {
+            @Override
+            public Unit invoke(Integer v) {
+                p.edit().putInt("human_mean_ms", v.intValue()).apply();
+                return Unit.INSTANCE;
+            }
+        }, true), lp(c, 8));
+        parent.addView(s.sliderRow(c, "일부러 틀릴 문항 수", "개", AdvancedSettings.WRONG_MIN, AdvancedSettings.WRONG_MAX, AdvancedSettings.WRONG_STEP, AdvancedSettings.wrongCount(p), new Function1<Integer, Unit>() {
+            @Override
+            public Unit invoke(Integer v) {
+                AdvancedSettings.setWrongCount(p, v.intValue());
+                return Unit.INSTANCE;
+            }
+        }, true), lp(c, 6));
+        parent.addView(s.sliderRow(c, "터치 몇 번에 일시정지", "회", AdvancedSettings.TOUCH_MIN, AdvancedSettings.TOUCH_MAX, AdvancedSettings.TOUCH_STEP, AdvancedSettings.touchPauseCount(p), new Function1<Integer, Unit>() {
+            @Override
+            public Unit invoke(Integer v) {
+                AdvancedSettings.setTouchPauseCount(p, v.intValue());
+                return Unit.INSTANCE;
+            }
+        }, true), lp(c, 6));
+        parent.addView(s.sliderRow(c, "최대 실행 시간", "초", AdvancedSettings.RUN_MIN, AdvancedSettings.RUN_MAX, AdvancedSettings.RUN_STEP, AdvancedSettings.runLimitSeconds(p), new Function1<Integer, Unit>() {
+            @Override
+            public Unit invoke(Integer v) {
+                AdvancedSettings.setRunLimitSeconds(p, v.intValue());
+                return Unit.INSTANCE;
+            }
+        }, true), lp(c, 6));
+        addSliders(c, parent, p, true);
+    }
+
+    private static LinearLayout panelSwitch(Context c, String title, boolean checked, final String key, final SharedPreferences p) {
+        AppStyle s = AppStyle.INSTANCE;
+        LinearLayout row = new LinearLayout(c);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(s.label(c, title, 12.5f, -1, true), new LinearLayout.LayoutParams(0, -2, 1.0f));
+        final android.widget.CompoundButton sw = s.toggle(c, checked, new android.widget.CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(android.widget.CompoundButton b, boolean on) {
+                p.edit().putBoolean(key, on).apply();
+            }
+        });
+        sw.setScaleX(0.8f);
+        sw.setScaleY(0.8f);
+        row.addView(sw, new LinearLayout.LayoutParams(-2, -2));
+        row.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                sw.toggle();
+            }
+        });
+        return row;
     }
 
     // ------------------------------------------------------------ settings

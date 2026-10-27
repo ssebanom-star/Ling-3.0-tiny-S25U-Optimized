@@ -50,6 +50,9 @@ public final class FloatingPanel extends LinearLayout {
     private final LinearLayout settingsChip;
     private final LinearLayout hideChip;
     private final LinearLayout sliders;
+    private final android.widget.ScrollView settingsScroll;
+    private boolean userCollapsed;
+    private boolean settingsShown;
     private final android.content.SharedPreferences panelPrefs;
     private final TextView settingsLabel;
     private boolean running;
@@ -167,7 +170,7 @@ public final class FloatingPanel extends LinearLayout {
         tools.setOrientation(HORIZONTAL);
         tools.setGravity(Gravity.END);
         settingsLabel = new TextView(context);
-        settingsChip = chip(context, R.drawable.ic_tune, "스크롤 설정", settingsLabel);
+        settingsChip = chip(context, R.drawable.ic_tune, "설정 접기", settingsLabel);
         hideChip = chip(context, R.drawable.ic_hide, "UI 끄기", new TextView(context));
         hideChip.setOnClickListener(new OnClickListener() {
             @Override
@@ -272,10 +275,13 @@ public final class FloatingPanel extends LinearLayout {
         panelPrefs = prefs;
         sliders = new LinearLayout(context);
         sliders.setOrientation(VERTICAL);
-        sliders.setVisibility(GONE);
         sliders.setPadding(s.dp(context, 8), s.dp(context, 4), s.dp(context, 4), 0);
-        Screens.addSliders(context, sliders, prefs, true);
-        addView(sliders, new LayoutParams(s.dp(context, 232), -2));
+        Screens.addPanelSettings(context, sliders, prefs);
+        settingsScroll = new android.widget.ScrollView(context);
+        settingsScroll.setOverScrollMode(2);
+        settingsScroll.setVisibility(GONE);
+        settingsScroll.addView(sliders, new android.view.ViewGroup.LayoutParams(-1, -2));
+        addView(settingsScroll, new LayoutParams(s.dp(context, 252), s.dp(context, 330)));
 
         settingsChip.setOnClickListener(new OnClickListener() {
             @Override
@@ -283,12 +289,8 @@ public final class FloatingPanel extends LinearLayout {
                 if (host.isBlocked()) {
                     return;
                 }
-                if (sliders.getVisibility() != VISIBLE) {
-                    // values may have been changed in the app since this panel was built
-                    sliders.removeAllViews();
-                    Screens.addSliders(getContext(), sliders, panelPrefs, true);
-                }
-                sliders.setVisibility(sliders.getVisibility() == VISIBLE ? GONE : VISIBLE);
+                userCollapsed = !userCollapsed;
+                applySettingsVisibility(!running);
             }
         });
 
@@ -501,8 +503,19 @@ public final class FloatingPanel extends LinearLayout {
         settingsChip.setVisibility(canSettings ? VISIBLE : GONE);
         hideChip.setVisibility(canHide ? VISIBLE : GONE);
         tools.setVisibility((canSettings || canHide) ? VISIBLE : GONE);
-        if (!canSettings) {
-            sliders.setVisibility(GONE);
+        applySettingsVisibility(!active && canSettings);
+    }
+
+    /** The settings are open by default while idle; the chip folds them away. */
+    private void applySettingsVisibility(boolean allowed) {
+        boolean show = allowed && !userCollapsed;
+        if (show && !settingsShown) {
+            // values may have been changed in the app since the panel was built
+            sliders.removeAllViews();
+            Screens.addPanelSettings(getContext(), sliders, panelPrefs);
         }
+        settingsShown = show;
+        settingsScroll.setVisibility(show ? VISIBLE : GONE);
+        settingsLabel.setText(userCollapsed ? "설정 펼치기" : "설정 접기");
     }
 }
