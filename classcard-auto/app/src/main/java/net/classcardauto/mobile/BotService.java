@@ -374,7 +374,7 @@ public final class BotService extends AccessibilityService {
         ((WindowManager) systemService).updateViewLayout(view, layoutParams);
         if (finished) {
             this.dragging = false;
-            if (this.engine != null && getEngine().isInTest()) {
+            if (this.engine != null && getEngine().getActive()) {
                 snapPanelToEdge();
             }
         }
@@ -710,7 +710,7 @@ public final class BotService extends AccessibilityService {
             this.overlayDismissed = false;
         }
         updateTouchLock();
-        boolean inTestNow = active && getEngine().isInTest();
+        boolean inTestNow = active;
         if (inTestNow && !this.snappedForTest) {
             this.snappedForTest = true;
             snapPanelToEdge();

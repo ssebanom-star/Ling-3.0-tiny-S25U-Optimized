@@ -357,7 +357,7 @@ public final class FloatingPanel extends LinearLayout {
         }
         s.setDotColor(dot, !running ? s.getAccent() : (pausedNow ? s.getWarn() : s.getInfo()));
         updateCaption();
-        applyCompact(running && inTest, locked, blocked, touches, limit);
+        applyCompact(running, inTest, locked, blocked, touches, limit);
     }
 
     private OnTouchListener dragListener(final Host host) {
@@ -386,8 +386,8 @@ public final class FloatingPanel extends LinearLayout {
         };
     }
 
-    /** During the test only the narrow strip is shown; otherwise the full card. */
-    private void applyCompact(boolean on, boolean locked, int blocked, int touches, int limit) {
+    /** While a run is going (collecting or testing) only the narrow strip is shown; otherwise the full card. */
+    private void applyCompact(boolean on, boolean inTest, boolean locked, int blocked, int touches, int limit) {
         if (on != compact) {
             compact = on;
             full.setVisibility(on ? GONE : VISIBLE);
@@ -407,8 +407,10 @@ public final class FloatingPanel extends LinearLayout {
                 miniInfo.setText("정지\n터치 " + touches);
             } else if (locked) {
                 miniInfo.setText("잠금\n막음 " + blocked);
-            } else {
+            } else if (inTest) {
                 miniInfo.setText("터치\n" + touches + "/" + limit);
+            } else {
+                miniInfo.setText("수집");
             }
             miniInfo.setTextColor((pausedNow || touches > 0 || blocked > 0) ? Color.rgb(255, 196, 92) : ON_PANEL_DIM);
         }

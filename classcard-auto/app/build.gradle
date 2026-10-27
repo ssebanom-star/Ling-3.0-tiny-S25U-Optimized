@@ -10,8 +10,8 @@ android {
         applicationId 'net.classcardauto.mobile.nocert'
         minSdk 26
         targetSdk 35
-        versionCode 41
-        versionName '0.6.32-dev'
+        versionCode 42
+        versionName '0.6.33-dev'
     }
     buildTypes { release { minifyEnabled false } }
     compileOptions {
