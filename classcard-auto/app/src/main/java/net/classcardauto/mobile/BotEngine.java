@@ -1682,6 +1682,8 @@ public final class BotEngine {
         this.natural = this.storage.getPrefs().getBoolean("natural", false);
         this.human = this.storage.getPrefs().getBoolean("human_like", false);
         this.wrongSet = null;
+        this.wrongOwed = 0;
+        this.wrongSkipped.clear();
         this.wrongPick.clear();
         this.pauseState.reset();
         this.blockedTouches = 0;
@@ -1870,6 +1872,8 @@ public final class BotEngine {
         }
     }
     private java.util.Set<Integer> wrongSet;
+    private int wrongOwed;
+    private final java.util.Set<String> wrongSkipped = new java.util.HashSet<>();
     private final java.util.Map<String, String> wrongPick = new java.util.HashMap<>();
 
     /**
@@ -1909,7 +1913,8 @@ public final class BotEngine {
             QuietJson planned = new QuietJson().put("count", this.wrongSet.size()).put("total", this.expectedQuestions);
             log("deliberate_wrong_planned", planned);
         }
-        if (!this.wrongSet.contains(Integer.valueOf(WrongAnswers.questionNumber(progress)))) {
+        boolean planned = this.wrongSet.contains(Integer.valueOf(WrongAnswers.questionNumber(progress)));
+        if (!planned && !this.wrongPick.containsKey(progress) && (this.wrongOwed <= 0 || this.wrongSkipped.contains(progress))) {
             return correct;
         }
         UiNode pick = null;
@@ -1932,9 +1937,17 @@ public final class BotEngine {
             }
             int index = WrongAnswers.pickWrong(this.rng, candidates);
             if (index < 0) {
+                // no choice is certainly wrong here: leave it right and make up for it on a later question
+                if (this.wrongSkipped.add(progress) && planned) {
+                    this.wrongOwed++;
+                }
+                log("deliberate_wrong_skipped", new QuietJson().put("progress", progress).put("owed", this.wrongOwed));
                 return correct;
             }
             pick = choices.get(index);
+            if (!planned) {
+                this.wrongOwed--;
+            }
             this.wrongPick.put(progress, pick.getText());
             QuietJson put = new QuietJson().put("progress", progress);
             log("deliberate_wrong", put);

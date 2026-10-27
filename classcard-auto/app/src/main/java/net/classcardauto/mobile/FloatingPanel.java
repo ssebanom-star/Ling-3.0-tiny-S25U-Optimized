@@ -50,6 +50,7 @@ public final class FloatingPanel extends LinearLayout {
     private final LinearLayout settingsChip;
     private final LinearLayout hideChip;
     private final LinearLayout sliders;
+    private final android.content.SharedPreferences panelPrefs;
     private final TextView settingsLabel;
     private boolean running;
     private boolean pausedNow;
@@ -192,6 +193,7 @@ public final class FloatingPanel extends LinearLayout {
         toolsParams.topMargin = s.dp(context, 6);
         addView(tools, toolsParams);
 
+        panelPrefs = prefs;
         sliders = new LinearLayout(context);
         sliders.setOrientation(VERTICAL);
         sliders.setVisibility(GONE);
@@ -204,6 +206,11 @@ public final class FloatingPanel extends LinearLayout {
             public void onClick(View v) {
                 if (host.isBlocked()) {
                     return;
+                }
+                if (sliders.getVisibility() != VISIBLE) {
+                    // values may have been changed in the app since this panel was built
+                    sliders.removeAllViews();
+                    Screens.addSliders(getContext(), sliders, panelPrefs, true);
                 }
                 sliders.setVisibility(sliders.getVisibility() == VISIBLE ? GONE : VISIBLE);
             }
