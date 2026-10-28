@@ -249,6 +249,23 @@ public final class BotService extends AccessibilityService {
             }
 
             @Override
+            public boolean isDockedRight() {
+                LinearLayout view = BotService.this.overlay;
+                WindowManager.LayoutParams lp = BotService.this.overlayParams;
+                if (view == null || lp == null) {
+                    return true;
+                }
+                int maxX = Math.max(0, BotService.this.getResources().getDisplayMetrics().widthPixels - view.getWidth());
+                // gravity is top|end, so x counts from the right edge
+                return lp.x <= maxX / 2;
+            }
+
+            @Override
+            public void onLayoutChanged() {
+                BotService.this.snapPanelToEdge();
+            }
+
+            @Override
             public void onTurnOff() {
                 if (BotService.this.getEngine().getActive()) {
                     return;

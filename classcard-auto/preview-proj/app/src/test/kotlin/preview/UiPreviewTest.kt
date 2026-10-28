@@ -172,6 +172,8 @@ class UiPreviewTest {
         override fun onPause() {}
         override fun onPanelTouch(eventTime: Long) {}
         override fun onTurnOff() {}
+        override fun isDockedRight() = true
+        override fun onLayoutChanged() {}
     }
 
     @Test
@@ -241,6 +243,16 @@ class UiPreviewTest {
         p.setRemaining(572)
         p.renderRun(false, 0, 2, false, true, 0)
         paparazzi.snapshot(overBackdrop(p), "overlay_collecting_hide")
+    }
+
+    @Test
+    fun overlayCollapsedTab() {
+        val p = FloatingPanel(paparazzi.context, MemoryPrefs(), host())
+        p.render(true, "단어 수집 12개", true, true)
+        p.setRemaining(572)
+        p.renderRun(false, 0, 2, false, true, 0)
+        p.setCollapsed(true)
+        paparazzi.snapshot(overBackdrop(p), "overlay_collapsed_tab")
     }
 
     @Test
