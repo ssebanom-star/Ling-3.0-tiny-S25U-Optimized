@@ -171,6 +171,7 @@ class UiPreviewTest {
         override fun isBlocked() = false
         override fun onPause() {}
         override fun onPanelTouch(eventTime: Long) {}
+        override fun onTurnOff() {}
     }
 
     @Test

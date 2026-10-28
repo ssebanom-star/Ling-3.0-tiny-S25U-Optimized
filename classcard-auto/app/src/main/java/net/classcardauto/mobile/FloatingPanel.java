@@ -35,6 +35,9 @@ public final class FloatingPanel extends LinearLayout {
 
         /** A finger went down on the panel itself (event time in uptime ms), so it is not a touch on the app below. */
         void onPanelTouch(long eventTime);
+
+        /** "끄기": the panel disappears until the app is opened again (only offered while idle). */
+        void onTurnOff();
     }
 
     private static final int PANEL = Color.argb(238, 18, 28, 25);
@@ -205,7 +208,18 @@ public final class FloatingPanel extends LinearLayout {
                 applyLayout();
             }
         });
-        tools.addView(minimizeChip, new LayoutParams(-2, s.dp(context, 34)));
+        LayoutParams mcp = new LayoutParams(-2, s.dp(context, 34));
+        tools.addView(minimizeChip, mcp);
+        LinearLayout offChip = chip(context, R.drawable.ic_hide, "끄기", new TextView(context));
+        offChip.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                host.onTurnOff();
+            }
+        });
+        LayoutParams ocp = new LayoutParams(-2, s.dp(context, 34));
+        ocp.leftMargin = s.dp(context, 8);
+        tools.addView(offChip, ocp);
         LayoutParams sp0 = new LayoutParams(-2, s.dp(context, 34));
         sp0.leftMargin = s.dp(context, 8);
         tools.addView(settingsChip, sp0);

@@ -62,6 +62,15 @@ public final class BotService extends AccessibilityService {
     private Button overlayButton;
     private FloatingPanel floating;
     private boolean overlayDismissed;
+    private boolean panelOff;
+
+    /** Brings back a panel switched off with "끄기" (called when the app screen is opened). */
+    public final void showPanel() {
+        if (this.panelOff) {
+            this.panelOff = false;
+            refreshOverlay();
+        }
+    }
     private boolean dragging;
     private View touchWatcher;
     private FrameLayout touchBlocker;
@@ -237,6 +246,16 @@ public final class BotService extends AccessibilityService {
                     engine.pause("직접 일시정지");
                 }
                 BotService.this.refreshOverlay();
+            }
+
+            @Override
+            public void onTurnOff() {
+                if (BotService.this.getEngine().getActive()) {
+                    return;
+                }
+                BotService.this.panelOff = true;
+                BotService.this.refreshOverlay();
+                android.widget.Toast.makeText(BotService.this, "MiMiC 앱을 열면 패널이 다시 나타나요", android.widget.Toast.LENGTH_LONG).show();
             }
 
             @Override
@@ -723,7 +742,7 @@ public final class BotService extends AccessibilityService {
         }
         LinearLayout linearLayout = this.overlay;
         if (linearLayout != null) {
-            linearLayout.setVisibility((UsageConsent.INSTANCE.getAllowed() && (active || this.currentStartAllowed) && !this.overlayDismissed) ? 0 : 8);
+            linearLayout.setVisibility((UsageConsent.INSTANCE.getAllowed() && (active || (this.currentStartAllowed && !this.panelOff)) && !this.overlayDismissed) ? 0 : 8);
         }
         WindowManager.LayoutParams layoutParams = this.overlayParams;
         if (layoutParams != null) {
@@ -882,6 +901,7 @@ public final class BotService extends AccessibilityService {
         if (getEngine().getActive()) {
             throw new IllegalStateException("현재 실행을 먼저 중지하세요.".toString());
         }
+        this.panelOff = false;
         getEngine().begin(mode);
         LinearLayout linearLayout = this.overlay;
         if (linearLayout != null) {

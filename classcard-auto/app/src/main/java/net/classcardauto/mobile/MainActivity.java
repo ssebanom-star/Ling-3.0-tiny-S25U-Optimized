@@ -908,6 +908,10 @@ public final class MainActivity extends Activity {
     @Override // android.app.Activity
     protected void onResume() {
         super.onResume();
+        BotService panelService = BotService.INSTANCE.getInstance();
+        if (panelService != null) {
+            panelService.showPanel();
+        }
         this.handler.post(this.refresh);
     }
 
