@@ -248,9 +248,7 @@ class UiPreviewTest {
     @Test
     fun overlayCollapsedTab() {
         val p = FloatingPanel(paparazzi.context, MemoryPrefs(), host())
-        p.render(true, "단어 수집 12개", true, true)
-        p.setRemaining(572)
-        p.renderRun(false, 0, 2, false, true, 0)
+        p.render(false, "", true, false)
         p.setCollapsed(true)
         paparazzi.snapshot(overBackdrop(p), "overlay_collapsed_tab")
     }

@@ -75,11 +75,11 @@ public final class FloatingPanel extends LinearLayout {
     private final LinearLayout mini;
     private final LinearLayout full;
     private final LinearLayout startOnly;
-    private final ImageView miniHide;
+    private final LinearLayout fullRow;
+    private final ImageView foldTab;
     private final LinearLayout tab;
     private final ImageView tabArrow;
     private boolean collapsed;
-    private boolean canCollapse;
     private boolean minimized;
     private final TextView miniTime;
     private final TextView miniInfo;
@@ -301,24 +301,6 @@ public final class FloatingPanel extends LinearLayout {
         LayoutParams msp = new LayoutParams(s.dp(context, 40), s.dp(context, 28));
         msp.topMargin = s.dp(context, 4);
         mini.addView(miniStop, msp);
-        miniHide = new ImageView(context);
-        miniHide.setImageResource(R.drawable.ic_chevron);
-        miniHide.setColorFilter(ON_PANEL);
-        miniHide.setPadding(s.dp(context, 11), s.dp(context, 3), s.dp(context, 11), s.dp(context, 3));
-        miniHide.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(60, 255, 255, 255)), s.roundRect(context, CHIP, 999, 0), null));
-        miniHide.setContentDescription("옆으로 접기");
-        miniHide.setVisibility(GONE);
-        miniHide.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                collapsed = true;
-                applyLayout();
-                host.onLayoutChanged();
-            }
-        });
-        LayoutParams mhp = new LayoutParams(s.dp(context, 40), s.dp(context, 26));
-        mhp.topMargin = s.dp(context, 4);
-        mini.addView(miniHide, mhp);
         miniInfo = s.label(context, "", 10.0f, ON_PANEL_DIM, true);
         miniInfo.setGravity(Gravity.CENTER);
         LayoutParams mip = new LayoutParams(-2, -2);
@@ -363,7 +345,25 @@ public final class FloatingPanel extends LinearLayout {
             removeView(kid);
             full.addView(kid, kp);
         }
-        addView(full, 0, new LayoutParams(-2, -2));
+        // the big card carries a fold tab on its inner side: pressing it slides the card away, leaving only the edge tab
+        fullRow = new LinearLayout(context);
+        fullRow.setOrientation(HORIZONTAL);
+        foldTab = new ImageView(context);
+        foldTab.setImageResource(R.drawable.ic_chevron);
+        foldTab.setColorFilter(ON_PANEL);
+        foldTab.setPadding(s.dp(context, 2), s.dp(context, 20), s.dp(context, 2), s.dp(context, 20));
+        foldTab.setBackground(s.roundRect(context, CHIP, 10, 0));
+        foldTab.setContentDescription("패널 접기");
+        foldTab.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                collapsed = true;
+                applyLayout();
+                host.onLayoutChanged();
+            }
+        });
+        fullRow.addView(full, new LayoutParams(-2, -2));
+        addView(fullRow, 0, new LayoutParams(-2, -2));
 
         // start-only strip: drag handle, start button, and a button that opens the full card again
         startOnly = new LinearLayout(context);
@@ -462,10 +462,6 @@ public final class FloatingPanel extends LinearLayout {
     public void renderRun(boolean paused, int touches, int limit, boolean inTest, boolean locked, int blocked) {
         AppStyle s = AppStyle.INSTANCE;
         pausedNow = paused && running;
-        if (pausedNow && collapsed) {
-            collapsed = false;
-            hostRef.onLayoutChanged();
-        }
         pauseChip.setVisibility(running ? VISIBLE : GONE);
         pauseLabel.setText(pausedNow ? "재개" : "일시정지");
         pauseIcon.setImageResource(pausedNow ? R.drawable.ic_play : R.drawable.ic_pause);
@@ -556,17 +552,27 @@ public final class FloatingPanel extends LinearLayout {
 
     /** Picks which of the three layouts is visible: the strip while running, the start-only strip, or the full card. */
     private void applyLayout() {
-        boolean startMode = !running && minimized && !compact;
-        boolean tabMode = compact && collapsed && running;
-        full.setVisibility(compact || startMode ? GONE : VISIBLE);
-        mini.setVisibility(compact && !tabMode ? VISIBLE : GONE);
+        boolean startMode = !running && minimized && !compact && !collapsed;
+        boolean tabMode = collapsed && !running;
+        fullRow.setVisibility(compact || startMode || tabMode ? GONE : VISIBLE);
+        mini.setVisibility(compact ? VISIBLE : GONE);
         startOnly.setVisibility(startMode ? VISIBLE : GONE);
         tab.setVisibility(tabMode ? VISIBLE : GONE);
         AppStyle s = AppStyle.INSTANCE;
         boolean right = hostRef.isDockedRight();
-        // the strip's arrow points at the edge it folds into; the tab's arrow points back into the screen
-        miniHide.setRotation(right ? 0 : 180);
+        // the fold tab sits on the card's inner side and points at the edge it folds into; the edge tab points back
+        foldTab.setRotation(right ? 0 : 180);
         tabArrow.setRotation(right ? 180 : 0);
+        fullRow.removeView(foldTab);
+        LinearLayout.LayoutParams ftp = new LinearLayout.LayoutParams(s.dp(getContext(), 22), s.dp(getContext(), 64));
+        ftp.topMargin = s.dp(getContext(), 4);
+        if (right) {
+            ftp.rightMargin = s.dp(getContext(), 6);
+            fullRow.addView(foldTab, 0, ftp);
+        } else {
+            ftp.leftMargin = s.dp(getContext(), 6);
+            fullRow.addView(foldTab, ftp);
+        }
         tab.setBackground(s.roundRect(getContext(), PANEL, 12, 0));
         if (tabMode) {
             setBackground(null);
@@ -577,7 +583,7 @@ public final class FloatingPanel extends LinearLayout {
             setElevation(s.dp(getContext(), 6));
         }
         if (tabMode) {
-            // padding set above
+            // no padding around the bare tab
         } else if (compact) {
             setPadding(s.dp(getContext(), 4), s.dp(getContext(), 4), s.dp(getContext(), 4), s.dp(getContext(), 6));
         } else if (startMode) {
@@ -671,9 +677,7 @@ public final class FloatingPanel extends LinearLayout {
         primary.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(70, 255, 255, 255)), base, null));
         settingsChip.setVisibility(canSettings ? VISIBLE : GONE);
         hideChip.setVisibility(canHide ? VISIBLE : GONE);
-        miniHide.setVisibility(canHide ? VISIBLE : GONE);
-        canCollapse = canHide;
-        if (!active) {
+        if (active) {
             collapsed = false;
         }
         tools.setVisibility((canSettings || canHide) ? VISIBLE : GONE);
