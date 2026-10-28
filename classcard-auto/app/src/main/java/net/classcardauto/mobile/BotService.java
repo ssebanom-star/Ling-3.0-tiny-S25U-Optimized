@@ -212,9 +212,6 @@ public final class BotService extends AccessibilityService {
 
             @Override
             public void onHide() {
-                if (BotService.this.busy) {
-                    return;
-                }
                 if (BotService.this.getEngine().getBeforeTest()) {
                     BotService.this.overlayDismissed = true;
                     BotService.this.refreshOverlay();
@@ -442,6 +439,8 @@ public final class BotService extends AccessibilityService {
                 // first press: explain the lock; a second press within 10 s starts
                 botService.lockConfirmUntil = SystemClock.elapsedRealtime() + 10000;
                 botService.setStatus("시작하면 화면 터치가 잠겨요 (일시정지로 해제). 시작하려면 10초 안에 한 번 더");
+                // the status line is not visible while the panel is shrunk to its start button
+                android.widget.Toast.makeText(botService, "화면 터치가 잠겨요. 시작하려면 10초 안에 한 번 더 누르세요", android.widget.Toast.LENGTH_LONG).show();
             } else {
                 botService.lockConfirmUntil = 0;
                 botService.arm("screen_auto");

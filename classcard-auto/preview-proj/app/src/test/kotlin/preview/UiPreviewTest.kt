@@ -191,6 +191,58 @@ class UiPreviewTest {
     }
 
     @Test
+    fun iconIdeas() {
+        val ctx = paparazzi.context
+        val grid = android.widget.GridLayout(ctx)
+        grid.columnCount = 4
+        grid.setBackgroundColor(Color.WHITE)
+        grid.setPadding(20, 20, 20, 20)
+        val ids = intArrayOf(R.drawable.icon_idea_1, R.drawable.icon_idea_2, R.drawable.icon_idea_3, R.drawable.icon_idea_4,
+            R.drawable.icon_idea_5, R.drawable.icon_idea_6, R.drawable.icon_idea_7, R.drawable.icon_idea_8)
+        for (id in ids) {
+            val v = android.widget.ImageView(ctx)
+            v.setImageResource(id)
+            val lp = android.widget.GridLayout.LayoutParams()
+            lp.width = 240
+            lp.height = 240
+            lp.setMargins(10, 10, 10, 10)
+            grid.addView(v, lp)
+        }
+        paparazzi.snapshot(grid, "icon_ideas")
+    }
+
+    @Test
+    fun iconPencil() {
+        val ctx = paparazzi.context
+        val row = android.widget.LinearLayout(ctx)
+        row.setBackgroundColor(Color.WHITE)
+        row.setPadding(20, 20, 20, 20)
+        for (id in intArrayOf(R.drawable.icon_idea_9, R.drawable.icon_idea_10)) {
+            val v = android.widget.ImageView(ctx)
+            v.setImageResource(id)
+            row.addView(v, android.widget.LinearLayout.LayoutParams(360, 360).also { it.rightMargin = 20 })
+        }
+        paparazzi.snapshot(row, "icon_pencil")
+    }
+
+    @Test
+    fun overlayStartOnly() {
+        val p = FloatingPanel(paparazzi.context, MemoryPrefs(), host())
+        p.render(false, "", true, false)
+        p.setMinimized(true)
+        paparazzi.snapshot(overBackdrop(p), "overlay_start_only")
+    }
+
+    @Test
+    fun overlayCollectingWithHide() {
+        val p = FloatingPanel(paparazzi.context, MemoryPrefs(), host())
+        p.render(true, "단어 수집 12개", true, true)
+        p.setRemaining(572)
+        p.renderRun(false, 0, 2, false, true, 0)
+        paparazzi.snapshot(overBackdrop(p), "overlay_collecting_hide")
+    }
+
+    @Test
     fun overlayIdle() {
         val p = FloatingPanel(paparazzi.context, MemoryPrefs(), host())
         p.render(false, "", true, false)

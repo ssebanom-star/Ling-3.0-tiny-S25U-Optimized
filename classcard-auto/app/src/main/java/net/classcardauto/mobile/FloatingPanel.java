@@ -65,6 +65,9 @@ public final class FloatingPanel extends LinearLayout {
     private long remainingSeconds = -1;
     private final LinearLayout mini;
     private final LinearLayout full;
+    private final LinearLayout startOnly;
+    private final Button miniHide;
+    private boolean minimized;
     private final TextView miniTime;
     private final TextView miniInfo;
     private final ImageView miniPauseIcon;
@@ -193,6 +196,16 @@ public final class FloatingPanel extends LinearLayout {
         });
         pauseChip.setVisibility(GONE);
         tools.addView(pauseChip, new LayoutParams(-2, s.dp(context, 34)));
+        LinearLayout minimizeChip = chip(context, R.drawable.ic_chevron, "작게", new TextView(context));
+        ((ImageView) minimizeChip.getChildAt(0)).setRotation(90);
+        minimizeChip.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                minimized = true;
+                applyLayout();
+            }
+        });
+        tools.addView(minimizeChip, new LayoutParams(-2, s.dp(context, 34)));
         LayoutParams sp0 = new LayoutParams(-2, s.dp(context, 34));
         sp0.leftMargin = s.dp(context, 8);
         tools.addView(settingsChip, sp0);
@@ -264,6 +277,30 @@ public final class FloatingPanel extends LinearLayout {
         LayoutParams msp = new LayoutParams(s.dp(context, 40), s.dp(context, 28));
         msp.topMargin = s.dp(context, 4);
         mini.addView(miniStop, msp);
+        miniHide = new Button(context);
+        miniHide.setAllCaps(false);
+        miniHide.setText("숨김");
+        miniHide.setTextSize(10.5f);
+        miniHide.setTextColor(ON_PANEL);
+        miniHide.setStateListAnimator(null);
+        miniHide.setElevation(0);
+        miniHide.setMinWidth(0);
+        miniHide.setMinimumWidth(0);
+        miniHide.setMinHeight(0);
+        miniHide.setMinimumHeight(0);
+        miniHide.setPadding(0, 0, 0, 0);
+        miniHide.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(60, 255, 255, 255)), s.roundRect(context, CHIP, 999, 0), null));
+        miniHide.setContentDescription("UI 끄기");
+        miniHide.setVisibility(GONE);
+        miniHide.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                host.onHide();
+            }
+        });
+        LayoutParams mhp = new LayoutParams(s.dp(context, 40), s.dp(context, 26));
+        mhp.topMargin = s.dp(context, 4);
+        mini.addView(miniHide, mhp);
         miniInfo = s.label(context, "", 10.0f, ON_PANEL_DIM, true);
         miniInfo.setGravity(Gravity.CENTER);
         LayoutParams mip = new LayoutParams(-2, -2);
@@ -309,6 +346,59 @@ public final class FloatingPanel extends LinearLayout {
             full.addView(kid, kp);
         }
         addView(full, 0, new LayoutParams(-2, -2));
+
+        // start-only strip: drag handle, start button, and a button that opens the full card again
+        startOnly = new LinearLayout(context);
+        startOnly.setOrientation(HORIZONTAL);
+        startOnly.setGravity(Gravity.CENTER_VERTICAL);
+        startOnly.setVisibility(GONE);
+        ImageView startHandle = new ImageView(context);
+        startHandle.setImageResource(R.drawable.ic_drag);
+        startHandle.setColorFilter(ON_PANEL_DIM);
+        startHandle.setContentDescription("패널 이동");
+        startHandle.setOnTouchListener(dragListener(host));
+        startOnly.addView(startHandle, new LayoutParams(s.dp(context, 24), s.dp(context, 36)));
+        Button startBtn = new Button(context);
+        startBtn.setAllCaps(false);
+        startBtn.setText("시작");
+        startBtn.setTextSize(13.0f);
+        startBtn.setTypeface(Typeface.create("sans-serif-medium", 0));
+        startBtn.setTextColor(-1);
+        startBtn.setStateListAnimator(null);
+        startBtn.setElevation(0);
+        startBtn.setMinWidth(0);
+        startBtn.setMinimumWidth(0);
+        startBtn.setMinHeight(0);
+        startBtn.setMinimumHeight(0);
+        startBtn.setPadding(s.dp(context, 16), 0, s.dp(context, 16), 0);
+        startBtn.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(70, 255, 255, 255)), s.roundRect(context, s.getAccent(), 999, 0), null));
+        startBtn.setContentDescription("현재 화면에서 자동 수집과 테스트 시작");
+        startBtn.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!host.isBlocked()) {
+                    host.onPrimary();
+                }
+            }
+        });
+        startOnly.addView(startBtn, new LayoutParams(-2, s.dp(context, 36)));
+        ImageView expand = new ImageView(context);
+        expand.setImageResource(R.drawable.ic_tune);
+        expand.setColorFilter(ON_PANEL);
+        expand.setPadding(s.dp(context, 7), s.dp(context, 7), s.dp(context, 7), s.dp(context, 7));
+        expand.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(60, 255, 255, 255)), s.roundRect(context, CHIP, 999, 0), null));
+        expand.setContentDescription("설정 펼치기");
+        expand.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                minimized = false;
+                applyLayout();
+            }
+        });
+        LayoutParams exp = new LayoutParams(s.dp(context, 34), s.dp(context, 34));
+        exp.leftMargin = s.dp(context, 6);
+        startOnly.addView(expand, exp);
+        addView(startOnly, new LayoutParams(-2, -2));
     }
 
     @Override
@@ -390,16 +480,8 @@ public final class FloatingPanel extends LinearLayout {
 
     /** While a run is going (collecting or testing) only the narrow strip is shown; otherwise the full card. */
     private void applyCompact(boolean on, boolean inTest, boolean locked, int blocked, int touches, int limit) {
-        if (on != compact) {
-            compact = on;
-            full.setVisibility(on ? GONE : VISIBLE);
-            mini.setVisibility(on ? VISIBLE : GONE);
-            if (on) {
-                setPadding(AppStyle.INSTANCE.dp(getContext(), 4), AppStyle.INSTANCE.dp(getContext(), 4), AppStyle.INSTANCE.dp(getContext(), 4), AppStyle.INSTANCE.dp(getContext(), 6));
-            } else {
-                setPadding(padL, padT, padR, padB);
-            }
-        }
+        compact = on;
+        applyLayout();
         if (on) {
             miniPauseIcon.setImageResource(pausedNow ? R.drawable.ic_play : R.drawable.ic_pause);
             ((View) miniPauseIcon.getParent()).setContentDescription(pausedNow ? "재개" : "일시정지");
@@ -415,6 +497,28 @@ public final class FloatingPanel extends LinearLayout {
                 miniInfo.setText("수집");
             }
             miniInfo.setTextColor((pausedNow || touches > 0 || blocked > 0) ? Color.rgb(255, 196, 92) : ON_PANEL_DIM);
+        }
+    }
+
+    /** Shows only the start button (while idle) or the full card again. */
+    public void setMinimized(boolean on) {
+        minimized = on;
+        applyLayout();
+    }
+
+    /** Picks which of the three layouts is visible: the strip while running, the start-only strip, or the full card. */
+    private void applyLayout() {
+        boolean startMode = !running && minimized && !compact;
+        full.setVisibility(compact || startMode ? GONE : VISIBLE);
+        mini.setVisibility(compact ? VISIBLE : GONE);
+        startOnly.setVisibility(startMode ? VISIBLE : GONE);
+        AppStyle s = AppStyle.INSTANCE;
+        if (compact) {
+            setPadding(s.dp(getContext(), 4), s.dp(getContext(), 4), s.dp(getContext(), 4), s.dp(getContext(), 6));
+        } else if (startMode) {
+            setPadding(s.dp(getContext(), 4), s.dp(getContext(), 4), s.dp(getContext(), 6), s.dp(getContext(), 4));
+        } else {
+            setPadding(padL, padT, padR, padB);
         }
     }
 
@@ -502,8 +606,10 @@ public final class FloatingPanel extends LinearLayout {
         primary.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(70, 255, 255, 255)), base, null));
         settingsChip.setVisibility(canSettings ? VISIBLE : GONE);
         hideChip.setVisibility(canHide ? VISIBLE : GONE);
+        miniHide.setVisibility(canHide ? VISIBLE : GONE);
         tools.setVisibility((canSettings || canHide) ? VISIBLE : GONE);
         applySettingsVisibility(!active && canSettings);
+        applyLayout();
     }
 
     /** The settings are open by default while idle; the chip folds them away. */
