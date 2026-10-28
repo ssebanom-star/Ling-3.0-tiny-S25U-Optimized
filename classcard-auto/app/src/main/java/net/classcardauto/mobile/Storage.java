@@ -27,12 +27,15 @@ public final class Storage {
         return this.root;
     }
 
+    private static volatile String latest;
+
+    /** Last run's summary, held in memory only. */
+    public static void setLatestSummary(String text) {
+        latest = text;
+    }
+
     public final String latestSummary() {
-        String readText$default;
-        File file = new File(this.root, "last-summary.json");
-        if (!file.exists()) {
-            file = null;
-        }
-        return (file == null || (readText$default = FilesKt.readText(file, kotlin.text.Charsets.UTF_8)) == null) ? "아직 실행 기록이 없습니다." : readText$default;
+        String text = latest;
+        return text != null ? text : "아직 실행 기록이 없습니다.";
     }
 }

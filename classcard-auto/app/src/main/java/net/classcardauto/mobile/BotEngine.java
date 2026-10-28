@@ -859,10 +859,6 @@ public final class BotEngine {
         this.vocabulary = copy$default;
         AdvancedSettings.applyMatching(this.storage.getPrefs());
         this.solver = new Solver(copy$default, this.partialChoices);
-        File file = new File(this.run, "prepared.json");
-        String jSONObject = new QuietJson().put("set_name", this.name).put("set_code", this.code).put("cards", copy$default.getCards().size()).put("source", copy$default.getSource()).put("complete", copy$default.getComplete()).put("prepare_seconds", RangesKt.coerceAtLeast((SystemClock.elapsedRealtime() - this.started) - 8000, 0L) / 1000.0d).toString(2);
-        Intrinsics.checkNotNullExpressionValue(jSONObject, "toString(...)");
-        FilesKt.writeText(file, jSONObject, kotlin.text.Charsets.UTF_8);
         if (!Intrinsics.areEqual(this.mode, "screen_prepare")) {
             transition("open_test", "자료 준비 완료 · 응시 열기");
             return;
@@ -1632,11 +1628,10 @@ public final class BotEngine {
         this.collectionScrollSignature = null;
         this.collectionReadPending = false;
         summary.put("data_discarded", true).put("retained_cards", 0).put("data_storage", "memory-only");
-        File runDir = this.run;
-        if (runDir != null) {
-            FilesKt.writeText(new File(runDir, "summary.json"), summary.toString(2), kotlin.text.Charsets.UTF_8);
-        }
-        FilesKt.writeText(new File(this.storage.getRoot(), "last-summary.json"), summary.toString(2), kotlin.text.Charsets.UTF_8);
+        // kept in memory only (lost when the process ends); nothing about the run or the set is written to storage
+        summary.remove("set_name");
+        summary.remove("set_code");
+        Storage.setLatestSummary(summary.toString(2));
     }
 
     static /* synthetic */ void writeSummary$default(BotEngine botEngine, String str, String str2, String str3, AnswerFailure answerFailure, int i, Object obj) {
@@ -1720,10 +1715,9 @@ public final class BotEngine {
         this.unchanged = 0;
         this.scrolls = 0;
         this.searchReset = false;
-        File file = new File(this.storage.getRoot(), "runs/" + DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS").withZone(ZoneId.systemDefault()).format(Instant.now()));
-        file.mkdirs();
-        this.run = file;
-        this.events = new File(this.run, "events.jsonl");
+        // nothing about a run is written to storage (no run folder, no event log); see log()
+        this.run = null;
+        this.events = null;
         QuietJson put = new QuietJson().put("mode", this.mode).put("runtime", "android-accessibility").put("day", this.desiredDay).put("device", Build.MANUFACTURER + " " + Build.MODEL).put("android_sdk", Build.VERSION.SDK_INT).put("started_at", Instant.now().toString()).put("requires_adb", false).put("pace", this.natural ? "natural" : "fast").put("ocr_mode", "qota-single-model").put("ocr_model", OcrReader.MODEL).put("ocr_only", this.ocrOnly);
         Intrinsics.checkNotNullExpressionValue(put, "put(...)");
         log("start", put);
@@ -2045,16 +2039,11 @@ public final class BotEngine {
         return this.mode;
     }
 
+    /**
+     * Run events are deliberately not recorded anywhere: not in a file, not in logcat. Keeping notes about ClassCard
+     * screens would be retaining service content, so the call sites stay (they document the flow) but do nothing.
+     */
     public final void log(String type, QuietJson data) {
-        Intrinsics.checkNotNullParameter(type, "type");
-        Intrinsics.checkNotNullParameter(data, "data");
-        data.put("type", type).put("seconds", (SystemClock.elapsedRealtime() - this.started) / 1000.0d);
-        JSONObject statistics = RetentionPolicy.INSTANCE.statistics(data);
-        File file = this.events;
-        if (file != null) {
-            FilesKt.appendText(file, statistics + "\n", kotlin.text.Charsets.UTF_8);
-        }
-        Log.i("ClassCardAuto", statistics.toString());
     }
 
     public final void stop(String reason) {
