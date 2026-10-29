@@ -5,7 +5,7 @@
     </queries>
     <application
         android:theme="@style/AppTheme"
-        android:label="MiMiC"
+        android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:name="net.classcardauto.mobile.BotApplication"
@@ -28,7 +28,7 @@
             android:enabled="false"
             android:exported="true"/>
         <service
-            android:label="MiMiC"
+            android:label="@string/app_name"
             android:name="net.classcardauto.mobile.BotService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="true">
@@ -42,7 +42,7 @@
         <provider
             android:name="ai.onnxruntime.TelemetryInitializer"
             android:exported="false"
-            android:authorities="net.classcardauto.mobile.nocert.onnxruntime_telemetry_initializer"
+            android:authorities="${applicationId}.onnxruntime_telemetry_initializer"
             android:initOrder="100"/>
     </application>
 </manifest>

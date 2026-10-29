@@ -1,6 +1,6 @@
 # 인계 문서 (다른 에이전트/개발자용)
 
-> 작성 시점 버전: **1.5** (versionCode 54, 산출물 이름 MiMiC-V1.5.apk, 앱 이름 MiMiC). 사용자 응답 언어는 **한국어**, 군더더기 없이 결과물 우선.
+> 작성 시점 버전: **1.5** (versionCode 54, 앱 이름 MiMiC). V1.5만 **auth(인증 있음)/noauth(인증 없음) 두 flavor**로 빌드했고, **V1.6부터는 auth만 빌드**한다 (`gradle :app:assembleAuthDebug` → MiMiC-V<버전>-auth.apk). noauth는 applicationId `net.classcardauto.mobile.noauth`, 인증 키 불필요(비밀번호는 동일). auth는 기존 applicationId `net.classcardauto.mobile.nocert`를 유지(덮어 설치·발급 키 유효). 둘 다 `BuildConfig.AUTH_REQUIRED`로 갈림. 사용자 응답 언어는 **한국어**, 군더더기 없이 결과물 우선.
 > V1.0: 사용자가 기기에서 시험을 해 보고 "다 테스트 통과"라고 보고함(0.7 기준, 세부 결과는 사용자 진술이며 이 저장소에 기록 없음). 아래 "미검증" 항목은 그 이전 시점의 목록이니, 사용자 보고와 다르면 사용자에게 확인할 것.
 
 ## 1. 이게 뭔가

@@ -45,9 +45,9 @@ public final class Certification {
         return document;
     }
 
-    /** This build only runs with an authorisation file issued for the phone (see issuer/ tools). */
+    /** The "auth" flavor only runs with an authorisation file issued for the phone (see issuer/ tools); "noauth" does not. */
     public final boolean getRequired() {
-        return true;
+        return BuildConfig.AUTH_REQUIRED;
     }
 
     // ---- authorisation file dropped in by the owner from a computer ----

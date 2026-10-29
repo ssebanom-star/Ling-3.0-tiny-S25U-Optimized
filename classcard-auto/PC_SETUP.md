@@ -6,9 +6,10 @@
 
 ## 빌드
 ```
-gradle :app:assembleDebug
+gradle :app:assembleAuthDebug      # 인증 있음 (이후 버전은 이것만)
+gradle :app:assembleNoauthDebug    # 인증 없음 (V1.5 한정)
 ```
-결과: `app/build/outputs/apk/debug/app-debug.apk` (디버그 키 서명. 같은 키로 서명해야 이전 버전 위에 설치됨 →
+결과: `app/build/outputs/apk/auth/debug/MiMiC-V<버전>-auth.apk` (noauth도 같은 방식) (디버그 키 서명. 같은 키로 서명해야 이전 버전 위에 설치됨 →
 기존 `~/.android/debug.keystore`를 쓰는 PC가 다르면 앱을 삭제 후 재설치하고 인증키도 다시 넣어야 함)
 
 ## 구성

@@ -6,8 +6,25 @@ plugins {
 android {
     namespace 'net.classcardauto.mobile'
     compileSdk 35
+    buildFeatures { buildConfig true }
+    flavorDimensions 'auth'
+    productFlavors {
+        // 인증 있음: 기기마다 발급한 인증 키 파일이 있어야 실행. applicationId는 이전 버전과 같아 덮어 설치되고 발급한 키도 유효.
+        auth {
+            dimension 'auth'
+            applicationId 'net.classcardauto.mobile.nocert'
+            buildConfigField 'boolean', 'AUTH_REQUIRED', 'true'
+            resValue 'string', 'app_name', 'MiMiC'
+        }
+        // 인증 없음: 인증 키 없이 실행(비밀번호는 동일하게 유지). 별도 앱으로 설치된다.
+        noauth {
+            dimension 'auth'
+            applicationId 'net.classcardauto.mobile.noauth'
+            buildConfigField 'boolean', 'AUTH_REQUIRED', 'false'
+            resValue 'string', 'app_name', 'MiMiC (인증 없음)'
+        }
+    }
     defaultConfig {
-        applicationId 'net.classcardauto.mobile.nocert'
         minSdk 26
         targetSdk 35
         versionCode 54
@@ -21,7 +38,7 @@ android {
     kotlinOptions { jvmTarget = '17' }
     lint { abortOnError false }
     applicationVariants.all { variant ->
-        variant.outputs.all { outputFileName = "MiMiC-V${variant.versionName}.apk" }
+        variant.outputs.all { outputFileName = "MiMiC-V${variant.versionName}-${variant.flavorName}.apk" }
     }
     packaging { jniLibs { useLegacyPackaging = false } }
 }
