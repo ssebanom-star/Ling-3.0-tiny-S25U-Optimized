@@ -1156,7 +1156,7 @@ public final class BotService extends AccessibilityService {
         if (linearLayout != null) {
             linearLayout.setVisibility(0);
         }
-        long countdown = getStorage().getPrefs().getBoolean("turbo", false) ? 3000L : 8000L;
+        long countdown = getStorage().getPrefs().getBoolean("turbo", false) ? 1000L : 8000L;
         long elapsedRealtime = SystemClock.elapsedRealtime() + countdown;
         this.armUntil = elapsedRealtime;
         this.lastActive = elapsedRealtime;
@@ -1422,6 +1422,11 @@ public final class BotService extends AccessibilityService {
         }
         // 끝에서 잠깐 멈춘 뒤 떼면 관성(fling) 없이 스와이프한 만큼만 움직인다
         long endHold = prefs.getBoolean("collect_end_hold", true) ? 150L : 0L;
+        if (getEngine().isTurbo() && endHold > 0) {
+            // the list follows the finger exactly and the hold stops any fling, so a quicker drag covers the same range
+            scrollMs = Math.min(scrollMs, 220L);
+            endHold = 110L;
+        }
         this.lastCollectionBounds = bounds;
         float fromY = bounds.getTop() + (bounds.getHeight() * span[0]);
         float toY = bounds.getTop() + (bounds.getHeight() * span[1]);

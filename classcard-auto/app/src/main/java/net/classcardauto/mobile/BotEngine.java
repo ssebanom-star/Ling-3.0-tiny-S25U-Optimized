@@ -538,7 +538,7 @@ public final class BotEngine {
         if (!Intrinsics.areEqual(id != null ? id.getText() : null, this.name)) {
             throw new IllegalStateException("뜻 수집 중 세트가 바뀌었습니다.".toString());
         }
-        if (this.collectionReadPending || now - this.collectionReadAt < 400) {
+        if (this.collectionReadPending || now - this.collectionReadAt < (this.turbo ? 200 : 400)) {
             return;
         }
         final UiNode uiNode = this.collectingWord;
@@ -591,7 +591,7 @@ public final class BotEngine {
         boolean z;
         Object obj3;
         boolean z2;
-        if (checkCollectionScreen(ns) && !this.collectionReadPending && now - this.collectionReadAt >= 400) {
+        if (checkCollectionScreen(ns) && !this.collectionReadPending && now - this.collectionReadAt >= (this.turbo ? 200 : 400)) {
             UiNode id = id(ns, "recycler_view");
             if (id == null || (bounds = id.getBounds()) == null) {
                 throw new IllegalStateException("단어 목록이 보이지 않습니다.".toString());
@@ -2501,9 +2501,9 @@ public final class BotEngine {
     }
 
     public final boolean isTurbo() {
-        // never while collecting: a read counts as settled after two equal reads in a row, so faster polling would
-        // read cards mid-flip and miss words
-        return this.active && this.turbo && (this.phase == null || !this.phase.startsWith("collect"));
+        // reads count as settled only after staying the same for a minimum time (StableCollectionRead.MIN_SPAN_MS),
+        // so faster polling during collection no longer reads cards mid-flip
+        return this.active && this.turbo;
     }
 
     public final java.util.Random getRng() {
@@ -2575,7 +2575,8 @@ public final class BotEngine {
 
     private final long scrollInterval() {
         long interval = ScrollSettings.intervalMs(this.storage.getPrefs());
-        return interval;
+        // with the end hold the list stops where the finger stops, so the next look can come sooner
+        return this.turbo ? Math.min(interval, 250L) : interval;
     }
 
     public final int getEpoch() {
