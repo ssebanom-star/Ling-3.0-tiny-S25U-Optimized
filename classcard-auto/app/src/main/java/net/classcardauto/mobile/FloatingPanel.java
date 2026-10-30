@@ -63,7 +63,7 @@ public final class FloatingPanel extends LinearLayout {
     static final int CHIP = Color.argb(30, 255, 255, 255);
     static final int AMBER = Color.rgb(255, 196, 92);
     private static final String K_TAB = "panel_tab";
-    private static final String[] TABS = {"입력", "시험", "안전", "수집"};
+    private static final String[] TABS = {"입력", "시험", "안전", "수집", "속도"};
 
     private final Host host;
     private final SharedPreferences prefs;

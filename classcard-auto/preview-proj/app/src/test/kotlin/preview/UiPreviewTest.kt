@@ -349,9 +349,9 @@ class UiPreviewTest {
 
     @Test
     fun overlayTabs() {
-        for (i in 0 until 4) {
+        for (i in 0 until 5) {
             val prefs = MemoryPrefs()
-            prefs.edit().putInt("panel_tab", i).apply()
+            prefs.edit().putInt("panel_tab", i).putBoolean("turbo", true).apply()
             val p = FloatingPanel(paparazzi.context, prefs, host())
             p.render(false, "", true, false)
             paparazzi.snapshot(overBackdrop(p), "overlay_tab_" + i)

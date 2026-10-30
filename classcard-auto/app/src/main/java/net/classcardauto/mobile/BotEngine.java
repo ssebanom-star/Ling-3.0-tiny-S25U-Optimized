@@ -313,7 +313,7 @@ public final class BotEngine {
     private long expandSince;
 
     private final boolean expandFirst() {
-        return this.turbo && this.storage.getPrefs().getBoolean("turbo_expand_first", false);
+        return turboPart(TurboParts.EXPAND_FIRST);
     }
 
     /** True once the list has looked the same for {@code ms} (it stopped flinging / relayouting). */
@@ -538,7 +538,7 @@ public final class BotEngine {
         if (!Intrinsics.areEqual(id != null ? id.getText() : null, this.name)) {
             throw new IllegalStateException("뜻 수집 중 세트가 바뀌었습니다.".toString());
         }
-        if (this.collectionReadPending || now - this.collectionReadAt < (this.turbo ? 200 : 400)) {
+        if (this.collectionReadPending || now - this.collectionReadAt < (turboPart(TurboParts.COLLECT) ? 200 : 400)) {
             return;
         }
         final UiNode uiNode = this.collectingWord;
@@ -591,7 +591,7 @@ public final class BotEngine {
         boolean z;
         Object obj3;
         boolean z2;
-        if (checkCollectionScreen(ns) && !this.collectionReadPending && now - this.collectionReadAt >= (this.turbo ? 200 : 400)) {
+        if (checkCollectionScreen(ns) && !this.collectionReadPending && now - this.collectionReadAt >= (turboPart(TurboParts.COLLECT) ? 200 : 400)) {
             UiNode id = id(ns, "recycler_view");
             if (id == null || (bounds = id.getBounds()) == null) {
                 throw new IllegalStateException("단어 목록이 보이지 않습니다.".toString());
@@ -2497,13 +2497,18 @@ public final class BotEngine {
     /** "초고속 모드": shorter waits everywhere the app itself waits; ClassCard's own animations are unchanged. */
     /** 초고속 + "확인 없이 넘기기": after tapping an answer, swipe on without waiting for ClassCard's feedback. */
     final boolean skipConfirm() {
-        return isTurbo() && "test".equals(this.phase) && this.storage.getPrefs().getBoolean("turbo_skip_confirm", false);
+        return turboPart(TurboParts.SKIP_CONFIRM) && "test".equals(this.phase);
     }
 
     public final boolean isTurbo() {
         // reads count as settled only after staying the same for a minimum time (StableCollectionRead.MIN_SPAN_MS),
         // so faster polling during collection no longer reads cards mid-flip
         return this.active && this.turbo;
+    }
+
+    /** One piece of 초고속 (see TurboParts) during a run. */
+    public final boolean turboPart(String key) {
+        return this.active && this.turbo && this.storage.getPrefs().getBoolean(key, TurboParts.defaultOf(key));
     }
 
     public final java.util.Random getRng() {
@@ -2576,7 +2581,7 @@ public final class BotEngine {
     private final long scrollInterval() {
         long interval = ScrollSettings.intervalMs(this.storage.getPrefs());
         // with the end hold the list stops where the finger stops, so the next look can come sooner
-        return this.turbo ? Math.min(interval, 250L) : interval;
+        return turboPart(TurboParts.COLLECT) ? Math.min(interval, 250L) : interval;
     }
 
     public final int getEpoch() {

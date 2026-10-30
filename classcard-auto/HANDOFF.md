@@ -105,3 +105,10 @@
 1.24 초고속 하위 옵션 "구간 먼저 전부 펼치기"(`turbo_expand_first`, 초고속일 때만): beginCollection이 collect_top 대신 `expand_down` → `expand_up` → `collect` 순으로 진행. expand_down: 관성 있는 큰 스와이프(BotService.flingCollection, 88%→12%, 110ms, 끝 멈춤 없음)를 목록 signature가 450ms 멈출 때까지 기다렸다 반복, 직전과 같으면 맨 아래. expand_up: 목록이 300ms 멈추면 화면 안의 접힌 구간(`titleopenstatus` 미선택 + 같은 줄 `term`) 중 **가장 아래 것**부터 탭(act, 키 expand-<구간명>), 접힌 게 없으면 위로 큰 스와이프, 스와이프해도 화면이 같으면 맨 위 → 일반 수집(collect, 남은 접힌 구간은 기존 로직이 처리). 두 단계는 화면 전환 제한시간 예외 목록에 추가(워치독은 적용). 아래부터 누르면 위쪽 줄이 밀리지 않는다는 전제는 사용자 관찰. **기기 검증 필요**.
 1.25 초고속 수집 가속: 안정 판정(StableCollectionRead/StableInlineRead)을 "연속 2회 같음"에서 "같은 값이 MIN_SPAN_MS=90ms 이상 유지"로 바꿔 폴링 주기와 무관하게(일반 100ms 폴링에서는 사실상 기존과 동일) → 1.20에서 뺀 수집 단계 초고속을 다시 적용(ticker 35ms·hold 절반). 초고속 수집: 읽기 사이 최소 간격 400→200ms, 스크롤 간격 최대 250ms, 끝 멈춤이 켜져 있으면 스와이프 최대 220ms·끝 멈춤 110ms. 시작 카운트다운 초고속 3→1초. 1.20의 누락 원인(애니메이션 중 35ms 간격 2회 일치)은 시간 기준으로 막았다고 보지만 **기기 검증 필요**. 누락 시 1.19 재수집(원래 속도 아님 — 재수집도 초고속) 후 찍기.
 1.26: 수집 중 스와이프 표시(`collect_show_swipe`) 기본값 꺼짐(미리 보기 버튼은 그대로). 한 번에 넘기는 범위 최대 60→85%(ScrollSettings.RANGE_MAX; 85%면 목록 높이의 97.5%→12.5% 지점, 겹침 15%라 누락 위험 증가 → 누락 시 1.19 재수집).
+
+## 버전 규칙 (사용자 지시, 이후 계속 적용)
+- 표기 버전(versionName)은 **'1.0'으로 고정**. 사용자가 "버전 올려"라고 할 때만 올린다. 파일명 MiMiC-V1.0-auth.apk.
+- versionCode는 75에 고정(안드로이드는 versionCode가 낮아지면 덮어쓰기 설치 거부, 같은 값은 허용). 사용자가 버전을 올리라고 하면 versionCode도 함께 올린다.
+- 위 1.x 이력은 이 규칙 이전의 내부 번호.
+
+(구 1.27 = 현 V1.0) 초고속 항목별 켜기(TurboParts): 마스터 `turbo` + 항목 `turbo_react`(화면 읽기 35ms·hold 절반), `turbo_collect`(수집 읽기 간격 200ms·스크롤 간격≤250ms·수집 스와이프≤220ms/끝 멈춤 110ms), `turbo_test`(시험 카드 스와이프 150ms), `turbo_countdown`(시작 1초) — 기본 켜짐; `turbo_skip_confirm`, `turbo_expand_first` — 기본 꺼짐. BotEngine.turboPart(key)/TurboParts.on(prefs,key). UI: 패널 5번째 탭 ‘속도’(Screens.addPanelGroup group 4), 설정 메뉴 ‘초고속 모드’(SECTIONS[4], 메뉴 순서 SECTION_ORDER). 입력 방식 페이지·입력 탭에서 초고속 항목 제거.

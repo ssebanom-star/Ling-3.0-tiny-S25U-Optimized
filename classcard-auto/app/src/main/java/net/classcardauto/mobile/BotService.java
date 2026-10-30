@@ -216,7 +216,7 @@ public final class BotService extends AccessibilityService {
             } finally {
                 BotService.this.getHandler().removeCallbacks(this);
                 // 초고속 모드는 화면을 더 자주 읽어 바뀐 화면에 바로 반응한다
-                BotService.this.getHandler().postDelayed(this, BotService.this.engine != null && BotService.this.getEngine().isTurbo() ? 35L : 100L);
+                BotService.this.getHandler().postDelayed(this, BotService.this.engine != null && BotService.this.getEngine().turboPart(TurboParts.REACT) ? 35L : 100L);
             }
         }
     };
@@ -1156,7 +1156,7 @@ public final class BotService extends AccessibilityService {
         if (linearLayout != null) {
             linearLayout.setVisibility(0);
         }
-        long countdown = getStorage().getPrefs().getBoolean("turbo", false) ? 1000L : 8000L;
+        long countdown = TurboParts.on(getStorage().getPrefs(), TurboParts.COUNTDOWN) ? 1000L : 8000L;
         long elapsedRealtime = SystemClock.elapsedRealtime() + countdown;
         this.armUntil = elapsedRealtime;
         this.lastActive = elapsedRealtime;
@@ -1217,7 +1217,7 @@ public final class BotService extends AccessibilityService {
     }
 
     public final void hold(long ms) {
-        if (this.engine != null && getEngine().isTurbo()) {
+        if (this.engine != null && getEngine().turboPart(TurboParts.REACT)) {
             ms = Math.max(40L, ms / 2);
         }
         this.holdUntil = SystemClock.elapsedRealtime() + ms;
@@ -1422,7 +1422,7 @@ public final class BotService extends AccessibilityService {
         }
         // 끝에서 잠깐 멈춘 뒤 떼면 관성(fling) 없이 스와이프한 만큼만 움직인다
         long endHold = prefs.getBoolean("collect_end_hold", true) ? 150L : 0L;
-        if (getEngine().isTurbo() && endHold > 0) {
+        if (getEngine().turboPart(TurboParts.COLLECT) && endHold > 0) {
             // the list follows the finger exactly and the hold stops any fling, so a quicker drag covers the same range
             scrollMs = Math.min(scrollMs, 220L);
             endHold = 110L;
@@ -1507,7 +1507,7 @@ public final class BotService extends AccessibilityService {
         engine.log("card_gesture", put);
         float humanDy = 0.0f;
         float humanDx = 0.0f;
-        long swipeMs = getEngine().isTurbo() ? 150L : 250L;
+        long swipeMs = getEngine().turboPart(TurboParts.TEST) ? 150L : 250L;
         if (getEngine().isHuman()) {
             java.util.Random rng = getEngine().getRng();
             humanDy = HumanTiming.jitter(rng, 6.0f);

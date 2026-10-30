@@ -551,13 +551,10 @@ public final class Screens {
         AppStyle s = AppStyle.INSTANCE;
         switch (group) {
             case 0: {
-                parent.addView(panelSwitch(c, "초고속 모드", p.getBoolean("turbo", false), "turbo", p), lp(c, 6));
-                parent.addView(panelNote(c, "앱의 대기를 최대한 줄여요. 켜면 사람처럼 입력은 쓰지 않아요."), lp(c, 0));
-                parent.addView(panelSwitch(c, "└ 확인 없이 넘기기", p.getBoolean("turbo_skip_confirm", false), "turbo_skip_confirm", p), lp(c, 4));
-                parent.addView(panelNote(c, "답을 누르자마자 넘겨요. 터치가 안 먹히면 그 문항은 틀려요. 초고속일 때만 동작."), lp(c, 0));
-                parent.addView(panelSwitch(c, "└ 구간 먼저 전부 펼치기", p.getBoolean("turbo_expand_first", false), "turbo_expand_first", p), lp(c, 4));
-                parent.addView(panelNote(c, "수집 전에 맨 아래로 크게 내린 뒤 아래 구간부터 펼치며 올라와요. 초고속일 때만 동작."), lp(c, 0));
-                parent.addView(panelSwitch(c, "사람처럼 입력", p.getBoolean("human_like", false), "human_like", p), lp(c, 8));
+                parent.addView(panelSwitch(c, "사람처럼 입력", p.getBoolean("human_like", false), "human_like", p), lp(c, 6));
+                if (p.getBoolean("turbo", false)) {
+                    parent.addView(panelNote(c, "지금은 ‘속도’ 탭의 초고속이 켜져 있어 사람처럼 입력은 쓰지 않아요."), lp(c, 0));
+                }
                 final TextView estimate = panelNote(c, paceEstimate(p));
                 final LinearLayout meanRow = s.sliderRow(c, "평균 응답 시간", "ms", HumanTiming.MEAN_MIN, HumanTiming.MEAN_MAX, HumanTiming.MEAN_STEP, HumanProfile.meanMs(p, false), new Function1<Integer, Unit>() {
                     @Override
@@ -637,6 +634,26 @@ public final class Screens {
                 }, true), lp(c, 8));
                 parent.addView(panelNote(c, "잠금이 꺼져 있을 때, 시험 중 화면을 직접 이만큼 누르면 멈춰요."), lp(c, 2));
                 break;
+            case 4: {
+                final LinearLayout parts = new LinearLayout(c);
+                parts.setOrientation(LinearLayout.VERTICAL);
+                final android.widget.CompoundButton master = panelSwitchView(c, "초고속 모드", p.getBoolean("turbo", false), "turbo", p, new Runnable() {
+                    @Override
+                    public void run() {
+                        dim(parts, !p.getBoolean("turbo", false));
+                    }
+                });
+                parent.addView((View) master.getTag(), lp(c, 6));
+                parent.addView(panelNote(c, "켜면 사람처럼 입력은 쓰지 않아요. 아래에서 필요한 것만 고르세요."), lp(c, 0));
+                for (Object[] part : TurboParts.PARTS) {
+                    String key = (String) part[0];
+                    parts.addView(panelSwitch(c, (String) part[1], p.getBoolean(key, (Boolean) part[3]), key, p), lp(c, 8));
+                    parts.addView(panelNote(c, (String) part[2]), lp(c, 0));
+                }
+                parent.addView(parts, lp(c, 4));
+                dim(parts, !p.getBoolean("turbo", false));
+                break;
+            }
             default:
                 parent.addView(panelNote(c, "처음 단어를 모을 때 목록을 넘기는 방식이에요."), lp(c, 8));
                 parent.addView(panelSwitch(c, "끝에서 멈춰 관성 막기", p.getBoolean("collect_end_hold", true), "collect_end_hold", p), lp(c, 6));
@@ -748,6 +765,33 @@ public final class Screens {
         return "문항당 약 " + String.format(java.util.Locale.US, "%.1f", per / 1000.0) + "초 · 20문항 약 " + AppStyle.formatClock(per * 20 / 1000) + " · 50문항 약 " + AppStyle.formatClock(per * 50 / 1000);
     }
 
+    /** Like panelSwitch, with a callback after the value changed; the row is the returned switch's tag. */
+    private static android.widget.CompoundButton panelSwitchView(Context c, String title, boolean checked, final String key, final SharedPreferences p, final Runnable changed) {
+        AppStyle s = AppStyle.INSTANCE;
+        LinearLayout row = new LinearLayout(c);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(s.label(c, title, 12.5f, -1, true), new LinearLayout.LayoutParams(0, -2, 1.0f));
+        final android.widget.CompoundButton sw = s.toggle(c, checked, new android.widget.CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(android.widget.CompoundButton b, boolean on) {
+                p.edit().putBoolean(key, on).apply();
+                changed.run();
+            }
+        });
+        sw.setScaleX(0.8f);
+        sw.setScaleY(0.8f);
+        row.addView(sw, new LinearLayout.LayoutParams(-2, -2));
+        row.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                sw.toggle();
+            }
+        });
+        sw.setTag(row);
+        return sw;
+    }
+
     private static LinearLayout panelSwitch(Context c, String title, boolean checked, final String key, final SharedPreferences p) {
         AppStyle s = AppStyle.INSTANCE;
         LinearLayout row = new LinearLayout(c);
@@ -792,7 +836,11 @@ public final class Screens {
             {"안전 · 잠금", "터치 잠금 · 진동 알림 · 실행 한도"},
             {"단어 읽기 · 수집", "화면 이미지로 읽기 · 스크롤"},
             {"정답 매칭", "보기를 고르는 기준 (고급)"},
+            {"초고속 모드", "빠르게 하는 항목을 골라 켜기"},
     };
+
+    /** Menu order of SECTIONS. */
+    private static final int[] SECTION_ORDER = {0, 4, 1, 2, 3};
 
     /** The settings menu: one row per category, then help and records. {@code onOpen} gets the category index. */
     public static LinearLayout settings(Context c, SharedPreferences prefs, String versionName, Function0<Unit> onBack, List<Nav> help, final Function1<Integer, Unit> onOpen) {
@@ -803,12 +851,12 @@ public final class Screens {
         add(content, s.sectionLabel(c, "실행 설정"), 12);
         LinearLayout menu = s.card(c);
         menu.setPadding(dp(c, 20), dp(c, 6), dp(c, 12), dp(c, 6));
-        for (int i = 0; i < SECTIONS.length; i++) {
-            final int index = i;
-            if (i > 0) {
+        for (int k = 0; k < SECTION_ORDER.length; k++) {
+            final int index = SECTION_ORDER[k];
+            if (k > 0) {
                 menu.addView(s.divider(c));
             }
-            menu.addView(s.navRow(c, SECTIONS[i][0], sectionSummary(prefs, i), new Function0<Unit>() {
+            menu.addView(s.navRow(c, SECTIONS[index][0], sectionSummary(prefs, index), new Function0<Unit>() {
                 @Override
                 public Unit invoke() {
                     return onOpen.invoke(index);
@@ -849,6 +897,8 @@ public final class Screens {
                 return (HumanProfile.usingMine(p) ? "내 패턴" : "평균 " + AppStyle.formatValue(HumanProfile.meanMs(p, false), "ms")) + " · 오답 " + AdvancedSettings.wrongCount(p) + "개";
             case 1:
                 return "잠금 " + (p.getBoolean("touch_lock", true) ? "켜짐" : "꺼짐") + " · 진동 " + (p.getBoolean("vibrate_alerts", true) ? "켜짐" : "꺼짐") + " · 최대 " + AppStyle.formatClock(AdvancedSettings.runLimitSeconds(p));
+            case 4:
+                return p.getBoolean("turbo", false) ? "켜짐 · 항목 " + TurboParts.count(p) + " 사용" : "꺼짐";
             case 2:
                 return (p.getBoolean("image_collection", false) ? "이미지로 읽기" : "화면 글자 우선") + " · 넘김 " + ScrollSettings.rangePercent(p) + "%";
             default:
@@ -865,33 +915,12 @@ public final class Screens {
         switch (section) {
             case 0: {
                 LinearLayout humanCard = s.card(c);
-                humanCard.addView(s.switchRow(c, "초고속 모드", "화면을 더 자주 읽고(0.1초→0.035초), 앱이 스스로 두는 대기·스와이프 시간·시작 카운트다운(8초→1초)을 줄입니다. 단어 수집도 빨라지지만, 화면이 0.09초 이상 그대로일 때만 읽어서 정확도는 일반 모드와 같습니다. 클래스카드 자체 애니메이션은 줄일 수 없습니다. 켜면 사람처럼 입력보다 우선합니다.", p.getBoolean("turbo", false), new CompoundButton.OnCheckedChangeListener() {
-                    @Override
-                    public void onCheckedChanged(CompoundButton b, boolean checked) {
-                        p.edit().putBoolean("turbo", checked).apply();
-                    }
-                }));
-                add(humanCard, s.divider(c), 16);
-                add(humanCard, s.switchRow(c, "확인 없이 넘기기 (초고속 전용)", "답을 누른 뒤 정답/오답 표시를 기다리지 않고 바로 다음 문항으로 넘깁니다. 터치가 반영되지 않아도 다시 누르지 않으므로 그 문항은 틀릴 수 있습니다. 초고속 모드가 켜져 있을 때만 동작합니다.", p.getBoolean("turbo_skip_confirm", false), new CompoundButton.OnCheckedChangeListener() {
-                    @Override
-                    public void onCheckedChanged(CompoundButton b, boolean checked) {
-                        p.edit().putBoolean("turbo_skip_confirm", checked).apply();
-                    }
-                }), 16);
-                add(humanCard, s.divider(c), 16);
-                add(humanCard, s.switchRow(c, "구간 먼저 전부 펼치기 (초고속 전용)", "단어를 수집하기 전에 목록을 크게 스와이프해 맨 아래까지 내린 뒤, 화면에서 가장 아래 구간부터 눌러 펼치면서 위로 올라옵니다. 맨 위에 도착하면 평소처럼 수집합니다. 아래부터 누르면 위쪽 줄이 밀리지 않아 연달아 누를 수 있습니다.", p.getBoolean("turbo_expand_first", false), new CompoundButton.OnCheckedChangeListener() {
-                    @Override
-                    public void onCheckedChanged(CompoundButton b, boolean checked) {
-                        p.edit().putBoolean("turbo_expand_first", checked).apply();
-                    }
-                }), 16);
-                add(humanCard, s.divider(c), 16);
-                add(humanCard, s.switchRow(c, "사람처럼 입력", "문제를 읽는 시간, 터치 위치와 길이, 카드를 넘기는 간격을 사람처럼 무작위로 흔듭니다. 다음 실행부터 적용됩니다.", p.getBoolean("human_like", false), new CompoundButton.OnCheckedChangeListener() {
+                humanCard.addView(s.switchRow(c, "사람처럼 입력", "문제를 읽는 시간, 터치 위치와 길이, 카드를 넘기는 간격을 사람처럼 무작위로 흔듭니다. 다음 실행부터 적용됩니다.", p.getBoolean("human_like", false), new CompoundButton.OnCheckedChangeListener() {
                     @Override
                     public void onCheckedChanged(CompoundButton b, boolean checked) {
                         p.edit().putBoolean("human_like", checked).apply();
                     }
-                }), 16);
+                }));
                 add(content, humanCard, 12);
 
                 add(content, s.sectionLabel(c, "응답 속도 기준"), 24);
@@ -964,6 +993,38 @@ public final class Screens {
                 }));
                 add(content, reading, 12);
                 add(content, scrollCard(c, prefs), 20);
+                break;
+            }
+            case 4: {
+                LinearLayout master = s.card(c);
+                final LinearLayout partsCard = s.card(c);
+                master.addView(s.switchRow(c, "초고속 모드", "앱이 스스로 두는 대기를 줄입니다. 클래스카드 자체 애니메이션은 줄일 수 없습니다. 켜면 사람처럼 입력은 쓰지 않습니다. 아래에서 적용할 항목만 고르세요.", p.getBoolean("turbo", false), new CompoundButton.OnCheckedChangeListener() {
+                    @Override
+                    public void onCheckedChanged(CompoundButton b, boolean checked) {
+                        p.edit().putBoolean("turbo", checked).apply();
+                        dim(partsCard, !checked);
+                    }
+                }));
+                add(content, master, 12);
+                add(content, s.sectionLabel(c, "적용할 항목"), 24);
+                for (int i = 0; i < TurboParts.PARTS.length; i++) {
+                    Object[] part = TurboParts.PARTS[i];
+                    final String key = (String) part[0];
+                    if (i == 4) {
+                        add(partsCard, s.divider(c), 16);
+                        add(partsCard, s.caption(c, "아래 두 항목은 문항을 틀리거나 구간을 덜 펼칠 수 있어 기본으로 꺼져 있습니다."), 12);
+                    } else if (i > 0) {
+                        add(partsCard, s.divider(c), 16);
+                    }
+                    add(partsCard, s.switchRow(c, (String) part[1], (String) part[2], p.getBoolean(key, (Boolean) part[3]), new CompoundButton.OnCheckedChangeListener() {
+                        @Override
+                        public void onCheckedChanged(CompoundButton b, boolean checked) {
+                            p.edit().putBoolean(key, checked).apply();
+                        }
+                    }), i == 0 ? 0 : 16);
+                }
+                add(content, partsCard, 8);
+                dim(partsCard, !p.getBoolean("turbo", false));
                 break;
             }
             default: {
