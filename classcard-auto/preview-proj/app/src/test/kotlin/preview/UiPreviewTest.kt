@@ -120,7 +120,7 @@ class UiPreviewTest {
             Screens.Nav("개인정보처리방침", null) { },
             Screens.Nav("최근 실행", "마지막 실행의 결과와 오류 요약") { },
         )
-        val v = Screens.settings(paparazzi.context, MemoryPrefs(), "0.6.14-dev", { }, help)
+        val v = Screens.settings(paparazzi.context, MemoryPrefs(), "1.15", { }, help, { _ -> Unit })
         paparazzi.snapshot(v, "settings")
     }
 
@@ -158,7 +158,8 @@ class UiPreviewTest {
         val frame = FrameLayout(paparazzi.context)
         frame.setBackgroundColor(Color.rgb(236, 238, 240))
         val lp = FrameLayout.LayoutParams(-2, -2)
-        lp.leftMargin = AppStyle.INSTANCE.dp(paparazzi.context, 120)
+        lp.gravity = android.view.Gravity.END or android.view.Gravity.TOP
+        lp.rightMargin = AppStyle.INSTANCE.dp(paparazzi.context, 8)
         lp.topMargin = AppStyle.INSTANCE.dp(paparazzi.context, 60)
         frame.addView(panel, lp)
         return frame
@@ -336,5 +337,32 @@ class UiPreviewTest {
         p.render(true, "3/20 · 2개 입력", false, false)
         p.setRemaining(45)
         paparazzi.snapshot(overBackdrop(p), "overlay_testing")
+    }
+
+    @Test
+    fun settingsSections() {
+        for (i in 0 until Screens.SECTIONS.size) {
+            val v = Screens.settingsSection(paparazzi.context, MemoryPrefs(), i, { })
+            paparazzi.snapshot(v, "settings_section_" + i)
+        }
+    }
+
+    @Test
+    fun overlayTabs() {
+        for (i in 0 until 4) {
+            val prefs = MemoryPrefs()
+            prefs.edit().putInt("panel_tab", i).apply()
+            val p = FloatingPanel(paparazzi.context, prefs, host())
+            p.render(false, "", true, false)
+            paparazzi.snapshot(overBackdrop(p), "overlay_tab_" + i)
+        }
+    }
+
+    @Test
+    fun overlayMeasure() {
+        val p = FloatingPanel(paparazzi.context, MemoryPrefs(), host())
+        p.render(false, "", true, false)
+        p.setCalibrating(true, "3 / 8문항 기록됨 · 3문항부터 반영할 수 있어요.")
+        paparazzi.snapshot(overBackdrop(p), "overlay_measure")
     }
 }

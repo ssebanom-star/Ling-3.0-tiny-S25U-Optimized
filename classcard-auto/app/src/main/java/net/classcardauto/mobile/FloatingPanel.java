@@ -5,7 +5,7 @@ import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.RippleDrawable;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -13,19 +13,28 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 /**
- * The card that floats above ClassCard: status, start/stop, and (before the test) scroll settings and a button that
- * hides the panel. It only builds and updates views; BotService owns the window and decides what the buttons do.
+ * The card that floats above ClassCard. It shows exactly one of five layouts at a time:
+ * <ul>
+ *   <li>CARD — idle: header (move · status · 시작), a toolbar (작게 · 끄기 · 설정) and the settings, split into tabs;</li>
+ *   <li>START — idle, minimized: only the start button;</li>
+ *   <li>TAB — idle, folded into a small tab on the screen edge;</li>
+ *   <li>MEASURE — the personal pace measurement is running: what to do and a button that ends it;</li>
+ *   <li>STRIP — a run is going: a narrow vertical strip (time, pause, stop, touches).</li>
+ * </ul>
+ * It only builds and updates views; BotService owns the window and decides what the buttons do.
  */
 public final class FloatingPanel extends LinearLayout {
     public interface Host {
         void onPrimary();
 
+        /** Kept for callers built against the older panel; the panel no longer offers a separate hide button. */
         void onHide();
 
-        /** Called while the handle is dragged, with the movement since the touch started (pixels). */
+        /** Called while a handle is dragged, with the movement since the touch started (pixels). */
         void onDrag(float dx, float dy, boolean finished);
 
         boolean isBlocked();
@@ -46,123 +55,86 @@ public final class FloatingPanel extends LinearLayout {
         void onLayoutChanged();
     }
 
-    private static final int PANEL = Color.argb(238, 18, 28, 25);
-    private static final int ON_PANEL = Color.argb(255, 255, 255, 255);
-    private static final int ON_PANEL_DIM = Color.argb(170, 255, 255, 255);
-    private static final int CHIP = Color.argb(34, 255, 255, 255);
+    private enum Mode { CARD, START, TAB, MEASURE, STRIP }
 
-    private final TextView statusText;
-    private final TextView caption;
+    static final int PANEL = Color.argb(240, 17, 26, 24);
+    static final int ON_PANEL = Color.WHITE;
+    static final int ON_PANEL_DIM = Color.argb(165, 255, 255, 255);
+    static final int CHIP = Color.argb(30, 255, 255, 255);
+    static final int AMBER = Color.rgb(255, 196, 92);
+    private static final String K_TAB = "panel_tab";
+    private static final String[] TABS = {"입력", "시험", "안전", "수집"};
+
+    private final Host host;
+    private final SharedPreferences prefs;
+
+    // CARD
+    private final LinearLayout cardRow;
+    private final ImageView foldTab;
     private final View dot;
+    private final TextView caption;
+    private final TextView statusText;
     private final Button primary;
-    private final LinearLayout tools;
-    private final LinearLayout settingsChip;
-    private final LinearLayout hideChip;
-    private final LinearLayout sliders;
-    private final android.widget.ScrollView settingsScroll;
-    private boolean userCollapsed;
-    private boolean settingsShown;
-    private final android.content.SharedPreferences panelPrefs;
-    private final TextView settingsLabel;
+    private final TextView settingsToggle;
+    private final LinearLayout settingsBox;
+    private final TextView[] tabViews = new TextView[TABS.length];
+    private final LinearLayout groupBody;
+    private final ScrollView groupScroll;
+    // START / TAB
+    private final LinearLayout startOnly;
+    private final LinearLayout edgeTab;
+    private final ImageView edgeArrow;
+    // MEASURE
+    private final LinearLayout measure;
+    private final TextView measureText;
+    // STRIP
+    private final LinearLayout strip;
+    private final TextView stripTime;
+    private final TextView stripEta;
+    private final ImageView stripPauseIcon;
+    private final TextView stripInfo;
+
     private boolean running;
     private boolean pausedNow;
-    private final LinearLayout pauseChip;
-    private final TextView pauseLabel;
-    private final ImageView pauseIcon;
-    private final TextView touchText;
-    private final Host hostRef;
-    private long remainingSeconds = -1;
-    private final LinearLayout mini;
-    private final LinearLayout full;
-    private final LinearLayout startOnly;
-    private final LinearLayout fullRow;
-    private final ImageView foldTab;
-    private final LinearLayout tab;
-    private final ImageView tabArrow;
-    private boolean collapsed;
+    private boolean calibrating;
     private boolean minimized;
-    private final TextView miniTime;
-    private final TextView miniEta;
+    private boolean collapsed;
+    private boolean settingsOpen = true;
+    private int tab;
+    private long remainingSeconds = -1;
     private long etaSeconds = -1;
-    private final TextView miniInfo;
-    private final ImageView miniPauseIcon;
-    private boolean compact;
-    private final int padL, padT, padR, padB;
+    private Mode mode;
 
     public FloatingPanel(final Context context, SharedPreferences prefs, final Host host) {
         super(context);
-        this.hostRef = host;
+        this.host = host;
+        this.prefs = prefs;
         final AppStyle s = AppStyle.INSTANCE;
         setOrientation(VERTICAL);
-        setBackground(s.roundRect(context, PANEL, 22, Color.argb(40, 255, 255, 255)));
-        setPadding(s.dp(context, 8), s.dp(context, 8), s.dp(context, 10), s.dp(context, 8));
-        setElevation(s.dp(context, 6));
+        tab = Math.max(0, Math.min(TABS.length - 1, prefs.getInt(K_TAB, 0)));
 
-        // header: drag handle | dot + text | primary button
+        // ---------------------------------------------------------------- CARD
+        LinearLayout card = new LinearLayout(context);
+        card.setOrientation(VERTICAL);
+
         LinearLayout header = new LinearLayout(context);
         header.setOrientation(HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
-
-        ImageView handle = new ImageView(context);
-        handle.setImageResource(R.drawable.ic_drag);
-        handle.setColorFilter(ON_PANEL_DIM);
-        handle.setContentDescription("패널 이동");
-        handle.setPadding(s.dp(context, 2), s.dp(context, 8), s.dp(context, 2), s.dp(context, 8));
-        handle.setOnTouchListener(new OnTouchListener() {
-            private float downX;
-            private float downY;
-
-            @Override
-            public boolean onTouch(View v, MotionEvent e) {
-                switch (e.getActionMasked()) {
-                    case MotionEvent.ACTION_DOWN:
-                        downX = e.getRawX();
-                        downY = e.getRawY();
-                        return true;
-                    case MotionEvent.ACTION_MOVE:
-                        host.onDrag(e.getRawX() - downX, e.getRawY() - downY, false);
-                        return true;
-                    case MotionEvent.ACTION_UP:
-                    case MotionEvent.ACTION_CANCEL:
-                        host.onDrag(e.getRawX() - downX, e.getRawY() - downY, true);
-                        return true;
-                    default:
-                        return false;
-                }
-            }
-        });
-        header.addView(handle, new LayoutParams(s.dp(context, 24), s.dp(context, 40)));
-
+        header.addView(handle(context, false), new LayoutParams(dp(24), dp(40)));
         dot = s.dot(context, s.getAccent(), 8);
-        LayoutParams dotParams = new LayoutParams(s.dp(context, 8), s.dp(context, 8));
-        dotParams.leftMargin = s.dp(context, 4);
-        dotParams.rightMargin = s.dp(context, 8);
+        LayoutParams dotParams = new LayoutParams(dp(8), dp(8));
+        dotParams.leftMargin = dp(4);
+        dotParams.rightMargin = dp(8);
         header.addView(dot, dotParams);
-
         LinearLayout texts = new LinearLayout(context);
         texts.setOrientation(VERTICAL);
         caption = s.label(context, "MiMiC", 10.5f, ON_PANEL_DIM, false);
-        caption.setLineSpacing(0, 1.0f);
         texts.addView(caption);
         statusText = s.label(context, "", 12.5f, ON_PANEL, true);
         statusText.setMaxLines(2);
-        statusText.setLineSpacing(0, 1.05f);
         texts.addView(statusText);
-        LayoutParams tp = new LayoutParams(s.dp(context, 112), -2);
-        header.addView(texts, tp);
-
-        primary = new Button(context);
-        primary.setAllCaps(false);
-        primary.setTextSize(13.0f);
-        primary.setTypeface(Typeface.create("sans-serif-medium", 0));
-        primary.setTextColor(-1);
-        primary.setStateListAnimator(null);
-        primary.setElevation(0);
-        primary.setMinWidth(0);
-        primary.setMinimumWidth(0);
-        primary.setMinHeight(0);
-        primary.setMinimumHeight(0);
-        primary.setPadding(s.dp(context, 14), 0, s.dp(context, 14), 0);
+        header.addView(texts, new LayoutParams(0, -2, 1.0f));
+        primary = pill(context, "시작", s.getAccent(), 13.0f, 16);
         primary.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -171,231 +143,118 @@ public final class FloatingPanel extends LinearLayout {
                 }
             }
         });
-        LayoutParams pp = new LayoutParams(-2, s.dp(context, 40));
-        pp.leftMargin = s.dp(context, 8);
+        LayoutParams pp = new LayoutParams(-2, dp(38));
+        pp.leftMargin = dp(8);
         header.addView(primary, pp);
-        addView(header, new LayoutParams(-2, -2));
+        card.addView(header, new LayoutParams(-1, -2));
 
-        touchText = s.label(context, "", 11.5f, ON_PANEL_DIM, true);
-        touchText.setVisibility(GONE);
-        LayoutParams touchParams = new LayoutParams(-2, -2);
-        touchParams.leftMargin = s.dp(context, 6);
-        touchParams.topMargin = s.dp(context, 2);
-        addView(touchText, touchParams);
-
-        // tools: scroll settings / hide (only offered before the test starts)
-        tools = new LinearLayout(context);
-        tools.setOrientation(HORIZONTAL);
-        tools.setGravity(Gravity.END);
-        settingsLabel = new TextView(context);
-        settingsChip = chip(context, R.drawable.ic_tune, "설정 접기", settingsLabel);
-        hideChip = chip(context, R.drawable.ic_hide, "UI 끄기", new TextView(context));
-        hideChip.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (!host.isBlocked()) {
-                    host.onHide();
-                }
-            }
-        });
-        pauseLabel = new TextView(context);
-        pauseChip = chip(context, R.drawable.ic_pause, "일시정지", pauseLabel);
-        pauseIcon = (ImageView) pauseChip.getChildAt(0);
-        pauseChip.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (!host.isBlocked()) {
-                    host.onPause();
-                }
-            }
-        });
-        pauseChip.setVisibility(GONE);
-        tools.addView(pauseChip, new LayoutParams(-2, s.dp(context, 34)));
-        LinearLayout minimizeChip = chip(context, R.drawable.ic_chevron, "작게", new TextView(context));
-        ((ImageView) minimizeChip.getChildAt(0)).setRotation(90);
-        minimizeChip.setOnClickListener(new OnClickListener() {
+        // toolbar: three equal buttons
+        LinearLayout toolbar = new LinearLayout(context);
+        toolbar.setOrientation(HORIZONTAL);
+        TextView small = tool(context, "작게");
+        small.setContentDescription("시작 버튼만 남기기");
+        small.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
                 minimized = true;
-                applyLayout();
+                applyMode();
             }
         });
-        LayoutParams mcp = new LayoutParams(-2, s.dp(context, 34));
-        tools.addView(minimizeChip, mcp);
-        LinearLayout offChip = chip(context, R.drawable.ic_hide, "끄기", new TextView(context));
-        offChip.setOnClickListener(new OnClickListener() {
+        TextView off = tool(context, "끄기");
+        off.setContentDescription("앱을 다시 열 때까지 패널 끄기");
+        off.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
                 host.onTurnOff();
             }
         });
-        LayoutParams ocp = new LayoutParams(-2, s.dp(context, 34));
-        ocp.leftMargin = s.dp(context, 8);
-        tools.addView(offChip, ocp);
-        LayoutParams sp0 = new LayoutParams(-2, s.dp(context, 34));
-        sp0.leftMargin = s.dp(context, 8);
-        tools.addView(settingsChip, sp0);
-        LayoutParams hp = new LayoutParams(-2, s.dp(context, 34));
-        hp.leftMargin = s.dp(context, 8);
-        tools.addView(hideChip, hp);
-        LayoutParams toolsParams = new LayoutParams(-1, -2);
-        toolsParams.topMargin = s.dp(context, 6);
-        addView(tools, toolsParams);
-
-        // compact strip used during the test so the panel covers as little of the questions as possible
-        mini = new LinearLayout(context);
-        mini.setOrientation(VERTICAL);
-        mini.setGravity(Gravity.CENTER_HORIZONTAL);
-        mini.setVisibility(GONE);
-        ImageView miniHandle = new ImageView(context);
-        miniHandle.setImageResource(R.drawable.ic_drag);
-        miniHandle.setColorFilter(ON_PANEL_DIM);
-        miniHandle.setContentDescription("패널 이동");
-        miniHandle.setRotation(90);
-        miniHandle.setOnTouchListener(dragListener(host));
-        mini.addView(miniHandle, new LayoutParams(s.dp(context, 40), s.dp(context, 22)));
-        miniTime = s.label(context, "", 12.0f, ON_PANEL, true);
-        miniTime.setGravity(Gravity.CENTER);
-        mini.addView(miniTime, new LayoutParams(-2, -2));
-        miniEta = s.label(context, "", 9.5f, ON_PANEL_DIM, false);
-        miniEta.setGravity(Gravity.CENTER);
-        miniEta.setVisibility(GONE);
-        mini.addView(miniEta, new LayoutParams(-2, -2));
-        LinearLayout miniPause = new LinearLayout(context);
-        miniPause.setGravity(Gravity.CENTER);
-        GradientDrawable pauseBg = s.roundRect(context, CHIP, 999, 0);
-        miniPause.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(60, 255, 255, 255)), pauseBg, null));
-        miniPause.setClickable(true);
-        miniPauseIcon = new ImageView(context);
-        miniPauseIcon.setImageResource(R.drawable.ic_pause);
-        miniPauseIcon.setColorFilter(ON_PANEL);
-        miniPause.addView(miniPauseIcon, new LayoutParams(s.dp(context, 18), s.dp(context, 18)));
-        miniPause.setContentDescription("일시정지");
-        miniPause.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (!host.isBlocked()) {
-                    host.onPause();
-                }
-            }
-        });
-        LayoutParams mpp = new LayoutParams(s.dp(context, 40), s.dp(context, 32));
-        mpp.topMargin = s.dp(context, 4);
-        mini.addView(miniPause, mpp);
-        Button miniStop = new Button(context);
-        miniStop.setAllCaps(false);
-        miniStop.setText("중지");
-        miniStop.setTextSize(11.0f);
-        miniStop.setTextColor(-1);
-        miniStop.setStateListAnimator(null);
-        miniStop.setElevation(0);
-        miniStop.setMinWidth(0);
-        miniStop.setMinimumWidth(0);
-        miniStop.setMinHeight(0);
-        miniStop.setMinimumHeight(0);
-        miniStop.setPadding(0, 0, 0, 0);
-        miniStop.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(70, 255, 255, 255)), s.roundRect(context, s.getDanger(), 999, 0), null));
-        miniStop.setContentDescription("자동 풀이 중지");
-        miniStop.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (!host.isBlocked()) {
-                    host.onPrimary();
-                }
-            }
-        });
-        LayoutParams msp = new LayoutParams(s.dp(context, 40), s.dp(context, 28));
-        msp.topMargin = s.dp(context, 4);
-        mini.addView(miniStop, msp);
-        miniInfo = s.label(context, "", 10.0f, ON_PANEL_DIM, true);
-        miniInfo.setGravity(Gravity.CENTER);
-        LayoutParams mip = new LayoutParams(-2, -2);
-        mip.topMargin = s.dp(context, 4);
-        mini.addView(miniInfo, mip);
-        addView(mini, new LayoutParams(-2, -2));
-        padL = s.dp(context, 8); padT = s.dp(context, 8); padR = s.dp(context, 10); padB = s.dp(context, 8);
-
-        panelPrefs = prefs;
-        sliders = new LinearLayout(context);
-        sliders.setOrientation(VERTICAL);
-        sliders.setPadding(s.dp(context, 8), s.dp(context, 4), s.dp(context, 4), 0);
-        Screens.addPanelSettings(context, sliders, prefs);
-        settingsScroll = new android.widget.ScrollView(context);
-        settingsScroll.setOverScrollMode(2);
-        settingsScroll.setVisibility(GONE);
-        settingsScroll.addView(sliders, new android.view.ViewGroup.LayoutParams(-1, -2));
-        addView(settingsScroll, new LayoutParams(s.dp(context, 252), s.dp(context, 330)));
-
-        settingsChip.setOnClickListener(new OnClickListener() {
+        settingsToggle = tool(context, "");
+        settingsToggle.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
                 if (host.isBlocked()) {
                     return;
                 }
-                userCollapsed = !userCollapsed;
-                applySettingsVisibility(!running);
+                settingsOpen = !settingsOpen;
+                applySettings();
             }
         });
+        toolbar.addView(small, toolParams(false));
+        toolbar.addView(off, toolParams(true));
+        toolbar.addView(settingsToggle, toolParams(true));
+        LayoutParams tbp = new LayoutParams(-1, dp(32));
+        tbp.topMargin = dp(6);
+        card.addView(toolbar, tbp);
 
-        // everything except the compact strip goes into one container so the two layouts can be swapped
-        full = new LinearLayout(context);
-        full.setOrientation(VERTICAL);
-        java.util.List<View> kids = new java.util.ArrayList<>();
-        for (int i = 0; i < getChildCount(); i++) {
-            if (getChildAt(i) != mini) {
-                kids.add(getChildAt(i));
+        // settings: one tab at a time so nothing has to be scrolled far
+        settingsBox = new LinearLayout(context);
+        settingsBox.setOrientation(VERTICAL);
+        LinearLayout tabs = new LinearLayout(context);
+        tabs.setOrientation(HORIZONTAL);
+        tabs.setPadding(dp(3), dp(3), dp(3), dp(3));
+        tabs.setBackground(s.roundRect(context, Color.argb(20, 255, 255, 255), 999, 0));
+        for (int i = 0; i < TABS.length; i++) {
+            final int index = i;
+            TextView t = s.label(context, TABS[i], 12.0f, ON_PANEL, true);
+            t.setGravity(Gravity.CENTER);
+            t.setOnClickListener(new OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (tab != index) {
+                        tab = index;
+                        prefs().edit().putInt(K_TAB, index).apply();
+                        fillGroup();
+                    }
+                }
+            });
+            tabViews[i] = t;
+            tabs.addView(t, new LayoutParams(0, dp(28), 1.0f));
+        }
+        LayoutParams tsp = new LayoutParams(-1, -2);
+        tsp.topMargin = dp(10);
+        settingsBox.addView(tabs, tsp);
+        groupBody = new LinearLayout(context);
+        groupBody.setOrientation(VERTICAL);
+        groupBody.setPadding(dp(4), 0, dp(4), dp(4));
+        groupScroll = new ScrollView(context) {
+            @Override
+            protected void onMeasure(int widthSpec, int heightSpec) {
+                // grow with the group, but never taller than 300dp
+                super.onMeasure(widthSpec, MeasureSpec.makeMeasureSpec(dp(300), MeasureSpec.AT_MOST));
             }
-        }
-        for (View kid : kids) {
-            android.view.ViewGroup.LayoutParams kp = kid.getLayoutParams();
-            removeView(kid);
-            full.addView(kid, kp);
-        }
-        // the big card carries a fold tab on its inner side: pressing it slides the card away, leaving only the edge tab
-        fullRow = new LinearLayout(context);
-        fullRow.setOrientation(HORIZONTAL);
+        };
+        groupScroll.setOverScrollMode(OVER_SCROLL_NEVER);
+        groupScroll.addView(groupBody, new android.view.ViewGroup.LayoutParams(-1, -2));
+        LayoutParams gsp = new LayoutParams(-1, -2);
+        gsp.topMargin = dp(4);
+        settingsBox.addView(groupScroll, gsp);
+        card.addView(settingsBox, new LayoutParams(-1, -2));
+
+        cardRow = new LinearLayout(context);
+        cardRow.setOrientation(HORIZONTAL);
         foldTab = new ImageView(context);
         foldTab.setImageResource(R.drawable.ic_chevron);
         foldTab.setColorFilter(ON_PANEL);
-        foldTab.setPadding(s.dp(context, 2), s.dp(context, 20), s.dp(context, 2), s.dp(context, 20));
-        foldTab.setBackground(s.roundRect(context, CHIP, 10, 0));
-        foldTab.setContentDescription("패널 접기");
+        foldTab.setPadding(dp(2), dp(20), dp(2), dp(20));
+        foldTab.setBackground(ripple(CHIP, 10));
+        foldTab.setContentDescription("패널을 화면 가장자리로 접기");
         foldTab.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
                 collapsed = true;
-                applyLayout();
+                applyMode();
                 host.onLayoutChanged();
             }
         });
-        fullRow.addView(full, new LayoutParams(-2, -2));
-        addView(fullRow, 0, new LayoutParams(-2, -2));
+        cardRow.addView(card, new LayoutParams(dp(256), -2));
+        addView(cardRow, new LayoutParams(-2, -2));
 
-        // start-only strip: drag handle, start button, and a button that opens the full card again
+        // --------------------------------------------------------------- START
         startOnly = new LinearLayout(context);
         startOnly.setOrientation(HORIZONTAL);
         startOnly.setGravity(Gravity.CENTER_VERTICAL);
-        startOnly.setVisibility(GONE);
-        ImageView startHandle = new ImageView(context);
-        startHandle.setImageResource(R.drawable.ic_drag);
-        startHandle.setColorFilter(ON_PANEL_DIM);
-        startHandle.setContentDescription("패널 이동");
-        startHandle.setOnTouchListener(dragListener(host));
-        startOnly.addView(startHandle, new LayoutParams(s.dp(context, 24), s.dp(context, 36)));
-        Button startBtn = new Button(context);
-        startBtn.setAllCaps(false);
-        startBtn.setText("시작");
-        startBtn.setTextSize(13.0f);
-        startBtn.setTypeface(Typeface.create("sans-serif-medium", 0));
-        startBtn.setTextColor(-1);
-        startBtn.setStateListAnimator(null);
-        startBtn.setElevation(0);
-        startBtn.setMinWidth(0);
-        startBtn.setMinimumWidth(0);
-        startBtn.setMinHeight(0);
-        startBtn.setMinimumHeight(0);
-        startBtn.setPadding(s.dp(context, 16), 0, s.dp(context, 16), 0);
-        startBtn.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(70, 255, 255, 255)), s.roundRect(context, s.getAccent(), 999, 0), null));
+        startOnly.addView(handle(context, false), new LayoutParams(dp(24), dp(36)));
+        Button startBtn = pill(context, "시작", s.getAccent(), 13.0f, 16);
         startBtn.setContentDescription("현재 화면에서 자동 수집과 테스트 시작");
         startBtn.setOnClickListener(new OnClickListener() {
             @Override
@@ -405,278 +264,150 @@ public final class FloatingPanel extends LinearLayout {
                 }
             }
         });
-        startOnly.addView(startBtn, new LayoutParams(-2, s.dp(context, 36)));
+        startOnly.addView(startBtn, new LayoutParams(-2, dp(36)));
         ImageView expand = new ImageView(context);
         expand.setImageResource(R.drawable.ic_tune);
         expand.setColorFilter(ON_PANEL);
-        expand.setPadding(s.dp(context, 7), s.dp(context, 7), s.dp(context, 7), s.dp(context, 7));
-        expand.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(60, 255, 255, 255)), s.roundRect(context, CHIP, 999, 0), null));
-        expand.setContentDescription("설정 펼치기");
+        expand.setPadding(dp(7), dp(7), dp(7), dp(7));
+        expand.setBackground(ripple(CHIP, 999));
+        expand.setContentDescription("패널 크게 보기");
         expand.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
                 minimized = false;
-                applyLayout();
+                applyMode();
             }
         });
-        LayoutParams exp = new LayoutParams(s.dp(context, 34), s.dp(context, 34));
-        exp.leftMargin = s.dp(context, 6);
+        LayoutParams exp = new LayoutParams(dp(34), dp(34));
+        exp.leftMargin = dp(6);
         startOnly.addView(expand, exp);
         addView(startOnly, new LayoutParams(-2, -2));
 
-        // edge tab: what is left of the strip when it is folded away; tapping it unfolds the strip again
-        tab = new LinearLayout(context);
-        tab.setOrientation(VERTICAL);
-        tab.setGravity(Gravity.CENTER);
-        tab.setVisibility(GONE);
-        tab.setContentDescription("패널 펼치기");
-        tabArrow = new ImageView(context);
-        tabArrow.setImageResource(R.drawable.ic_chevron);
-        tabArrow.setColorFilter(ON_PANEL);
-        tab.addView(tabArrow, new LayoutParams(s.dp(context, 20), s.dp(context, 20)));
-        tab.setOnClickListener(new OnClickListener() {
+        // ----------------------------------------------------------------- TAB
+        edgeTab = new LinearLayout(context);
+        edgeTab.setOrientation(VERTICAL);
+        edgeTab.setGravity(Gravity.CENTER);
+        edgeTab.setContentDescription("패널 펼치기");
+        edgeTab.setBackground(s.roundRect(context, PANEL, 12, 0));
+        edgeArrow = new ImageView(context);
+        edgeArrow.setImageResource(R.drawable.ic_chevron);
+        edgeArrow.setColorFilter(ON_PANEL);
+        edgeTab.addView(edgeArrow, new LayoutParams(dp(20), dp(20)));
+        edgeTab.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
                 collapsed = false;
-                applyLayout();
+                applyMode();
                 host.onLayoutChanged();
             }
         });
-        addView(tab, new LayoutParams(s.dp(context, 24), s.dp(context, 96)));
+        addView(edgeTab, new LayoutParams(dp(24), dp(96)));
+
+        // ------------------------------------------------------------- MEASURE
+        measure = new LinearLayout(context);
+        measure.setOrientation(VERTICAL);
+        LinearLayout mHead = new LinearLayout(context);
+        mHead.setOrientation(HORIZONTAL);
+        mHead.setGravity(Gravity.CENTER_VERTICAL);
+        mHead.addView(handle(context, false), new LayoutParams(dp(24), dp(32)));
+        View mDot = s.dot(context, AMBER, 8);
+        LayoutParams mdp = new LayoutParams(dp(8), dp(8));
+        mdp.leftMargin = dp(4);
+        mdp.rightMargin = dp(8);
+        mHead.addView(mDot, mdp);
+        mHead.addView(s.label(context, "내 패턴 측정 중", 12.5f, ON_PANEL, true), new LayoutParams(-2, -2));
+        measure.addView(mHead, new LayoutParams(-1, -2));
+        measureText = s.label(context, "", 11.5f, ON_PANEL_DIM, false);
+        measureText.setLineSpacing(0, 1.1f);
+        LayoutParams mtp = new LayoutParams(-1, -2);
+        mtp.leftMargin = dp(6);
+        mtp.topMargin = dp(2);
+        measure.addView(measureText, mtp);
+        Button endMeasure = pill(context, "측정 끝내기", s.getAccent(), 12.5f, 14);
+        endMeasure.setContentDescription("측정 끝내기 (3문항 이상이면 반영)");
+        endMeasure.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                BotService service = BotService.INSTANCE.getInstance();
+                if (service != null) {
+                    service.toggleCalibration();
+                }
+            }
+        });
+        LayoutParams emp = new LayoutParams(-1, dp(34));
+        emp.topMargin = dp(8);
+        measure.addView(endMeasure, emp);
+        addView(measure, new LayoutParams(dp(220), -2));
+
+        // --------------------------------------------------------------- STRIP
+        strip = new LinearLayout(context);
+        strip.setOrientation(VERTICAL);
+        strip.setGravity(Gravity.CENTER_HORIZONTAL);
+        strip.addView(handle(context, true), new LayoutParams(dp(40), dp(22)));
+        stripTime = s.label(context, "", 12.0f, ON_PANEL, true);
+        stripTime.setGravity(Gravity.CENTER);
+        strip.addView(stripTime, new LayoutParams(-2, -2));
+        stripEta = s.label(context, "", 9.5f, ON_PANEL_DIM, false);
+        stripEta.setGravity(Gravity.CENTER);
+        stripEta.setVisibility(GONE);
+        strip.addView(stripEta, new LayoutParams(-2, -2));
+        LinearLayout pause = new LinearLayout(context);
+        pause.setGravity(Gravity.CENTER);
+        pause.setBackground(ripple(CHIP, 999));
+        pause.setClickable(true);
+        stripPauseIcon = new ImageView(context);
+        stripPauseIcon.setImageResource(R.drawable.ic_pause);
+        stripPauseIcon.setColorFilter(ON_PANEL);
+        pause.addView(stripPauseIcon, new LayoutParams(dp(18), dp(18)));
+        pause.setContentDescription("일시정지");
+        pause.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!host.isBlocked()) {
+                    host.onPause();
+                }
+            }
+        });
+        LayoutParams spp = new LayoutParams(dp(40), dp(32));
+        spp.topMargin = dp(4);
+        strip.addView(pause, spp);
+        Button stop = pill(context, "중지", s.getDanger(), 11.0f, 0);
+        stop.setContentDescription("자동 풀이 중지");
+        stop.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!host.isBlocked()) {
+                    host.onPrimary();
+                }
+            }
+        });
+        LayoutParams stp = new LayoutParams(dp(40), dp(28));
+        stp.topMargin = dp(4);
+        strip.addView(stop, stp);
+        stripInfo = s.label(context, "", 10.0f, ON_PANEL_DIM, true);
+        stripInfo.setGravity(Gravity.CENTER);
+        LayoutParams sip = new LayoutParams(-2, -2);
+        sip.topMargin = dp(4);
+        strip.addView(stripInfo, sip);
+        addView(strip, new LayoutParams(-2, -2));
+
+        applySettings();
+        applyMode();
+    }
+
+    private SharedPreferences prefs() {
+        return prefs;
     }
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
         if (ev.getActionMasked() == MotionEvent.ACTION_DOWN) {
-            hostRef.onPanelTouch(ev.getEventTime());
+            host.onPanelTouch(ev.getEventTime());
         }
         return super.dispatchTouchEvent(ev);
     }
 
-    /**
-     * Pause state and the user-touch counter. Shown only during a run; the counter only during the test.
-     *
-     * @param paused  the bot is paused
-     * @param touches touches by the user since the run started or was last resumed
-     * @param limit   touches that pause the bot
-     * @param inTest  the test screen is active
-     */
-    public void renderRun(boolean paused, int touches, int limit, boolean inTest) {
-        renderRun(paused, touches, limit, inTest, false, 0);
-    }
-
-    public void renderRun(boolean paused, int touches, int limit, boolean inTest, boolean locked, int blocked) {
-        AppStyle s = AppStyle.INSTANCE;
-        pausedNow = paused && running;
-        pauseChip.setVisibility(running ? VISIBLE : GONE);
-        pauseLabel.setText(pausedNow ? "재개" : "일시정지");
-        pauseIcon.setImageResource(pausedNow ? R.drawable.ic_play : R.drawable.ic_pause);
-        pauseChip.setContentDescription(pausedNow ? "재개" : "일시정지");
-        if (running) {
-            tools.setVisibility(VISIBLE);
-        }
-        if (running && locked && !pausedNow) {
-            touchText.setVisibility(VISIBLE);
-            touchText.setText("화면 잠금 중 · 막은 터치 " + blocked + "회");
-            touchText.setTextColor(blocked > 0 ? Color.rgb(255, 196, 92) : ON_PANEL_DIM);
-        } else if (running && (inTest || pausedNow)) {
-            touchText.setVisibility(VISIBLE);
-            if (pausedNow) {
-                touchText.setText("일시정지됨 · 잠금 해제됨 · 직접 터치 " + touches + "회");
-                touchText.setTextColor(Color.rgb(255, 196, 92));
-            } else {
-                touchText.setText("직접 터치 " + touches + " / " + limit + "회");
-                touchText.setTextColor(touches > 0 ? Color.rgb(255, 196, 92) : ON_PANEL_DIM);
-            }
-        } else {
-            touchText.setVisibility(GONE);
-        }
-        s.setDotColor(dot, !running ? s.getAccent() : (pausedNow ? s.getWarn() : s.getInfo()));
-        updateCaption();
-        applyCompact(running, inTest, locked, blocked, touches, limit);
-    }
-
-    private OnTouchListener dragListener(final Host host) {
-        return new OnTouchListener() {
-            private float downX;
-            private float downY;
-
-            @Override
-            public boolean onTouch(View v, MotionEvent e) {
-                switch (e.getActionMasked()) {
-                    case MotionEvent.ACTION_DOWN:
-                        downX = e.getRawX();
-                        downY = e.getRawY();
-                        return true;
-                    case MotionEvent.ACTION_MOVE:
-                        host.onDrag(e.getRawX() - downX, e.getRawY() - downY, false);
-                        return true;
-                    case MotionEvent.ACTION_UP:
-                    case MotionEvent.ACTION_CANCEL:
-                        host.onDrag(e.getRawX() - downX, e.getRawY() - downY, true);
-                        return true;
-                    default:
-                        return false;
-                }
-            }
-        };
-    }
-
-    /** While a run is going (collecting or testing) only the narrow strip is shown; otherwise the full card. */
-    private void applyCompact(boolean on, boolean inTest, boolean locked, int blocked, int touches, int limit) {
-        compact = on;
-        applyLayout();
-        if (on) {
-            miniPauseIcon.setImageResource(pausedNow ? R.drawable.ic_play : R.drawable.ic_pause);
-            ((View) miniPauseIcon.getParent()).setContentDescription(pausedNow ? "재개" : "일시정지");
-            miniTime.setText(remainingSeconds < 0 ? "" : AppStyle.formatClock(remainingSeconds));
-            miniTime.setTextColor(pausedNow || (remainingSeconds >= 0 && remainingSeconds <= 60) ? Color.rgb(255, 196, 92) : ON_PANEL);
-            if (pausedNow) {
-                miniInfo.setText("정지\n터치 " + touches);
-            } else if (locked) {
-                miniInfo.setText("잠금\n막음 " + blocked);
-            } else if (inTest) {
-                miniInfo.setText("터치\n" + touches + "/" + limit);
-            } else {
-                miniInfo.setText("수집");
-            }
-            miniInfo.setTextColor((pausedNow || touches > 0 || blocked > 0) ? Color.rgb(255, 196, 92) : ON_PANEL_DIM);
-        }
-    }
-
-    /** Folds the run strip into its edge tab (or unfolds it). */
-    public void setCollapsed(boolean on) {
-        collapsed = on;
-        applyLayout();
-    }
-
-    /** Shows only the start button (while idle) or the full card again. */
-    public void setMinimized(boolean on) {
-        minimized = on;
-        applyLayout();
-    }
-
-    /** Picks which of the three layouts is visible: the strip while running, the start-only strip, or the full card. */
-    private void applyLayout() {
-        boolean startMode = !running && minimized && !compact && !collapsed;
-        boolean tabMode = collapsed && !running;
-        fullRow.setVisibility(compact || startMode || tabMode ? GONE : VISIBLE);
-        mini.setVisibility(compact ? VISIBLE : GONE);
-        startOnly.setVisibility(startMode ? VISIBLE : GONE);
-        tab.setVisibility(tabMode ? VISIBLE : GONE);
-        AppStyle s = AppStyle.INSTANCE;
-        boolean right = hostRef.isDockedRight();
-        // the fold tab sits on the card's inner side and points at the edge it folds into; the edge tab points back
-        foldTab.setRotation(right ? 0 : 180);
-        tabArrow.setRotation(right ? 180 : 0);
-        fullRow.removeView(foldTab);
-        LinearLayout.LayoutParams ftp = new LinearLayout.LayoutParams(s.dp(getContext(), 22), s.dp(getContext(), 64));
-        ftp.topMargin = s.dp(getContext(), 4);
-        if (right) {
-            ftp.rightMargin = s.dp(getContext(), 6);
-            fullRow.addView(foldTab, 0, ftp);
-        } else {
-            ftp.leftMargin = s.dp(getContext(), 6);
-            fullRow.addView(foldTab, ftp);
-        }
-        tab.setBackground(s.roundRect(getContext(), PANEL, 12, 0));
-        if (tabMode) {
-            setBackground(null);
-            setElevation(0);
-            setPadding(0, 0, 0, 0);
-        } else {
-            setBackground(s.roundRect(getContext(), PANEL, 22, Color.argb(40, 255, 255, 255)));
-            setElevation(s.dp(getContext(), 6));
-        }
-        if (tabMode) {
-            // no padding around the bare tab
-        } else if (compact) {
-            setPadding(s.dp(getContext(), 4), s.dp(getContext(), 4), s.dp(getContext(), 4), s.dp(getContext(), 6));
-        } else if (startMode) {
-            setPadding(s.dp(getContext(), 4), s.dp(getContext(), 4), s.dp(getContext(), 6), s.dp(getContext(), 4));
-        } else {
-            setPadding(padL, padT, padR, padB);
-        }
-    }
-
-    private LinearLayout chip(Context context, int iconRes, String label, TextView labelView) {
-        AppStyle s = AppStyle.INSTANCE;
-        LinearLayout chip = new LinearLayout(context);
-        chip.setOrientation(HORIZONTAL);
-        chip.setGravity(Gravity.CENTER_VERTICAL);
-        chip.setPadding(s.dp(context, 10), 0, s.dp(context, 12), 0);
-        GradientDrawable base = s.roundRect(context, CHIP, 999, 0);
-        chip.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(60, 255, 255, 255)), base, null));
-        chip.setClickable(true);
-        chip.setFocusable(true);
-        chip.setContentDescription(label);
-        ImageView icon = new ImageView(context);
-        icon.setImageResource(iconRes);
-        icon.setColorFilter(ON_PANEL);
-        icon.setImportantForAccessibility(2);
-        chip.addView(icon, new LayoutParams(s.dp(context, 18), s.dp(context, 18)));
-        labelView.setText(label);
-        labelView.setTextSize(12.0f);
-        labelView.setTextColor(ON_PANEL);
-        labelView.setTypeface(Typeface.create("sans-serif-medium", 0));
-        LayoutParams lp = new LayoutParams(-2, -2);
-        lp.leftMargin = s.dp(context, 6);
-        chip.addView(labelView, lp);
-        return chip;
-    }
-
-    /** Estimated seconds until the test is answered completely (from this run's own pace); -1 hides it. */
-    public void setEta(long seconds) {
-        if (seconds == etaSeconds) {
-            return;
-        }
-        etaSeconds = seconds;
-        if (seconds < 0) {
-            miniEta.setVisibility(GONE);
-        } else {
-            miniEta.setText("끝까지 " + AppStyle.formatClock(seconds));
-            miniEta.setVisibility(VISIBLE);
-        }
-    }
-
-    /** Rebuilds the settings list so sliders show values changed elsewhere (e.g. by the pace measurement). */
-    public void rebuildSettings() {
-        if (settingsShown) {
-            sliders.removeAllViews();
-            Screens.addPanelSettings(getContext(), sliders, panelPrefs);
-        }
-    }
-
-    /** Seconds left before the run limit; shown next to "실행 중" and turns amber in the last minute. */
-    public void setRemaining(long seconds) {
-        if (seconds == remainingSeconds) {
-            return;
-        }
-        remainingSeconds = seconds;
-        if (running) {
-            updateCaption();
-            if (compact) {
-                miniTime.setText(seconds < 0 ? "" : AppStyle.formatClock(seconds));
-                miniTime.setTextColor(pausedNow || (seconds >= 0 && seconds <= 60) ? Color.rgb(255, 196, 92) : ON_PANEL);
-            }
-        }
-    }
-
-    private void updateCaption() {
-        AppStyle s = AppStyle.INSTANCE;
-        if (!running) {
-            caption.setText("MiMiC");
-            caption.setTextColor(ON_PANEL_DIM);
-            return;
-        }
-        if (remainingSeconds < 0) {
-            caption.setText(pausedNow ? "일시정지" : "실행 중");
-            caption.setTextColor(ON_PANEL_DIM);
-            return;
-        }
-        caption.setText((pausedNow ? "일시정지 · 남은 " : "실행 중 · 남은 ") + AppStyle.formatClock(remainingSeconds));
-        caption.setTextColor(remainingSeconds <= 60 ? Color.rgb(255, 196, 92) : ON_PANEL_DIM);
-    }
+    // ------------------------------------------------------------------ public API
 
     public TextView getStatusText() {
         return statusText;
@@ -687,42 +418,307 @@ public final class FloatingPanel extends LinearLayout {
     }
 
     /**
-     * @param active       a run is in progress
-     * @param status       text to show while running
-     * @param canSettings  scroll settings may be changed now (idle or collecting)
-     * @param canHide      the panel may still be switched off (before the test)
+     * @param active      a run is in progress
+     * @param status      text to show while running
+     * @param canSettings settings may be changed now (idle or collecting)
+     * @param canHide     unused; kept so callers built for the older panel still compile
      */
     public void render(boolean active, String status, boolean canSettings, boolean canHide) {
         AppStyle s = AppStyle.INSTANCE;
-        Context c = getContext();
-        statusText.setText(AppStyle.keepWords(active ? status : "현재 화면에서 시작"));
+        boolean wasRunning = running;
         running = active;
-        updateCaption();
-        s.setDotColor(dot, active ? s.getInfo() : s.getAccent());
+        statusText.setText(AppStyle.keepWords(active ? status : "현재 화면에서 시작"));
         primary.setText(active ? "중지" : "시작");
         primary.setContentDescription(active ? "자동 풀이 중지" : "현재 화면에서 자동 수집과 테스트 시작");
-        GradientDrawable base = s.roundRect(c, active ? s.getDanger() : s.getAccent(), 999, 0);
-        primary.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(70, 255, 255, 255)), base, null));
-        settingsChip.setVisibility(canSettings ? VISIBLE : GONE);
-        hideChip.setVisibility(canHide ? VISIBLE : GONE);
+        primary.setBackground(ripple(active ? s.getDanger() : s.getAccent(), 999));
+        s.setDotColor(dot, active ? s.getInfo() : s.getAccent());
         if (active) {
             collapsed = false;
         }
-        tools.setVisibility((canSettings || canHide) ? VISIBLE : GONE);
-        applySettingsVisibility(!active && canSettings);
-        applyLayout();
+        if (wasRunning && !active) {
+            // values may have been changed in the app (or by the measurement) during the run
+            fillGroup();
+        }
+        updateCaption();
+        applyMode();
     }
 
-    /** The settings are open by default while idle; the chip folds them away. */
-    private void applySettingsVisibility(boolean allowed) {
-        boolean show = allowed && !userCollapsed;
-        if (show && !settingsShown) {
-            // values may have been changed in the app since the panel was built
-            sliders.removeAllViews();
-            Screens.addPanelSettings(getContext(), sliders, panelPrefs);
+    /** The personal pace measurement is on (or off); {@code status} says what to do next. */
+    public void setCalibrating(boolean on, String status) {
+        boolean changed = calibrating != on;
+        calibrating = on;
+        if (on) {
+            measureText.setText(AppStyle.keepWords(status == null ? "" : status));
         }
-        settingsShown = show;
-        settingsScroll.setVisibility(show ? VISIBLE : GONE);
-        settingsLabel.setText(userCollapsed ? "설정 펼치기" : "설정 접기");
+        if (changed) {
+            if (!on) {
+                fillGroup();
+            }
+            applyMode();
+            host.onLayoutChanged();
+        }
+    }
+
+    public void renderRun(boolean paused, int touches, int limit, boolean inTest) {
+        renderRun(paused, touches, limit, inTest, false, 0);
+    }
+
+    /**
+     * Pause state and the touch counters, shown in the strip while a run is going.
+     *
+     * @param touches touches by the user since the run started or was last resumed
+     * @param limit   touches that pause the bot
+     * @param locked  the screen is locked against touches
+     * @param blocked touches the lock swallowed
+     */
+    public void renderRun(boolean paused, int touches, int limit, boolean inTest, boolean locked, int blocked) {
+        AppStyle s = AppStyle.INSTANCE;
+        pausedNow = paused && running;
+        s.setDotColor(dot, !running ? s.getAccent() : (pausedNow ? s.getWarn() : s.getInfo()));
+        updateCaption();
+        if (!running) {
+            return;
+        }
+        stripPauseIcon.setImageResource(pausedNow ? R.drawable.ic_play : R.drawable.ic_pause);
+        ((View) stripPauseIcon.getParent()).setContentDescription(pausedNow ? "재개" : "일시정지");
+        showTime();
+        if (pausedNow) {
+            stripInfo.setText("정지\n터치 " + touches);
+        } else if (locked) {
+            stripInfo.setText("잠금\n막음 " + blocked);
+        } else if (inTest) {
+            stripInfo.setText("터치\n" + touches + "/" + limit);
+        } else {
+            stripInfo.setText("수집");
+        }
+        stripInfo.setTextColor(pausedNow || touches > 0 || blocked > 0 ? AMBER : ON_PANEL_DIM);
+    }
+
+    /** Seconds left before the run limit; turns amber in the last minute. */
+    public void setRemaining(long seconds) {
+        if (seconds == remainingSeconds) {
+            return;
+        }
+        remainingSeconds = seconds;
+        if (running) {
+            updateCaption();
+            showTime();
+        }
+    }
+
+    /** Estimated seconds until the test is answered completely (from this run's own pace); -1 hides it. */
+    public void setEta(long seconds) {
+        if (seconds == etaSeconds) {
+            return;
+        }
+        etaSeconds = seconds;
+        if (seconds < 0) {
+            stripEta.setVisibility(GONE);
+        } else {
+            stripEta.setText("끝까지 " + AppStyle.formatClock(seconds));
+            stripEta.setVisibility(VISIBLE);
+        }
+    }
+
+    /** Rebuilds the open settings tab so it shows values changed elsewhere (e.g. by the pace measurement). */
+    public void rebuildSettings() {
+        fillGroup();
+    }
+
+    /** Folds the idle card into its edge tab (or unfolds it). */
+    public void setCollapsed(boolean on) {
+        collapsed = on;
+        applyMode();
+    }
+
+    /** Shows only the start button (while idle) or the full card again. */
+    public void setMinimized(boolean on) {
+        minimized = on;
+        applyMode();
+    }
+
+    // ------------------------------------------------------------------ layout
+
+    private Mode pickMode() {
+        if (running) {
+            return Mode.STRIP;
+        }
+        if (calibrating) {
+            return Mode.MEASURE;
+        }
+        if (collapsed) {
+            return Mode.TAB;
+        }
+        return minimized ? Mode.START : Mode.CARD;
+    }
+
+    private void applyMode() {
+        AppStyle s = AppStyle.INSTANCE;
+        mode = pickMode();
+        cardRow.setVisibility(mode == Mode.CARD ? VISIBLE : GONE);
+        startOnly.setVisibility(mode == Mode.START ? VISIBLE : GONE);
+        edgeTab.setVisibility(mode == Mode.TAB ? VISIBLE : GONE);
+        measure.setVisibility(mode == Mode.MEASURE ? VISIBLE : GONE);
+        strip.setVisibility(mode == Mode.STRIP ? VISIBLE : GONE);
+
+        boolean right = host.isDockedRight();
+        // the fold tab sits on the card's inner side and points at the edge it folds into; the edge tab points back
+        foldTab.setRotation(right ? 0 : 180);
+        edgeArrow.setRotation(right ? 180 : 0);
+        cardRow.removeView(foldTab);
+        LayoutParams ftp = new LayoutParams(dp(22), dp(64));
+        ftp.topMargin = dp(4);
+        if (right) {
+            ftp.rightMargin = dp(6);
+            cardRow.addView(foldTab, 0, ftp);
+        } else {
+            ftp.leftMargin = dp(6);
+            cardRow.addView(foldTab, ftp);
+        }
+
+        if (mode == Mode.TAB) {
+            setBackground(null);
+            setElevation(0);
+            setPadding(0, 0, 0, 0);
+            return;
+        }
+        setBackground(s.roundRect(getContext(), PANEL, mode == Mode.STRIP || mode == Mode.START ? 18 : 22, Color.argb(40, 255, 255, 255)));
+        setElevation(dp(6));
+        switch (mode) {
+            case STRIP:
+                setPadding(dp(4), dp(4), dp(4), dp(6));
+                break;
+            case START:
+                setPadding(dp(4), dp(4), dp(6), dp(4));
+                break;
+            case MEASURE:
+                setPadding(dp(8), dp(8), dp(12), dp(10));
+                break;
+            default:
+                setPadding(dp(8), dp(8), dp(10), dp(10));
+                break;
+        }
+    }
+
+    private void applySettings() {
+        settingsBox.setVisibility(settingsOpen ? VISIBLE : GONE);
+        settingsToggle.setText(settingsOpen ? "설정 ▴" : "설정 ▾");
+        settingsToggle.setContentDescription(settingsOpen ? "설정 접기" : "설정 펼치기");
+        if (settingsOpen) {
+            fillGroup();
+        }
+    }
+
+    /** Fills the settings area with the selected tab's controls (read fresh from the preferences). */
+    private void fillGroup() {
+        AppStyle s = AppStyle.INSTANCE;
+        for (int i = 0; i < tabViews.length; i++) {
+            boolean selected = i == tab;
+            tabViews[i].setTextColor(selected ? ON_PANEL : ON_PANEL_DIM);
+            tabViews[i].setBackground(selected ? s.roundRect(getContext(), s.getAccent(), 999, 0) : null);
+        }
+        if (!settingsOpen) {
+            return;
+        }
+        groupBody.removeAllViews();
+        Screens.addPanelGroup(getContext(), groupBody, prefs, tab);
+        groupScroll.scrollTo(0, 0);
+    }
+
+    private void showTime() {
+        stripTime.setText(remainingSeconds < 0 ? "" : AppStyle.formatClock(remainingSeconds));
+        stripTime.setTextColor(pausedNow || (remainingSeconds >= 0 && remainingSeconds <= 60) ? AMBER : ON_PANEL);
+    }
+
+    private void updateCaption() {
+        if (!running) {
+            caption.setText("MiMiC");
+            caption.setTextColor(ON_PANEL_DIM);
+            return;
+        }
+        String head = pausedNow ? "일시정지" : "실행 중";
+        caption.setText(remainingSeconds < 0 ? head : head + " · 남은 " + AppStyle.formatClock(remainingSeconds));
+        caption.setTextColor(remainingSeconds >= 0 && remainingSeconds <= 60 ? AMBER : ON_PANEL_DIM);
+    }
+
+    // ------------------------------------------------------------------ helpers
+
+    private int dp(int v) {
+        return AppStyle.INSTANCE.dp(getContext(), v);
+    }
+
+    private Drawable ripple(int color, int radius) {
+        return new RippleDrawable(ColorStateList.valueOf(Color.argb(60, 255, 255, 255)), AppStyle.INSTANCE.roundRect(getContext(), color, radius, 0), null);
+    }
+
+    private Button pill(Context context, String text, int color, float size, int padH) {
+        Button b = new Button(context);
+        b.setAllCaps(false);
+        b.setText(text);
+        b.setTextSize(size);
+        b.setTypeface(Typeface.create("sans-serif-medium", 0));
+        b.setTextColor(Color.WHITE);
+        b.setStateListAnimator(null);
+        b.setElevation(0);
+        b.setMinWidth(0);
+        b.setMinimumWidth(0);
+        b.setMinHeight(0);
+        b.setMinimumHeight(0);
+        b.setPadding(dp(padH), 0, dp(padH), 0);
+        b.setBackground(ripple(color, 999));
+        return b;
+    }
+
+    private TextView tool(Context context, String text) {
+        TextView t = AppStyle.INSTANCE.label(context, text, 12.0f, ON_PANEL, true);
+        t.setGravity(Gravity.CENTER);
+        t.setBackground(ripple(CHIP, 999));
+        t.setClickable(true);
+        t.setFocusable(true);
+        return t;
+    }
+
+    private LayoutParams toolParams(boolean gap) {
+        LayoutParams lp = new LayoutParams(0, -1, 1.0f);
+        if (gap) {
+            lp.leftMargin = dp(6);
+        }
+        return lp;
+    }
+
+    private ImageView handle(Context context, boolean vertical) {
+        ImageView h = new ImageView(context);
+        h.setImageResource(R.drawable.ic_drag);
+        h.setColorFilter(ON_PANEL_DIM);
+        h.setContentDescription("패널 이동");
+        if (vertical) {
+            h.setRotation(90);
+        } else {
+            h.setPadding(dp(2), dp(8), dp(2), dp(8));
+        }
+        h.setOnTouchListener(new OnTouchListener() {
+            private float downX;
+            private float downY;
+
+            @Override
+            public boolean onTouch(View v, MotionEvent e) {
+                switch (e.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        downX = e.getRawX();
+                        downY = e.getRawY();
+                        return true;
+                    case MotionEvent.ACTION_MOVE:
+                        host.onDrag(e.getRawX() - downX, e.getRawY() - downY, false);
+                        return true;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        host.onDrag(e.getRawX() - downX, e.getRawY() - downY, true);
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+        });
+        return h;
     }
 }

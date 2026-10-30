@@ -180,6 +180,10 @@ public final class BotService extends AccessibilityService {
                 } else if (BotService.this.getEngine().isCalibrating()) {
                     // measuring the user's own pace: only look at the screen, never touch it
                     BotService.this.getEngine().observeCalibration(BotService.this.readScreen(), SystemClock.elapsedRealtime());
+                    FloatingPanel measuring = BotService.this.floating;
+                    if (measuring != null && BotService.this.getEngine().isCalibrating()) {
+                        measuring.setCalibrating(true, BotService.this.calibrationText());
+                    }
                 } else {
                     long elapsedRealtime2 = SystemClock.elapsedRealtime();
                     j = BotService.this.idleCheckedAt;
@@ -449,6 +453,15 @@ public final class BotService extends AccessibilityService {
         setStatus("측정 중 · 클래스카드에서 ‘테스트 시작’을 직접 눌러 " + BotEngine.CALIBRATION_TARGET + "문항을 풀어 주세요");
     }
 
+    /** What the floating panel says while the personal pace is measured. */
+    final String calibrationText() {
+        int n = getEngine().getCalibrationCount();
+        if (n <= 0) {
+            return "세트 화면에서 ‘테스트 시작’을 직접 누르고 평소처럼 풀어 주세요. 앱은 화면을 보기만 해요.";
+        }
+        return n + " / " + BotEngine.CALIBRATION_TARGET + "문항 기록됨 · 3문항부터 반영할 수 있어요.";
+    }
+
     public final void onCalibrationDone(String message) {
         if (message != null && message.startsWith("내 패턴")) {
             alert(2);
@@ -458,6 +471,7 @@ public final class BotService extends AccessibilityService {
             panel.rebuildSettings();
         }
         setStatus(message != null ? message : "측정을 마쳤어요");
+        android.widget.Toast.makeText(this, message != null ? message : "측정을 마쳤어요", android.widget.Toast.LENGTH_LONG).show();
     }
     private UiNode verifyTarget;
     private int verifyAborts;
@@ -874,9 +888,7 @@ public final class BotService extends AccessibilityService {
         FloatingPanel panel = this.floating;
         if (panel != null) {
             panel.render(active, this.status, !active || collecting, beforeTest);
-            if (getEngine().isCalibrating()) {
-                panel.getStatusText().setText(this.status);
-            }
+            panel.setCalibrating(getEngine().isCalibrating(), calibrationText());
             panel.renderRun(getEngine().isPaused(), getEngine().getUserTouches(), getEngine().getTouchLimit(), getEngine().isInTest(), getEngine().isTouchLocked(), getEngine().getBlockedTouches());
         }
         LinearLayout linearLayout = this.overlay;

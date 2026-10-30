@@ -81,6 +81,7 @@ public final class MainActivity extends Activity {
             alertDialog2.dismiss();
         }
         this.inSettings = false;
+        this.settingsSection = -1;
         this.settingsDialog = null;
         this.messageDialog = null;
         this.activation = null;
@@ -389,13 +390,36 @@ public final class MainActivity extends Activity {
             version = "";
         }
         SharedPreferences prefs = this.storage.getPrefs();
+        this.settingsSection = -1;
         setContentView(Screens.settings(this, prefs, version, new Function0<Unit>() {
             @Override
             public Unit invoke() {
                 MainActivity.this.showHome();
                 return Unit.INSTANCE;
             }
-        }, help));
+        }, help, new kotlin.jvm.functions.Function1<Integer, Unit>() {
+            @Override
+            public Unit invoke(Integer section) {
+                MainActivity.this.showSettingsSection(section.intValue());
+                return Unit.INSTANCE;
+            }
+        }));
+    }
+
+    /** Settings category page open (-1: the settings menu or another screen). */
+    private int settingsSection = -1;
+
+    private final void showSettingsSection(int section) {
+        this.inSettings = true;
+        this.home = null;
+        this.settingsSection = section;
+        setContentView(Screens.settingsSection(this, this.storage.getPrefs(), section, new Function0<Unit>() {
+            @Override
+            public Unit invoke() {
+                MainActivity.this.showSettings();
+                return Unit.INSTANCE;
+            }
+        }));
     }
 
     /* JADX INFO: Access modifiers changed from: private */
@@ -625,6 +649,7 @@ public final class MainActivity extends Activity {
             throw new IllegalStateException("Check failed.");
         }
         this.inSettings = false;
+        this.settingsSection = -1;
         Screens.Home h = Screens.home(this, this.storage.getPrefs(), guard(new Function0<Unit>() {
             @Override
             public Unit invoke() {
@@ -898,6 +923,10 @@ public final class MainActivity extends Activity {
     }
 
     public void onBackPressed() {
+        if (this.inSettings && this.settingsSection >= 0) {
+            showSettings();
+            return;
+        }
         if (this.inSettings && UsageConsent.INSTANCE.getAllowed()) {
             showHome();
             return;
