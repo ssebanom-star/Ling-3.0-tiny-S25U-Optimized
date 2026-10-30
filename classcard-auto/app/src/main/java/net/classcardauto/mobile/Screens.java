@@ -876,10 +876,12 @@ public final class Screens {
     public static final class Activation {
         public final LinearLayout root;
         public final TextView status;
+        public final android.widget.EditText codeInput;
 
-        Activation(LinearLayout root, TextView status) {
+        Activation(LinearLayout root, TextView status, android.widget.EditText codeInput) {
             this.root = root;
             this.status = status;
+            this.codeInput = codeInput;
         }
     }
 
@@ -934,7 +936,7 @@ public final class Screens {
      * First-run screen shown until an authorisation file issued for this phone has been dropped into the app folder.
      * {@code code} is this phone's device code, {@code folder} the folder to copy the key file into.
      */
-    public static Activation activation(Context c, String code, String folder, Function0<Unit> onCheck, Function0<Unit> onCopyCode, Function0<Unit> onCopyFolder, Function0<Unit> onPasteCode, Function0<Unit> onScanCode, Function0<Unit> onClose) {
+    public static Activation activation(Context c, String code, String folder, Function0<Unit> onCheck, Function0<Unit> onCopyCode, Function0<Unit> onCopyFolder, Function0<Unit> onPasteCode, Function0<Unit> onScanCode, Function0<Unit> onSubmitAuthCode, Function0<Unit> onClose) {
         AppStyle s = AppStyle.INSTANCE;
         Page page = page(c, brandBar(c, null));
         LinearLayout content = page.content;
@@ -998,6 +1000,41 @@ public final class Screens {
         add(cardB, scanCode, 8);
         add(content, cardB, 10);
 
+        add(content, s.sectionLabel(c, "방법 C · 인증용 앱(MiMiC Auth)으로 코드 받기"), 22);
+        LinearLayout cardC = s.card(c);
+        final android.widget.EditText codeInput = new android.widget.EditText(c);
+        try {
+            if (AuthChallenge.available()) {
+                cardC.addView(s.label(c, "내 인증용 앱으로 아래 QR을 찍으면 앱에 짧은 코드가 떠요. 그 코드를 입력하세요.", 14.0f, s.getMuted(), false));
+                android.widget.ImageView qr = new android.widget.ImageView(c);
+                qr.setImageBitmap(QrCodec.render(AuthChallenge.qrText(c), 700));
+                qr.setAdjustViewBounds(true);
+                LinearLayout.LayoutParams qp = new LinearLayout.LayoutParams(dp(c, 190), dp(c, 190));
+                qp.topMargin = dp(c, 12);
+                qp.gravity = Gravity.CENTER_HORIZONTAL;
+                cardC.addView(qr, qp);
+            } else {
+                cardC.addView(s.label(c, "이 빌드에는 인증용 앱이 아직 등록되지 않았어요. 인증용 앱의 공개키를 넣어 다시 빌드하면 쓸 수 있어요.", 14.0f, s.getMuted(), false));
+            }
+        } catch (Exception e) {
+            cardC.addView(s.label(c, "QR을 만들지 못했어요.", 14.0f, s.getDanger(), false));
+        }
+        codeInput.setHint("코드 입력 (예: 3-ABCDE-FGH12)");
+        codeInput.setSingleLine(true);
+        codeInput.setTextSize(17.0f);
+        codeInput.setTextColor(s.getInk());
+        codeInput.setHintTextColor(s.getMuted());
+        codeInput.setTypeface(android.graphics.Typeface.MONOSPACE);
+        codeInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        codeInput.setBackground(s.roundRect(c, s.getBackground(), 12, s.getBorder()));
+        codeInput.setPadding(dp(c, 14), dp(c, 10), dp(c, 14), dp(c, 10));
+        add(cardC, codeInput, 12);
+        Button submit = s.button(c, "코드 확인", AppStyle.Tone.TONAL, onSubmitAuthCode);
+        submit.setMinHeight(dp(c, 48));
+        submit.setMinimumHeight(dp(c, 48));
+        add(cardC, submit, 8);
+        add(content, cardC, 10);
+
         TextView status = s.label(c, "", 14.0f, s.getDanger(), false);
         add(content, status, 16);
         Button check = s.button(c, "확인", AppStyle.Tone.PRIMARY, onCheck);
@@ -1005,7 +1042,7 @@ public final class Screens {
         add(content, check, 12);
         add(content, s.button(c, "닫기", AppStyle.Tone.TEXT, onClose), 6);
         add(content, s.caption(c, "키 파일을 넣으면 몇 초 안에 자동으로 확인해요. 확인이 끝나면 파일은 지워져요."), 12);
-        return new Activation(page.root, status);
+        return new Activation(page.root, status, codeInput);
     }
 
     /** Simple text body for sheets (privacy policy, notices, last run). */

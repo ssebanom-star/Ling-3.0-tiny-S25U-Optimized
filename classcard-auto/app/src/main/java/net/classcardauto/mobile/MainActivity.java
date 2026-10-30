@@ -812,6 +812,12 @@ public final class MainActivity extends Activity {
         }), guard(new Function0<Unit>() {
             @Override
             public Unit invoke() {
+                MainActivity.this.submitAuthCode();
+                return Unit.INSTANCE;
+            }
+        }), guard(new Function0<Unit>() {
+            @Override
+            public Unit invoke() {
                 MainActivity.this.closeApp();
                 return Unit.INSTANCE;
             }
@@ -834,6 +840,22 @@ public final class MainActivity extends Activity {
             return;
         }
         installActivationText(text);
+    }
+
+    /** Checks the code typed from the authenticator app. */
+    private final void submitAuthCode() {
+        Screens.Activation a = this.activation;
+        if (a == null) {
+            return;
+        }
+        String message = AuthChallenge.submit(this, a.codeInput.getText().toString());
+        if (message != null) {
+            a.status.setText(AppStyle.keepWords(message));
+            return;
+        }
+        this.activation = null;
+        this.handler.removeCallbacks(this.activationPoll);
+        beginEntry$default(this, false, 1, null);
     }
 
     /** Installs an activation code (pasted or read from a QR) and continues into the app when it is valid. */
