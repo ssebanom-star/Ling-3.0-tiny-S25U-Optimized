@@ -366,6 +366,52 @@ public final class Screens {
                     return Unit.INSTANCE;
                 }
             }, false), lp(c, 16));
+        } else if (kind == 2) {
+            String measured = HumanProfile.describe(p);
+            card.addView(s.caption(c, "‘사람처럼 입력’의 세부 값입니다. ‘내 속도 측정’을 하면 직접 푼 모습에서 자동으로 채워져요. " + (measured.isEmpty() ? "아직 측정한 값이 없어요." : "측정한 패턴: " + measured + ".") + " 다음 실행부터 적용됩니다."));
+            final int mean = p.getInt("human_mean_ms", HumanTiming.MEAN_DEFAULT);
+            card.addView(s.sliderRow(c, "응답 시간의 변동 폭", "%", HumanProfile.SIGMA_MIN, HumanProfile.SIGMA_MAX, HumanProfile.SIGMA_STEP, (int) Math.round(HumanProfile.sigma(p) * 100), new Function1<Integer, Unit>() {
+                @Override
+                public Unit invoke(Integer v) {
+                    p.edit().putInt(HumanProfile.K_SIGMA, v.intValue()).apply();
+                    return Unit.INSTANCE;
+                }
+            }, false), lp(c, 16));
+            card.addView(s.sliderRow(c, "가끔 더 망설일 확률", "%", HumanProfile.HESITATE_MIN, HumanProfile.HESITATE_MAX, HumanProfile.HESITATE_STEP, (int) Math.round(HumanProfile.hesitation(p) * 100), new Function1<Integer, Unit>() {
+                @Override
+                public Unit invoke(Integer v) {
+                    p.edit().putInt(HumanProfile.K_HESITATE, v.intValue()).apply();
+                    return Unit.INSTANCE;
+                }
+            }, false), lp(c, 16));
+            card.addView(s.sliderRow(c, "문항마다 느려지는 정도", "‰", HumanProfile.FATIGUE_MIN, HumanProfile.FATIGUE_MAX, HumanProfile.FATIGUE_STEP, (int) Math.round(HumanProfile.fatiguePerQuestion(p) * 1000), new Function1<Integer, Unit>() {
+                @Override
+                public Unit invoke(Integer v) {
+                    p.edit().putInt(HumanProfile.K_FATIGUE, v.intValue()).apply();
+                    return Unit.INSTANCE;
+                }
+            }, false), lp(c, 16));
+            card.addView(s.sliderRow(c, "답을 누른 뒤 카드 넘기기 전 멈춤", "ms", HumanProfile.PAUSE_MIN, HumanProfile.PAUSE_MAX, HumanProfile.PAUSE_STEP, (int) HumanProfile.advanceMs(p, mean), new Function1<Integer, Unit>() {
+                @Override
+                public Unit invoke(Integer v) {
+                    p.edit().putInt(HumanProfile.K_ADVANCE, v.intValue()).apply();
+                    return Unit.INSTANCE;
+                }
+            }, false), lp(c, 16));
+            card.addView(s.sliderRow(c, "보기를 열기 전 멈춤", "ms", HumanProfile.PAUSE_MIN, HumanProfile.PAUSE_MAX, HumanProfile.PAUSE_STEP, (int) HumanProfile.revealMs(p, mean), new Function1<Integer, Unit>() {
+                @Override
+                public Unit invoke(Integer v) {
+                    p.edit().putInt(HumanProfile.K_REVEAL, v.intValue()).apply();
+                    return Unit.INSTANCE;
+                }
+            }, false), lp(c, 16));
+            card.addView(s.sliderRow(c, "시작 버튼 누르기 전 기다림", "ms", HumanProfile.NAV_MIN, HumanProfile.NAV_MAX, HumanProfile.NAV_STEP, (int) HumanProfile.navMs(p), new Function1<Integer, Unit>() {
+                @Override
+                public Unit invoke(Integer v) {
+                    p.edit().putInt(HumanProfile.K_NAV, v.intValue()).apply();
+                    return Unit.INSTANCE;
+                }
+            }, false), lp(c, 16));
         } else {
             card.addView(s.caption(c, "실행이 너무 오래 걸리거나 화면이 멈춘 것처럼 보일 때 언제 포기할지 정합니다. 다음 실행부터 적용됩니다."));
             card.addView(s.sliderRow(c, "실행 제한 시간", "초", AdvancedSettings.RUN_MIN, AdvancedSettings.RUN_MAX, AdvancedSettings.RUN_STEP, AdvancedSettings.runLimitSeconds(p), new Function1<Integer, Unit>() {
@@ -423,6 +469,8 @@ public final class Screens {
             public Unit invoke() {
                 if (kind == 0) {
                     AdvancedSettings.resetMatching(p);
+                } else if (kind == 2) {
+                    HumanProfile.reset(p);
                 } else {
                     AdvancedSettings.resetLimits(p);
                 }
@@ -506,6 +554,12 @@ public final class Screens {
         LinearLayout.LayoutParams mlp = lp(c, 6);
         mlp.height = s.dp(c, 30);
         parent.addView(measure, mlp);
+        String measured = HumanProfile.describe(p);
+        if (!measured.isEmpty()) {
+            TextView known = s.label(c, "측정한 내 패턴: " + measured, 10.5f, -1, false);
+            known.setAlpha(0.7f);
+            parent.addView(known, lp(c, 4));
+        }
         parent.addView(s.sliderRow(c, "일부러 틀릴 문항 수", "개", AdvancedSettings.WRONG_MIN, AdvancedSettings.WRONG_MAX, AdvancedSettings.WRONG_STEP, AdvancedSettings.wrongCount(p), new Function1<Integer, Unit>() {
             @Override
             public Unit invoke(Integer v) {
@@ -533,7 +587,7 @@ public final class Screens {
     private static String calibrationLabel() {
         BotService service = BotService.INSTANCE.getInstance();
         boolean on = service != null && service.getEngine().isCalibrating();
-        return on ? "측정 끝내기 (3문항 이상이면 반영)" : "내 속도로 맞추기 (직접 " + BotEngine.CALIBRATION_TARGET + "문항 풀기)";
+        return on ? "측정 끝내기 (3문항 이상이면 반영)" : "내 패턴 측정 · 시작부터 직접 하기";
     }
 
     /** One line saying how long a test is expected to take with the current settings (a rough estimate). */
@@ -647,6 +701,8 @@ public final class Screens {
         add(humanCard, s.caption(c, "한 번 실행에서 이 개수만큼의 문항을 무작위로 골라 정답이 아닌 보기를 누릅니다. 0이면 모두 맞힙니다. 문항 수보다 크면 전체가 오답이 됩니다."), 8);
         add(content, humanCard, 8);
 
+        add(content, s.sectionLabel(c, "고급 · 내 패턴 세부값"), 24);
+        add(content, advancedCard(c, p, 2), 8);
         add(content, s.sectionLabel(c, "고급 · 정답 매칭"), 24);
         add(content, advancedCard(c, p, 0), 8);
         add(content, s.sectionLabel(c, "고급 · 실행 한도"), 24);

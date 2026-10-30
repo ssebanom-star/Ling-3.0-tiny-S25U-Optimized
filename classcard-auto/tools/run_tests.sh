@@ -10,7 +10,7 @@ CP="$HERE/tools/lib/json.jar:$KSTD:$ANDROID_JAR"  # real org.json must precede t
 SRC="$HERE/app/src/main/java"
 ZXING=${3:-$(find "$HOME/.gradle" -name 'core-3.5.3.jar' | head -1)}
 CP="$CP:$ZXING"
-for t in MatcherTest HumanTimingTest WrongAnswersTest PauseStateTest FailureLogTest QrCodecTest; do
+for t in MatcherTest HumanTimingTest WrongAnswersTest PauseStateTest FailureLogTest PaceModelTest QrCodecTest; do
   javac -nowarn -d "$OUT" -cp "$CP" -sourcepath "$SRC" "$HERE/solver/src/$t.java"
   echo "== $t"; java -cp "$OUT:$CP" "net.classcardauto.mobile.$t" | tail -3
 done

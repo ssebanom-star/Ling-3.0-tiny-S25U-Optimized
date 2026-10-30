@@ -446,11 +446,11 @@ public final class BotService extends AccessibilityService {
             return;
         }
         getEngine().startCalibration();
-        setStatus("측정 중 0/" + BotEngine.CALIBRATION_TARGET + " · 시험을 직접 풀어 주세요");
+        setStatus("측정 중 · 클래스카드에서 ‘테스트 시작’을 직접 눌러 " + BotEngine.CALIBRATION_TARGET + "문항을 풀어 주세요");
     }
 
     public final void onCalibrationDone(String message) {
-        if (message != null && message.startsWith("내 속도")) {
+        if (message != null && message.startsWith("내 패턴")) {
             alert(2);
         }
         FloatingPanel panel = this.floating;

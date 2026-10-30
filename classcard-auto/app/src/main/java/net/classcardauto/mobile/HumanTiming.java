@@ -43,11 +43,16 @@ public final class HumanTiming {
      * @param questionIndex 0-based index of the question in this run
      */
     public static long thinkMillis(Random r, int meanMs, int promptChars, int choiceChars, int questionIndex) {
+        return thinkMillis(r, meanMs, promptChars, choiceChars, questionIndex, THINK_SIGMA, HESITATION_CHANCE, 0.003);
+    }
+
+    /** Same, with the spread, the chance of an extra hesitation and the per-question slow-down given. */
+    public static long thinkMillis(Random r, int meanMs, int promptChars, int choiceChars, int questionIndex, double sigma, double hesitation, double fatiguePerQuestion) {
         double lengthFactor = lengthFactor(promptChars, choiceChars);
         double median = meanMs * 0.85 * lengthFactor;
-        double value = median * Math.exp(THINK_SIGMA * gauss(r));
-        value *= 1.0 + Math.min(0.2, 0.003 * Math.max(0, questionIndex));
-        if (r.nextDouble() < HESITATION_CHANCE) {
+        double value = median * Math.exp(sigma * gauss(r));
+        value *= 1.0 + Math.min(0.2, fatiguePerQuestion * Math.max(0, questionIndex));
+        if (r.nextDouble() < hesitation) {
             value += 800 + r.nextDouble() * 1400;
         }
         return (long) clamp(value, THINK_MIN_MS, THINK_MAX_MS);
@@ -88,9 +93,21 @@ public final class HumanTiming {
 
     /** Pause after the answer was accepted before the card is swiped on. */
     public static long advanceMillis(Random r, int meanMs) {
-        double median = 0.25 * meanMs;
-        double value = median * Math.exp(0.4 * gauss(r));
-        return (long) clamp(value, 120, 4000);
+        return pauseMillis(r, 0.25 * meanMs);
+    }
+
+    /** A pause around {@code medianMs}, right-skewed like the other human waits. */
+    public static long pauseMillis(Random r, double medianMs) {
+        double value = medianMs * Math.exp(0.4 * gauss(r));
+        return (long) clamp(value, 120, 8000);
+    }
+
+    /** Wait before pressing a start button, around {@code medianMs}. */
+    public static long navMillis(Random r, double medianMs) {
+        if (medianMs <= 0) {
+            return 0;
+        }
+        return (long) clamp(medianMs * Math.exp(0.35 * gauss(r)), 200, 30000);
     }
 
     /** A touch point inside the rectangle, clustered around the middle and never within the outer ~12% of the edge. */

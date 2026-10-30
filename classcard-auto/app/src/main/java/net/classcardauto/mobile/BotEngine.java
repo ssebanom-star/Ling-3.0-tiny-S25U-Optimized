@@ -268,6 +268,9 @@ public final class BotEngine {
 
     private final void act(String key, long now, Function0<Unit> action) {
         String str = this.phase + ":" + key;
+        if (this.human && (key.equals("open") || key.equals("start")) && !humanNavReady("nav:" + str, now)) {
+            return;
+        }
         Long l = this.lastActions.get(str);
         if (l == null || now - l.longValue() >= 800) {
             Integer num = this.actionAttempts.get(str);
@@ -1879,23 +1882,47 @@ public final class BotEngine {
         this.service.setStatus(strict ? "재개했어요" : "자동으로 이어서 진행해요");
     }
 
-    // ---- personal pace: watch the user answer a few questions by hand (memory only, nothing is stored) ----
+    // ---- personal pace: watch the user press start and answer a few questions by hand (memory only) ----
 
     public static final int CALIBRATION_TARGET = 8;
     private boolean calibrating;
-    private final java.util.List<Double> calSamples = new ArrayList<>();
+    private long calStartedAt;
+    private final java.util.List<PaceModel.Think> calThink = new ArrayList<>();
+    private final java.util.List<Long> calReveal = new ArrayList<>();
+    private final java.util.List<Long> calAdvance = new ArrayList<>();
+    private final java.util.List<Long> calNav = new ArrayList<>();
+    private CurrentEntry calEntry;
+    private long calEntrySeenAt;
     private String calProgress = "";
-    private long calSeenAt;
-    private boolean calDone;
+    private long calPromptAt;
+    private long calChoicesAt;
+    private long calFeedbackAt;
     private int calPromptChars;
     private int calChoiceChars;
+    private boolean calThinkTaken;
+    private boolean calQuestionOpen;
 
     public final boolean isCalibrating() {
         return this.calibrating;
     }
 
     public final int getCalibrationCount() {
-        return this.calSamples.size();
+        return this.calThink.size();
+    }
+
+    private final void clearCalibration() {
+        this.calThink.clear();
+        this.calReveal.clear();
+        this.calAdvance.clear();
+        this.calNav.clear();
+        this.calEntry = null;
+        this.calEntrySeenAt = 0L;
+        this.calProgress = "";
+        this.calPromptAt = 0L;
+        this.calChoicesAt = 0L;
+        this.calFeedbackAt = 0L;
+        this.calThinkTaken = false;
+        this.calQuestionOpen = false;
     }
 
     public final void startCalibration() {
@@ -1903,41 +1930,55 @@ public final class BotEngine {
             return;
         }
         this.calibrating = true;
-        this.calSamples.clear();
-        this.calProgress = "";
-        this.calSeenAt = 0L;
-        this.calDone = false;
+        this.calStartedAt = SystemClock.elapsedRealtime();
+        clearCalibration();
     }
 
     public final void cancelCalibration() {
         this.calibrating = false;
-        this.calSamples.clear();
+        clearCalibration();
     }
 
     /**
-     * Ends the measurement. With at least 3 answers the median is turned into the "average response time" setting;
-     * returns a message for the user (or null when nothing was saved).
+     * Ends the measurement. With at least 3 answered questions everything measured is turned into the settings of the
+     * human-like mode; returns a message for the user (or null when nothing was saved).
      */
     public final String finishCalibration() {
-        boolean enough = this.calSamples.size() >= 3;
         String message = null;
-        if (enough) {
-            java.util.List<Double> sorted = new ArrayList<>(this.calSamples);
-            java.util.Collections.sort(sorted);
-            double median = sorted.get(sorted.size() / 2);
-            int mean = HumanTiming.snapMean(median);
-            this.storage.getPrefs().edit().putInt("human_mean_ms", mean).apply();
-            message = "내 속도 반영: 평균 응답 시간 " + AppStyle.formatValue(mean, "ms") + " (" + this.calSamples.size() + "문항 기준)";
+        if (this.calThink.size() >= 3) {
+            PaceModel.Result result = PaceModel.summarize(this.calThink, this.calReveal, this.calAdvance, this.calNav);
+            HumanProfile.apply(this.storage.getPrefs(), result);
+            message = "내 패턴 반영 (" + this.calThink.size() + "문항) · " + result.describe();
         }
         this.calibrating = false;
-        this.calSamples.clear();
+        clearCalibration();
         return message;
     }
 
-    /** Called every tick while measuring: times each question from "choices shown" to "answer accepted". */
+    /** Called every tick while measuring: times the start presses, the opening of choices, the answers and the swipes on. */
     public final void observeCalibration(List<UiNode> ns, long now) {
         if (!this.calibrating || this.active) {
             return;
+        }
+        CurrentEntry entry = CoreKt.currentEntry(ns);
+        if (entry == CurrentEntry.SET || entry == CurrentEntry.PREVIEW) {
+            if (this.calEntry != entry) {
+                // a new start-type screen: the wait before pressing is counted from the later of "measuring began" and "screen appeared"
+                this.calEntry = entry;
+                this.calEntrySeenAt = Math.max(now, this.calStartedAt);
+            }
+            return;
+        }
+        if (entry != CurrentEntry.ACTIVE_TEST) {
+            return;
+        }
+        if (this.calEntry != null && this.calEntrySeenAt > 0) {
+            long wait = now - this.calEntrySeenAt;
+            if (wait >= 300 && wait <= 120000) {
+                this.calNav.add(Long.valueOf(wait));
+            }
+            this.calEntry = null;
+            this.calEntrySeenAt = 0L;
         }
         UiNode current = id(ns, "txt_current_num");
         UiNode total = id(ns, "txt_total_cnt");
@@ -1945,13 +1986,22 @@ public final class BotEngine {
             return;
         }
         String progress = current.getText().trim() + " | " + total.getText().trim();
+        UiNode quest = id(ns, "txt_quest");
+        boolean promptShown = quest != null && !StringsKt.isBlank(quest.getText());
         if (!progress.equals(this.calProgress)) {
+            // the next question appeared: how long the card was left after the previous answer
+            if (this.calQuestionOpen && this.calFeedbackAt > 0) {
+                long pause = now - this.calFeedbackAt;
+                if (pause >= 120 && pause <= 30000) {
+                    this.calAdvance.add(Long.valueOf(pause));
+                }
+            }
             this.calProgress = progress;
-            this.calSeenAt = 0L;
-            this.calDone = false;
-        }
-        if (this.calDone) {
-            return;
+            this.calPromptAt = 0L;
+            this.calChoicesAt = 0L;
+            this.calFeedbackAt = 0L;
+            this.calThinkTaken = false;
+            this.calQuestionOpen = true;
         }
         UiNode message = id(ns, "txt_bottom_msg");
         String bottom = message != null ? message.getText() : "";
@@ -1963,25 +2013,32 @@ public final class BotEngine {
                 chars += node.getText().length();
             }
         }
-        if (this.calSeenAt == 0) {
-            if (choices == this.service.getProfile().getChoiceCount() && bottom.equals(this.service.getProfile().getReadyMessage())) {
-                UiNode quest = id(ns, "txt_quest");
-                this.calPromptChars = quest != null ? quest.getText().length() : 0;
-                this.calChoiceChars = chars;
-                this.calSeenAt = now;
-            }
-            return;
+        boolean choicesShown = choices == this.service.getProfile().getChoiceCount() && bottom.equals(this.service.getProfile().getReadyMessage());
+        if (this.calPromptAt == 0 && promptShown && !choicesShown) {
+            this.calPromptAt = now;
+            this.calPromptChars = quest.getText().length();
         }
-        if (bottom.contains(this.service.getProfile().getFeedbackMessage())) {
-            long ms = now - this.calSeenAt;
-            this.calDone = true;
-            if (ms >= 300 && ms <= 30000) {
-                this.calSamples.add(Double.valueOf(HumanTiming.meanFromObserved(ms, this.calPromptChars, this.calChoiceChars)));
-                if (this.calSamples.size() >= CALIBRATION_TARGET) {
+        if (this.calChoicesAt == 0 && choicesShown) {
+            this.calChoicesAt = now;
+            this.calChoiceChars = chars;
+            if (quest != null) {
+                this.calPromptChars = quest.getText().length();
+            }
+            if (this.calPromptAt > 0 && now - this.calPromptAt >= 250) {
+                this.calReveal.add(Long.valueOf(now - this.calPromptAt));
+            }
+        }
+        if (this.calChoicesAt > 0 && this.calFeedbackAt == 0 && bottom.contains(this.service.getProfile().getFeedbackMessage())) {
+            this.calFeedbackAt = now;
+            long ms = now - this.calChoicesAt - PaceModel.TAP_LATENCY_MS;
+            if (!this.calThinkTaken && ms >= 300 && ms <= 30000) {
+                this.calThinkTaken = true;
+                this.calThink.add(new PaceModel.Think(ms, this.calPromptChars, this.calChoiceChars));
+                if (this.calThink.size() >= CALIBRATION_TARGET) {
                     this.service.onCalibrationDone(finishCalibration());
                     return;
                 }
-                this.service.setStatus("측정 중 " + this.calSamples.size() + "/" + CALIBRATION_TARGET + " · 계속 직접 풀어 주세요");
+                this.service.setStatus("측정 중 " + this.calThink.size() + "/" + CALIBRATION_TARGET + " · 계속 직접 풀어 주세요");
             }
         }
     }
@@ -2238,11 +2295,26 @@ public final class BotEngine {
                 choiceChars += node.getText().length();
             }
             int mean = this.storage.getPrefs().getInt("human_mean_ms", HumanTiming.MEAN_DEFAULT);
-            long wait = HumanTiming.thinkMillis(this.rng, mean, prompt.length(), choiceChars, this.answered.size());
+            android.content.SharedPreferences hp = this.storage.getPrefs();
+            long wait = HumanTiming.thinkMillis(this.rng, mean, prompt.length(), choiceChars, this.answered.size(), HumanProfile.sigma(hp), HumanProfile.hesitation(hp), HumanProfile.fatiguePerQuestion(hp));
             due = Long.valueOf(now + wait);
             this.humanDue.put(key, due);
             QuietJson put = new QuietJson().put("progress", progress).put("think_ms", wait);
             log("think", put);
+        }
+        return now >= due.longValue();
+    }
+
+    /** A human-like wait before pressing a start button; a no-op unless a wait was measured or set. */
+    private final boolean humanNavReady(String key, long now) {
+        long median = HumanProfile.navMs(this.storage.getPrefs());
+        if (median <= 0) {
+            return true;
+        }
+        Long due = this.humanDue.get(key);
+        if (due == null) {
+            due = Long.valueOf(now + HumanTiming.navMillis(this.rng, median));
+            this.humanDue.put(key, due);
         }
         return now >= due.longValue();
     }
@@ -2255,7 +2327,10 @@ public final class BotEngine {
         Long due = this.humanDue.get(key);
         if (due == null) {
             int mean = this.storage.getPrefs().getInt("human_mean_ms", HumanTiming.MEAN_DEFAULT);
-            due = Long.valueOf(now + HumanTiming.advanceMillis(this.rng, mean));
+            android.content.SharedPreferences hp = this.storage.getPrefs();
+            // ":prompt" is the pause before opening the choices, ":feedback" the pause before swiping on
+            long median = key.endsWith(":prompt") ? HumanProfile.revealMs(hp, mean) : HumanProfile.advanceMs(hp, mean);
+            due = Long.valueOf(now + HumanTiming.pauseMillis(this.rng, median));
             this.humanDue.put(key, due);
         }
         return now >= due.longValue();
