@@ -1,6 +1,6 @@
 # 인계 문서 (다른 에이전트/개발자용)
 
-> 작성 시점 버전: **1.5** (versionCode 54, 앱 이름 MiMiC). V1.5만 **auth(인증 있음)/noauth(인증 없음) 두 flavor**로 빌드했고, **V1.6부터는 auth만 빌드**한다 (`gradle :app:assembleAuthDebug` → MiMiC-V<버전>-auth.apk). noauth는 applicationId `net.classcardauto.mobile.noauth`, 인증 키 불필요(비밀번호는 동일). auth는 기존 applicationId `net.classcardauto.mobile.nocert`를 유지(덮어 설치·발급 키 유효). 둘 다 `BuildConfig.AUTH_REQUIRED`로 갈림. 사용자 응답 언어는 **한국어**, 군더더기 없이 결과물 우선.
+> 작성 시점 버전: **1.6** (versionCode 55, auth만 빌드). V1.5만 **auth(인증 있음)/noauth(인증 없음) 두 flavor**로 빌드했고, **V1.6부터는 auth만 빌드**한다 (`gradle :app:assembleAuthDebug` → MiMiC-V<버전>-auth.apk). noauth는 applicationId `net.classcardauto.mobile.noauth`, 인증 키 불필요(비밀번호는 동일). auth는 기존 applicationId `net.classcardauto.mobile.nocert`를 유지(덮어 설치·발급 키 유효). 둘 다 `BuildConfig.AUTH_REQUIRED`로 갈림. 사용자 응답 언어는 **한국어**, 군더더기 없이 결과물 우선.
 > V1.0: 사용자가 기기에서 시험을 해 보고 "다 테스트 통과"라고 보고함(0.7 기준, 세부 결과는 사용자 진술이며 이 저장소에 기록 없음). 아래 "미검증" 항목은 그 이전 시점의 목록이니, 사용자 보고와 다르면 사용자에게 확인할 것.
 
 ## 1. 이게 뭔가
@@ -84,3 +84,4 @@
 0.6.24 시작 전 잠금 경고 / 0.6.25 패널에서 오답 수 조절 / 0.6.26 OCR 촬영 시 패널 가림 방지.
 0.7 (=0.6.38) 이름 MiMiC·아이콘·시험/수집 중 가장자리 막대·설정 펼침 패널·응답 시간 0.5~8초(기본 1초) 등 반영.
 1.0 = 0.7과 같은 코드(버전 표기만 변경). 사용자 기기 테스트 통과 보고 후 확정.
+1.6 안정성: ① 클래스카드가 3초 이상 안 보이거나 화면이 잠기면 중지 대신 **자동 대기**(BotEngine.autoHold, 진동 알림) → 돌아와 1.2초 보이면 자동 재개(resumeAuto, 8초 미만 이탈이면 추측/개입 표시 없이 이어감), 자동 대기 최대 `limit_hold_seconds`(기본 180초) 초과 시 중지 ② 단어 수집 중 사용자 터치는 읽던 페이지 상태를 버리고 1.5초 대기(registerCollectionTouch) ③ 탭 직전 대상 노드 재확인(BotService.targetStillThere, 24px 이내, 2회까지 건너뛰고 3번째는 그대로 진행) ④ 워치독(BotEngine.watchdog: 시험 30초 재동기화/60초 중지, 수집 90초/180초) ⑤ 화면 회전 시 재동기화(onConfigurationChanged) ⑥ 진동 알림(`vibrate_alerts`, VIBRATE 권한; 대기=짧게 2번, 중지·오류=길게 1번, 완료=짧게 2번+길게). 전부 JVM 테스트 불가 영역이라 **기기 검증 필요**.

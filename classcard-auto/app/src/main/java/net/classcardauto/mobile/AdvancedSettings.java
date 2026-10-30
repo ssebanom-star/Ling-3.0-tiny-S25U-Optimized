@@ -33,6 +33,9 @@ public final class AdvancedSettings {
     /** How many touches by the user during the test pause the run. */
     public static final int TOUCH_MIN = 1, TOUCH_MAX = 5, TOUCH_DEFAULT = 2, TOUCH_STEP = 1;
 
+    /** How long the run waits on its own (ClassCard out of sight, screen locked) before it gives up, in seconds. */
+    public static final int HOLD_MIN = 30, HOLD_MAX = 600, HOLD_DEFAULT = 180, HOLD_STEP = 30;
+
     // ---- deliberate mistakes ----
     public static final int WRONG_MIN = 0, WRONG_MAX = 20, WRONG_DEFAULT = 0, WRONG_STEP = 1;
 
@@ -46,6 +49,7 @@ public final class AdvancedSettings {
     private static final String K_GATE = "limit_gate_ms";
     private static final String K_WRONG = "wrong_count";
     private static final String K_TOUCH = "limit_touch_pause";
+    private static final String K_HOLD = "limit_hold_seconds";
 
     static int clamp(int v, int lo, int hi) {
         return Math.max(lo, Math.min(hi, v));
@@ -89,6 +93,14 @@ public final class AdvancedSettings {
 
     public static void setTouchPauseCount(SharedPreferences p, int v) {
         p.edit().putInt(K_TOUCH, clamp(v, TOUCH_MIN, TOUCH_MAX)).apply();
+    }
+
+    public static int holdSeconds(SharedPreferences p) {
+        return clamp(p.getInt(K_HOLD, HOLD_DEFAULT), HOLD_MIN, HOLD_MAX);
+    }
+
+    public static void setHoldSeconds(SharedPreferences p, int v) {
+        p.edit().putInt(K_HOLD, clamp(v, HOLD_MIN, HOLD_MAX)).apply();
     }
 
     public static int wrongCount(SharedPreferences p) {
@@ -136,7 +148,7 @@ public final class AdvancedSettings {
     }
 
     public static void resetLimits(SharedPreferences p) {
-        p.edit().remove(K_RUN).remove(K_PHASE).remove(K_SCROLL).remove(K_RETRY).remove(K_GATE).remove(K_TOUCH).apply();
+        p.edit().remove(K_RUN).remove(K_PHASE).remove(K_SCROLL).remove(K_RETRY).remove(K_GATE).remove(K_TOUCH).remove(K_HOLD).apply();
     }
 
     /** Pushes the matching settings into {@link Matcher}; called when a run's solver is created. */

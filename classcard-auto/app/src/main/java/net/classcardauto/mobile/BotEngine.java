@@ -1466,6 +1466,7 @@ public final class BotEngine {
                 this.active = false;
                 this.epoch++;
                 String wrongNote = this.wrongSet != null ? " · 의도한 오답 " + this.wrongSet.size() + "개 중 " + this.wrongPick.size() + "개 실행" : "";
+                this.service.alert(2);
                 this.service.setStatus(str3 + " · " + this.answered.size() + "문항 완료" + wrongNote);
             }
         }
@@ -1678,6 +1679,8 @@ public final class BotEngine {
         this.natural = this.storage.getPrefs().getBoolean("natural", false);
         this.human = this.storage.getPrefs().getBoolean("human_like", false);
         this.wrongSet = null;
+        this.autoPaused = false;
+        this.watchStamp = "";
         this.wrongOwed = 0;
         this.wrongSkipped.clear();
         this.wrongPick.clear();
@@ -1742,6 +1745,7 @@ public final class BotEngine {
             writeSummary$default(this, "error", reason, null, failure, 4, null);
             this.active = false;
             this.epoch++;
+            this.service.alert(1);
             this.service.setStatus(reason);
         }
     }
@@ -1830,6 +1834,21 @@ public final class BotEngine {
      * may have moved on or answered by hand while paused).
      */
     public final void resume() {
+        this.autoPaused = false;
+        resumeInternal(true);
+    }
+
+    /** Resume after the run held itself (ClassCard out of sight / screen locked); a short absence changes nothing else. */
+    public final void resumeAuto() {
+        if (!isAutoPaused()) {
+            return;
+        }
+        long held = SystemClock.elapsedRealtime() - this.autoPausedAt;
+        this.autoPaused = false;
+        resumeInternal(held >= 8000);
+    }
+
+    private final void resumeInternal(boolean strict) {
         long pausedFor = this.pauseState.resume(SystemClock.elapsedRealtime());
         if (pausedFor < 0 || !this.active) {
             return;
@@ -1844,11 +1863,105 @@ public final class BotEngine {
         this.collectionReadPending = false;
         this.gate = new SwipeGate(AdvancedSettings.gateMs(this.storage.getPrefs()), 2);
         this.service.markScreenSeen();
-        this.intervened = true;
-        this.guessNext = true;
+        this.watchStamp = "";
+        this.collectionStability.reset();
+        this.inlineStability.reset();
+        this.previousSignature = "";
+        this.unchanged = 0;
+        if (strict) {
+            // someone may have moved on or answered by hand: do not trust the old question, guess the first unresolved one
+            this.intervened = true;
+            this.guessNext = true;
+        }
         QuietJson put = new QuietJson().put("paused_ms", pausedFor).put("phase", this.phase);
         log("resumed", put);
-        this.service.setStatus("재개했어요");
+        this.service.setStatus(strict ? "재개했어요" : "자동으로 이어서 진행해요");
+    }
+
+    // ---- stability: self-hold when ClassCard is out of sight, watchdog, collection touch resync ----
+
+    private boolean autoPaused;
+    private long autoPausedAt;
+    private String watchStamp = "";
+    private long watchSince;
+    private boolean watchResynced;
+
+    public final boolean isAutoPaused() {
+        return this.active && this.autoPaused && this.pauseState.isPaused();
+    }
+
+    public final long autoPausedFor(long now) {
+        return isAutoPaused() ? now - this.autoPausedAt : 0L;
+    }
+
+    /** Waits (instead of stopping) while ClassCard cannot be seen or the screen is locked; resumes by itself later. */
+    public final void autoHold(String reason) {
+        if (!this.active || this.pauseState.isPaused()) {
+            return;
+        }
+        pause(reason);
+        if (this.pauseState.isPaused()) {
+            this.autoPaused = true;
+            this.autoPausedAt = SystemClock.elapsedRealtime();
+            this.service.alert(0);
+        }
+    }
+
+    /** A finger touched the screen while words were being collected: forget the half-read page and wait a moment. */
+    public final void registerCollectionTouch() {
+        if (!this.active || this.pauseState.isPaused() || this.phase == null || !this.phase.startsWith("collect")) {
+            return;
+        }
+        this.previousSignature = "";
+        this.unchanged = 0;
+        this.collectionReadPending = false;
+        this.inlineStability.reset();
+        this.collectionStability.reset();
+        this.service.hold(1500L);
+        log("collection_touch", new QuietJson().put("phase", this.phase));
+    }
+
+    /** Screen rotated or similar: positions changed, so drop in-flight state and look again. */
+    public final void resyncAfterChange() {
+        if (this.active) {
+            resync();
+        }
+    }
+
+    private final void resync() {
+        this.humanDue.clear();
+        this.pending = null;
+        this.collectionReadPending = false;
+        this.previousSignature = "";
+        this.unchanged = 0;
+        this.inlineStability.reset();
+        this.collectionStability.reset();
+        this.gate = new SwipeGate(AdvancedSettings.gateMs(this.storage.getPrefs()), 2);
+        this.service.markScreenSeen();
+        log("resync", new QuietJson().put("phase", this.phase));
+    }
+
+    /** Nothing moved for a long time: first look again, then give up with a clear reason. */
+    private final void watchdog(long now) {
+        String stamp = this.phase + "|" + this.lastProgress + "|" + this.answered.size() + "|" + this.collected.size() + "|" + this.scrolls + "|" + (this.pending != null) + "|" + this.humanDue.size() + "|" + this.guessPick.size();
+        if (!stamp.equals(this.watchStamp)) {
+            this.watchStamp = stamp;
+            this.watchSince = now;
+            this.watchResynced = false;
+            return;
+        }
+        long idle = now - this.watchSince;
+        // word collection can scroll for a long time without any of the counted values changing
+        boolean collecting = this.phase != null && this.phase.startsWith("collect");
+        long resyncAfter = collecting ? 90000L : 30000L;
+        long giveUpAfter = collecting ? 180000L : 60000L;
+        if (idle > giveUpAfter) {
+            throw new IllegalStateException("진행이 멈춰서 중지했습니다 (같은 화면에서 " + (giveUpAfter / 1000) + "초 변화 없음)");
+        }
+        if (idle > resyncAfter && !this.watchResynced) {
+            this.watchResynced = true;
+            resync();
+        }
     }
 
     /** A touch by the user during the test; pauses the run when the configured number is reached. */
@@ -2055,6 +2168,9 @@ public final class BotEngine {
             writeSummary$default(this, "stopped", reason, null, null, 12, null);
             this.active = false;
             this.epoch++;
+            if (!reason.startsWith("사용자")) {
+                this.service.alert(1);
+            }
             this.service.setStatus(reason);
         }
     }
@@ -2069,6 +2185,7 @@ public final class BotEngine {
             return;
         }
         if (this.active) {
+            watchdog(now);
             if (now - this.started >= runLimitMs()) {
                 throw new IllegalStateException(("실행 제한 시간(" + (runLimitMs() / 1000) + "초)을 초과했습니다.").toString());
             }

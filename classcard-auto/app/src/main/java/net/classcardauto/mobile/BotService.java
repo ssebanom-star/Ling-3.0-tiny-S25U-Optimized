@@ -144,11 +144,15 @@ public final class BotService extends AccessibilityService {
                     Object systemService2 = BotService.this.getSystemService("keyguard");
                     Intrinsics.checkNotNull(systemService2, "null cannot be cast to non-null type android.app.KeyguardManager");
                     if (!((PowerManager) systemService).isInteractive() || ((KeyguardManager) systemService2).isKeyguardLocked()) {
-                        BotService.this.stop("화면이 잠겨 중지했습니다.");
+                        // wait instead of giving up; the run continues once the screen is back
+                        BotService.this.getEngine().autoHold("화면이 잠겼어요 · 켜면 이어서 진행해요");
                     } else {
                         j2 = BotService.this.armUntil;
                         if (BotService.this.getEngine().isPaused()) {
-                            // paused: the user is in control, do not touch the screen
+                            // paused: the user is in control, do not touch the screen; a self-hold ends when ClassCard is back
+                            if (BotService.this.getEngine().isAutoPaused()) {
+                                BotService.this.autoResumeCheck(elapsedRealtime);
+                            }
                         } else if (elapsedRealtime < j2) {
                             BotService botService = BotService.this;
                             j5 = botService.armUntil;
@@ -161,8 +165,8 @@ public final class BotService extends AccessibilityService {
                                     List<UiNode> readScreen = BotService.this.readScreen();
                                     if (readScreen.isEmpty()) {
                                         j4 = BotService.this.lastActive;
-                                        if (elapsedRealtime - j4 > 5000) {
-                                            BotService.this.stop("클래스카드 화면이 보이지 않아 중지했습니다.");
+                                        if (elapsedRealtime - j4 > 3000) {
+                                            BotService.this.getEngine().autoHold("클래스카드 화면이 보이지 않아요 · 돌아오면 이어서 진행해요");
                                         }
                                     } else {
                                         BotService.this.lastActive = elapsedRealtime;
@@ -179,6 +183,12 @@ public final class BotService extends AccessibilityService {
                         BotService.this.idleCheckedAt = SystemClock.elapsedRealtime();
                         BotService.this.currentStartAllowed = SetsKt.setOf((Object[]) new CurrentEntry[]{CurrentEntry.SET, CurrentEntry.PREVIEW}).contains(CoreKt.currentEntry(BotService.this.readScreen()));
                         BotService.this.refreshOverlay();
+                    }
+                }
+                if (BotService.this.getEngine().isAutoPaused()) {
+                    long heldMs = BotService.this.getEngine().autoPausedFor(SystemClock.elapsedRealtime());
+                    if (heldMs > AdvancedSettings.holdSeconds(BotService.this.getStorage().getPrefs()) * 1000L) {
+                        BotService.this.stop("자동 대기 시간이 지나 중지했습니다.");
                     }
                 }
             } catch (Exception e) {
@@ -365,7 +375,7 @@ public final class BotService extends AccessibilityService {
             // the blocking layer already swallows (and counts) these
             return;
         }
-        if (!e.isInTest() || e.isPaused()) {
+        if ((!e.isInTest() && !e.getCollecting()) || e.isPaused()) {
             return;
         }
         if (this.busy || SystemClock.uptimeMillis() - this.lastGestureEnd < 150) {
@@ -379,8 +389,13 @@ public final class BotService extends AccessibilityService {
                     return;
                 }
                 BotEngine engine = BotService.this.getEngine();
-                if (engine.isInTest() && !engine.isPaused()) {
+                if (engine.isPaused()) {
+                    return;
+                }
+                if (engine.isInTest()) {
                     engine.registerUserTouch();
+                } else if (engine.getCollecting()) {
+                    engine.registerCollectionTouch();
                 }
             }
         }, 40L);
@@ -414,6 +429,68 @@ public final class BotService extends AccessibilityService {
     }
 
     private boolean snappedForTest;
+    private long visibleSince;
+    private UiNode verifyTarget;
+    private int verifyAborts;
+
+    /** While self-held: once ClassCard has been on screen for a moment, carry on. */
+    private final void autoResumeCheck(long now) {
+        if (this.busy) {
+            return;
+        }
+        List<UiNode> nodes = readScreen();
+        if (nodes.isEmpty()) {
+            this.visibleSince = 0;
+            return;
+        }
+        if (this.visibleSince == 0) {
+            this.visibleSince = now;
+        }
+        if (now - this.visibleSince >= 1200) {
+            this.visibleSince = 0;
+            getEngine().resumeAuto();
+        }
+    }
+
+    /** True when the node that was about to be tapped is still on screen at (nearly) the same place. */
+    private final boolean targetStillThere(UiNode wanted) {
+        for (UiNode n : readScreen()) {
+            if (java.util.Objects.equals(n.getId(), wanted.getId()) && n.getText().equals(wanted.getText())) {
+                Bounds a = n.getBounds();
+                Bounds b = wanted.getBounds();
+                if (Math.abs(a.getX() - b.getX()) <= 24 && Math.abs(a.getY() - b.getY()) <= 24) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Short vibration patterns: 0 = waiting, 1 = stopped/failed, 2 = finished. */
+    public final void alert(int kind) {
+        if (this.storage == null || !getStorage().getPrefs().getBoolean("vibrate_alerts", true)) {
+            return;
+        }
+        try {
+            android.os.Vibrator vibrator = (android.os.Vibrator) getSystemService("vibrator");
+            if (vibrator == null || !vibrator.hasVibrator()) {
+                return;
+            }
+            long[] pattern = kind == 0 ? new long[]{0, 120, 120, 120} : (kind == 1 ? new long[]{0, 450} : new long[]{0, 80, 100, 80, 100, 220});
+            vibrator.vibrate(android.os.VibrationEffect.createWaveform(pattern, -1));
+        } catch (Exception ignored) {
+        }
+    }
+
+    @Override
+    public void onConfigurationChanged(android.content.res.Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        if (this.engine != null && getEngine().getActive()) {
+            getEngine().resyncAfterChange();
+            hold(1200L);
+        }
+        snapPanelToEdge();
+    }
     private boolean panelPassThrough;
 
     /** True when a gesture from (x1,y1) to (x2,y2) would be delivered to the floating panel instead of the app below. */
@@ -578,6 +655,19 @@ public final class BotService extends AccessibilityService {
             });
             return;
         }
+        UiNode verify = botService.verifyTarget;
+        botService.verifyTarget = null;
+        if (verify != null && !botService.targetStillThere(verify) && ++botService.verifyAborts < 3) {
+            // the screen moved under us: skip this tap, the engine looks again on its next pass
+            botService.finishGesture(j, 60L, new Function0() {
+                @Override
+                public Object invoke() {
+                    return Unit.INSTANCE;
+                }
+            });
+            return;
+        }
+        botService.verifyAborts = 0;
         try {
             BotService$gesture$3$accepted$1 accepted = new BotService$gesture$3$accepted$1(botService, j, i2, function0);
             if (botService.dispatchGesture(gestureDescription, accepted, botService.handler)) {
@@ -1232,12 +1322,18 @@ public final class BotService extends AccessibilityService {
             throw new IllegalStateException("유효하지 않은 터치 위치입니다.".toString());
         }
         Bounds b = target.getBounds();
-        if (getEngine().isHuman() && !precise) {
-            java.util.Random rng = getEngine().getRng();
-            float[] p = HumanTiming.tapPoint(rng, b.getLeft(), b.getTop(), b.getRight(), b.getBottom());
-            gesture(p[0], p[1], p[0], p[1], HumanTiming.tapDurationMs(rng), after);
-            return;
+        this.verifyTarget = target;
+        try {
+            if (getEngine().isHuman() && !precise) {
+                java.util.Random rng = getEngine().getRng();
+                float[] p = HumanTiming.tapPoint(rng, b.getLeft(), b.getTop(), b.getRight(), b.getBottom());
+                gesture(p[0], p[1], p[0], p[1], HumanTiming.tapDurationMs(rng), after);
+                return;
+            }
+            gesture(b.getX(), b.getY(), b.getX(), b.getY(), precise ? 70L : 45L, after);
+        } catch (RuntimeException e) {
+            this.verifyTarget = null;
+            throw e;
         }
-        gesture(b.getX(), b.getY(), b.getX(), b.getY(), precise ? 70L : 45L, after);
     }
 }

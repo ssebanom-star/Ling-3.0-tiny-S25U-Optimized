@@ -389,6 +389,13 @@ public final class Screens {
                     return Unit.INSTANCE;
                 }
             }, false), lp(c, 16));
+            card.addView(s.sliderRow(c, "자동 대기 최대 시간(화면 이탈·잠김)", "초", AdvancedSettings.HOLD_MIN, AdvancedSettings.HOLD_MAX, AdvancedSettings.HOLD_STEP, AdvancedSettings.holdSeconds(p), new Function1<Integer, Unit>() {
+                @Override
+                public Unit invoke(Integer v) {
+                    AdvancedSettings.setHoldSeconds(p, v.intValue());
+                    return Unit.INSTANCE;
+                }
+            }, false), lp(c, 16));
             card.addView(s.sliderRow(c, "단어 수집 스크롤 최대 횟수", "회", AdvancedSettings.SCROLL_MIN, AdvancedSettings.SCROLL_MAX, AdvancedSettings.SCROLL_STEP, AdvancedSettings.scrollSteps(p), new Function1<Integer, Unit>() {
                 @Override
                 public Unit invoke(Integer v) {
@@ -471,6 +478,7 @@ public final class Screens {
         AppStyle s = AppStyle.INSTANCE;
         parent.addView(panelSwitch(c, "사람처럼 입력", p.getBoolean("human_like", false), "human_like", p), lp(c, 2));
         parent.addView(panelSwitch(c, "실행 중 화면 터치 잠금", p.getBoolean("touch_lock", true), "touch_lock", p), lp(c, 2));
+        parent.addView(panelSwitch(c, "멈추면 진동으로 알림", p.getBoolean("vibrate_alerts", true), "vibrate_alerts", p), lp(c, 2));
         parent.addView(s.sliderRow(c, "평균 응답 시간", "ms", HumanTiming.MEAN_MIN, HumanTiming.MEAN_MAX, HumanTiming.MEAN_STEP, p.getInt("human_mean_ms", HumanTiming.MEAN_DEFAULT), new Function1<Integer, Unit>() {
             @Override
             public Unit invoke(Integer v) {
@@ -571,6 +579,13 @@ public final class Screens {
             @Override
             public void onCheckedChanged(CompoundButton b, boolean checked) {
                 p.edit().putBoolean("touch_lock", checked).apply();
+            }
+        }));
+        lockCard.addView(s.divider(c));
+        lockCard.addView(s.switchRow(c, "멈추면 진동으로 알림", "클래스카드 화면을 벗어나거나 중지·완료·오류로 끝났을 때 짧게 진동합니다.", p.getBoolean("vibrate_alerts", true), new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton b, boolean checked) {
+                p.edit().putBoolean("vibrate_alerts", checked).apply();
             }
         }));
         add(content, lockCard, 8);
