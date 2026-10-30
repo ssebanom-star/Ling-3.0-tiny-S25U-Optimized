@@ -641,7 +641,7 @@ public final class Screens {
                 parent.addView(panelNote(c, "처음 단어를 모을 때 목록을 넘기는 방식이에요."), lp(c, 8));
                 parent.addView(panelSwitch(c, "끝에서 멈춰 관성 막기", p.getBoolean("collect_end_hold", true), "collect_end_hold", p), lp(c, 6));
                 parent.addView(panelNote(c, "손을 떼기 전 0.15초 멈춰서, 설정한 범위만큼만 넘어가요."), lp(c, 0));
-                parent.addView(panelSwitch(c, "수집 중 스와이프 표시", p.getBoolean("collect_show_swipe", true), "collect_show_swipe", p), lp(c, 6));
+                parent.addView(panelSwitch(c, "수집 중 스와이프 표시", p.getBoolean("collect_show_swipe", false), "collect_show_swipe", p), lp(c, 6));
                 TextView preview = s.label(c, "화면에서 미리 보기", 12.0f, -1, true);
                 preview.setGravity(Gravity.CENTER);
                 preview.setBackground(s.roundRect(c, android.graphics.Color.argb(34, 255, 255, 255), 999, 0));

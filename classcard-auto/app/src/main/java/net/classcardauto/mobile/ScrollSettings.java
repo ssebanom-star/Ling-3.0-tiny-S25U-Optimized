@@ -9,7 +9,7 @@ import android.content.SharedPreferences;
  */
 public final class ScrollSettings {
     public static final int RANGE_MIN = 20;
-    public static final int RANGE_MAX = 60;
+    public static final int RANGE_MAX = 85;
     public static final int RANGE_DEFAULT = 45;
     public static final int RANGE_STEP = 5;
 

@@ -1432,7 +1432,7 @@ public final class BotService extends AccessibilityService {
         float toY = bounds.getTop() + (bounds.getHeight() * span[1]);
         Function0<Unit> done = after;
         final SwipeGuide guide = this.swipeGuide;
-        if (guide != null && prefs.getBoolean("collect_show_swipe", true)) {
+        if (guide != null && prefs.getBoolean("collect_show_swipe", false)) {
             guide.show(x, fromY, toY, scrollMs + 32L, endHold + 400L, ScrollSettings.rangePercent(prefs) + "%");
             final Function0<Unit> original = after;
             // gone before the engine reads the screen again
