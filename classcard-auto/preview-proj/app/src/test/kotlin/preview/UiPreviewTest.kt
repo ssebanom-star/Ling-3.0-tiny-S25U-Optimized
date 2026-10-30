@@ -365,4 +365,21 @@ class UiPreviewTest {
         p.setCalibrating(true, "3 / 8문항 기록됨 · 3문항부터 반영할 수 있어요.")
         paparazzi.snapshot(overBackdrop(p), "overlay_measure")
     }
+
+    @Test
+    fun overlayRunThenFail() {
+        for (tab in 0 until 4) {
+            val prefs = MemoryPrefs()
+            prefs.edit().putInt("panel_tab", tab).putBoolean("human_like", true).apply()
+            val p = FloatingPanel(paparazzi.context, prefs, host())
+            p.render(false, "", true, false)
+            p.render(true, "3/20 · 2개 입력", false, false)
+            p.renderRun(false, 0, 2, true, true, 0)
+            p.setRemaining(300)
+            p.render(false, "답 입력 제한 시간이 지났습니다: 3/20", true, false)
+            p.setCalibrating(false, "")
+            p.renderRun(false, 0, 2, false, false, 0)
+            if (tab == 1) paparazzi.snapshot(overBackdrop(p), "overlay_after_fail")
+        }
+    }
 }

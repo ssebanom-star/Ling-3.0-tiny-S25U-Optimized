@@ -452,6 +452,13 @@ public final class Screens {
                     return Unit.INSTANCE;
                 }
             }, false), lp(c, 16));
+            card.addView(s.sliderRow(c, "문항당 최대 응답 시간", "초", AdvancedSettings.QCAP_MIN, AdvancedSettings.QCAP_MAX, AdvancedSettings.QCAP_STEP, AdvancedSettings.questionCapSeconds(p), new Function1<Integer, Unit>() {
+                @Override
+                public Unit invoke(Integer v) {
+                    AdvancedSettings.setQuestionCapSeconds(p, v.intValue());
+                    return Unit.INSTANCE;
+                }
+            }, false), lp(c, 16));
             card.addView(s.sliderRow(c, "단어 수집 스크롤 최대 횟수", "회", AdvancedSettings.SCROLL_MIN, AdvancedSettings.SCROLL_MAX, AdvancedSettings.SCROLL_STEP, AdvancedSettings.scrollSteps(p), new Function1<Integer, Unit>() {
                 @Override
                 public Unit invoke(Integer v) {
@@ -589,6 +596,14 @@ public final class Screens {
                     }
                 }, true), lp(c, 8));
                 parent.addView(panelNote(c, "실제 시험에 나온 문항 중에서 무작위로 골라 틀려요."), lp(c, 2));
+                parent.addView(s.sliderRow(c, "문항당 최대 응답 시간", "초", AdvancedSettings.QCAP_MIN, AdvancedSettings.QCAP_MAX, AdvancedSettings.QCAP_STEP, AdvancedSettings.questionCapSeconds(p), new Function1<Integer, Unit>() {
+                    @Override
+                    public Unit invoke(Integer v) {
+                        AdvancedSettings.setQuestionCapSeconds(p, v.intValue());
+                        return Unit.INSTANCE;
+                    }
+                }, true), lp(c, 10));
+                parent.addView(panelNote(c, "랜덤 시간이 길게 뽑혀도 이 안에 답해요. 클래스카드 문항 제한시간보다 짧게 두세요."), lp(c, 2));
                 parent.addView(s.sliderRow(c, "최대 실행 시간", "초", AdvancedSettings.RUN_MIN, AdvancedSettings.RUN_MAX, AdvancedSettings.RUN_STEP, AdvancedSettings.runLimitSeconds(p), new Function1<Integer, Unit>() {
                     @Override
                     public Unit invoke(Integer v) {

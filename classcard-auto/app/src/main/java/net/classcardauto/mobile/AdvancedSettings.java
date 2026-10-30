@@ -37,6 +37,18 @@ public final class AdvancedSettings {
     public static final int HOLD_MIN = 30, HOLD_MAX = 600, HOLD_DEFAULT = 180, HOLD_STEP = 30;
 
     // ---- deliberate mistakes ----
+    /** Longest time from a question appearing to answering it (s); keep it under ClassCard's own per-question limit. */
+    public static final int QCAP_MIN = 2, QCAP_MAX = 20, QCAP_DEFAULT = 5, QCAP_STEP = 1;
+    private static final String K_QCAP = "limit_question_seconds";
+
+    public static int questionCapSeconds(SharedPreferences p) {
+        return clamp(p.getInt(K_QCAP, QCAP_DEFAULT), QCAP_MIN, QCAP_MAX);
+    }
+
+    public static void setQuestionCapSeconds(SharedPreferences p, int v) {
+        p.edit().putInt(K_QCAP, clamp(v, QCAP_MIN, QCAP_MAX)).apply();
+    }
+
     public static final int WRONG_MIN = 0, WRONG_MAX = 20, WRONG_DEFAULT = 0, WRONG_STEP = 1;
 
     private static final String K_FUZZY = "match_fuzzy_percent";
@@ -148,7 +160,7 @@ public final class AdvancedSettings {
     }
 
     public static void resetLimits(SharedPreferences p) {
-        p.edit().remove(K_RUN).remove(K_PHASE).remove(K_SCROLL).remove(K_RETRY).remove(K_GATE).remove(K_TOUCH).remove(K_HOLD).apply();
+        p.edit().remove(K_QCAP).remove(K_RUN).remove(K_PHASE).remove(K_SCROLL).remove(K_RETRY).remove(K_GATE).remove(K_TOUCH).remove(K_HOLD).apply();
     }
 
     /** Pushes the matching settings into {@link Matcher}; called when a run's solver is created. */

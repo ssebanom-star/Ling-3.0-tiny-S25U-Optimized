@@ -199,17 +199,24 @@ public final class BotService extends AccessibilityService {
                         BotService.this.stop("자동 대기 시간이 지나 중지했습니다.");
                     }
                 }
-            } catch (Exception e) {
-                BotEngine engine = BotService.this.getEngine();
-                String message = e.getMessage();
-                if (message == null) {
-                    message = e.getClass().getSimpleName();
+            } catch (Throwable e) {
+                try {
+                    BotEngine engine = BotService.this.getEngine();
+                    String message = e.getMessage();
+                    if (message == null) {
+                        message = e.getClass().getSimpleName();
+                    }
+                    AnswerResolutionException answerResolutionException = e instanceof AnswerResolutionException ? (AnswerResolutionException) e : null;
+                    engine.fail(message, answerResolutionException != null ? answerResolutionException.getFailure() : null);
+                } catch (Throwable second) {
+                    // the failure path itself broke (e.g. while redrawing the panel): stop quietly and keep the service alive
+                    BotService.this.recordCrash(second);
+                    BotService.this.getEngine().forceStop();
                 }
-                Intrinsics.checkNotNull(message);
-                AnswerResolutionException answerResolutionException = e instanceof AnswerResolutionException ? (AnswerResolutionException) e : null;
-                engine.fail(message, answerResolutionException != null ? answerResolutionException.getFailure() : null);
+            } finally {
+                BotService.this.getHandler().removeCallbacks(this);
+                BotService.this.getHandler().postDelayed(this, 100L);
             }
-            BotService.this.getHandler().postDelayed(this, 100L);
         }
     };
 
@@ -1231,10 +1238,45 @@ public final class BotService extends AccessibilityService {
         stop("접근성 서비스 중단");
     }
 
+    /** Writes one failure record for an unexpected exception: its type, message and the app frames it passed through. */
+    final void recordCrash(Throwable e) {
+        try {
+            FailureLog.Record record = new FailureLog.Record();
+            record.time = System.currentTimeMillis();
+            record.code = "CRASH";
+            StringBuilder where = new StringBuilder(e.getClass().getSimpleName());
+            if (e.getMessage() != null) {
+                where.append(": ").append(e.getMessage().length() > 80 ? e.getMessage().substring(0, 80) : e.getMessage());
+            }
+            int frames = 0;
+            for (StackTraceElement el : e.getStackTrace()) {
+                if (el.getClassName().startsWith("net.classcardauto") && frames < 3) {
+                    String cls = el.getClassName().substring(el.getClassName().lastIndexOf('.') + 1);
+                    where.append(" @ ").append(cls).append('.').append(el.getMethodName()).append(':').append(el.getLineNumber());
+                    frames++;
+                }
+            }
+            record.message = where.toString();
+            record.phase = this.engine != null ? String.valueOf(getEngine().getPhase()) : "";
+            FailureLog.append(getStorage().getRoot(), record);
+        } catch (Throwable ignored) {
+        }
+    }
+
     @Override // android.accessibilityservice.AccessibilityService
     protected void onServiceConnected() {
         this.destroyed = false;
         instance = this;
+        final Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+            @Override
+            public void uncaughtException(Thread t, Throwable e) {
+                recordCrash(e);
+                if (previous != null) {
+                    previous.uncaughtException(t, e);
+                }
+            }
+        });
         BotService botService = this;
         setStorage(new Storage(botService));
         setProfile(new UiProfile(botService));

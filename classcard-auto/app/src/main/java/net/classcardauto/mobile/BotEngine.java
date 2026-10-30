@@ -1410,6 +1410,9 @@ public final class BotEngine {
                             }
                         }
                         this.service.setStatus(intValue + "/" + intValue2 + " · " + this.answered.size() + "개 입력");
+                        if (!this.questionSeen.containsKey(str)) {
+                            this.questionSeen.put(str, Long.valueOf(now));
+                        }
                         if (Intrinsics.areEqual(text4, this.service.getProfile().getReadyMessage()) && !this.answered.contains(str)) {
                             if (humanReady(str, str2, sortedWith, now)) {
                                 inputAnswer(ns, sortedWith, str, str2, now, 1);
@@ -1694,6 +1697,7 @@ public final class BotEngine {
         this.guessNext = false;
         this.guessPick.clear();
         this.humanDue.clear();
+        this.questionSeen.clear();
         this.replace = this.storage.getPrefs().getBoolean("replace", false);
         this.partialChoices = this.storage.getPrefs().getBoolean("partial_choices", false);
         this.started = SystemClock.elapsedRealtime();
@@ -1773,6 +1777,17 @@ public final class BotEngine {
 
     private final java.util.Random rng = new java.util.Random();
     private final java.util.Map<String, Long> humanDue = new java.util.HashMap<>();
+    /** When each question (by progress text) was first seen; the human waits are fitted inside the per-question cap. */
+    private final java.util.Map<String, Long> questionSeen = new java.util.HashMap<>();
+
+    /** Latest time the answer may be tapped for this question, with a safety margin; Long.MAX_VALUE if unknown. */
+    private final long questionDeadline(String progress) {
+        Long seen = this.questionSeen.get(progress);
+        if (seen == null) {
+            return Long.MAX_VALUE;
+        }
+        return seen.longValue() + AdvancedSettings.questionCapSeconds(this.storage.getPrefs()) * 1000L - 700;
+    }
     private boolean human;
     private final PauseState pauseState = new PauseState();
     private boolean intervened;
@@ -1863,6 +1878,7 @@ public final class BotEngine {
             this.testStarted += pausedFor;
         }
         this.humanDue.clear();
+        this.questionSeen.clear();
         this.pending = null;
         this.collectionReadPending = false;
         this.gate = new SwipeGate(AdvancedSettings.gateMs(this.storage.getPrefs()), 2);
@@ -2108,6 +2124,7 @@ public final class BotEngine {
 
     private final void resync() {
         this.humanDue.clear();
+        this.questionSeen.clear();
         this.pending = null;
         this.collectionReadPending = false;
         this.previousSignature = "";
@@ -2297,6 +2314,11 @@ public final class BotEngine {
             android.content.SharedPreferences hp = this.storage.getPrefs();
             int mean = HumanProfile.meanMs(hp);
             long wait = HumanTiming.thinkMillis(this.rng, mean, prompt.length(), choiceChars, this.answered.size(), HumanProfile.sigma(hp), HumanProfile.hesitation(hp), HumanProfile.fatiguePerQuestion(hp));
+            // never let a slow draw run into ClassCard's own time limit for the question
+            long deadline = questionDeadline(progress);
+            if (deadline != Long.MAX_VALUE) {
+                wait = Math.max(150, Math.min(wait, deadline - now));
+            }
             due = Long.valueOf(now + wait);
             this.humanDue.put(key, due);
             QuietJson put = new QuietJson().put("progress", progress).put("think_ms", wait);
@@ -2329,7 +2351,12 @@ public final class BotEngine {
             android.content.SharedPreferences hp = this.storage.getPrefs();
             // ":prompt" is the pause before opening the choices, ":feedback" the pause before swiping on
             long median = key.endsWith(":prompt") ? HumanProfile.revealMs(hp) : HumanProfile.advanceMs(hp);
-            due = Long.valueOf(now + HumanTiming.pauseMillis(this.rng, median));
+            long pause = HumanTiming.pauseMillis(this.rng, median);
+            if (key.endsWith(":prompt")) {
+                // opening the choices may use at most a third of the question's time
+                pause = Math.min(pause, AdvancedSettings.questionCapSeconds(hp) * 1000L / 3);
+            }
+            due = Long.valueOf(now + pause);
             this.humanDue.put(key, due);
         }
         return now >= due.longValue();
@@ -2352,6 +2379,18 @@ public final class BotEngine {
      * screens would be retaining service content, so the call sites stay (they document the flow) but do nothing.
      */
     public final void log(String type, QuietJson data) {
+    }
+
+    /** Last-resort stop when the normal stop/fail path itself threw: just end the run, touch nothing else. */
+    public final void forceStop() {
+        this.active = false;
+        this.epoch++;
+        this.vocabulary = null;
+        this.solver = null;
+        this.pending = null;
+        this.collected.clear();
+        this.questionSeen.clear();
+        this.humanDue.clear();
     }
 
     public final void stop(String reason) {

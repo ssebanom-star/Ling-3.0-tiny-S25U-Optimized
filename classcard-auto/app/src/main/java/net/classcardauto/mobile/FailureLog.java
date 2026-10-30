@@ -181,6 +181,8 @@ public final class FailureLog {
                 return "잘린 보기 부족";
             case "PARTIAL_TIE":
                 return "잘린 보기 동점";
+            case "CRASH":
+                return "앱 오류(강제 종료)";
             default:
                 return "오류";
         }
