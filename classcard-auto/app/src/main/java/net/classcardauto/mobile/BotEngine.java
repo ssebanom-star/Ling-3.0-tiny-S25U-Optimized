@@ -299,7 +299,138 @@ public final class BotEngine {
         this.collectionReusedRows = 0;
         this.observedCollectionWords.clear();
         this.inlineStability.reset();
+        if (expandFirst()) {
+            // 초고속 · 구간 먼저 펼치기: fling to the bottom, open every section from the bottom up, then collect from the top
+            this.expandSince = 0L;
+            this.expandSignature = "";
+            transition("expand_down", "구간 펼치기 · 목록 맨 아래로");
+            return;
+        }
         transition("collect_top", "앱 카드 수집 · 목록 처음으로");
+    }
+
+    private String expandSignature = "";
+    private long expandSince;
+
+    private final boolean expandFirst() {
+        return this.turbo && this.storage.getPrefs().getBoolean("turbo_expand_first", false);
+    }
+
+    /** True once the list has looked the same for {@code ms} (it stopped flinging / relayouting). */
+    private final boolean expandSettled(List<UiNode> ns, long now, long ms) {
+        String sig = signature(ns);
+        if (!sig.equals(this.expandSignature)) {
+            this.expandSignature = sig;
+            this.expandSince = now;
+            return false;
+        }
+        return now - this.expandSince >= ms;
+    }
+
+    /** Big unrestricted swipes down until the list stops moving (the bottom). */
+    private final void expandDown(List<UiNode> ns, long now) {
+        UiNode list;
+        if (!checkCollectionScreen(ns) || (list = id(ns, "recycler_view")) == null || this.service.getBusy()) {
+            return;
+        }
+        Long last = this.lastActions.get("expand-fling");
+        if (last != null && now - last.longValue() < 250) {
+            return;
+        }
+        if (last != null && expandSettled(ns, now, 450)) {
+            String bottom = signature(ns);
+            if (bottom.equals(this.previousSignature)) {
+                // the last fling changed nothing: this is the bottom
+                this.previousSignature = "";
+                this.expandSince = 0L;
+                this.expandSignature = "";
+                transition("expand_up", "구간 펼치기 · 아래부터");
+                return;
+            }
+            this.previousSignature = bottom;
+        } else if (last != null) {
+            return;
+        }
+        int n = this.scrolls;
+        this.scrolls = n + 1;
+        if (n >= 200) {
+            throw new IllegalStateException("구간 펼치기: 목록 끝을 찾지 못했습니다.".toString());
+        }
+        this.lastActions.put("expand-fling", Long.valueOf(now));
+        this.service.flingCollection(list.getBounds(), true, new Function0<Unit>() {
+            @Override
+            public Unit invoke() {
+                return Unit.INSTANCE;
+            }
+        });
+    }
+
+    /** From the bottom: tap the lowest closed section on screen until none is left, then fling up; at the top, collect. */
+    private final void expandUp(List<UiNode> ns, long now) {
+        UiNode list;
+        if (!checkCollectionScreen(ns) || (list = id(ns, "recycler_view")) == null || this.service.getBusy()) {
+            return;
+        }
+        if (!expandSettled(ns, now, 300)) {
+            return;
+        }
+        Bounds area = list.getBounds();
+        UiNode lowest = null;
+        for (UiNode status : ns) {
+            if (!"titleopenstatus".equals(status.getId()) || status.getSelected()) {
+                continue;
+            }
+            for (UiNode term : ns) {
+                if ("term".equals(term.getId()) && Intrinsics.areEqual(term.getRowBounds(), status.getRowBounds())) {
+                    int y = term.getBounds().getY();
+                    if (y >= area.getTop() && y <= area.getBottom() && (lowest == null || y > lowest.getBounds().getY())) {
+                        lowest = term;
+                    }
+                    break;
+                }
+            }
+        }
+        if (lowest != null) {
+            final UiNode target = lowest;
+            act("expand-" + target.getText(), now, new Function0<Unit>() {
+                @Override
+                public Unit invoke() {
+                    BotEngine.this.service.tap(target, new Function0<Unit>() {
+                        @Override
+                        public Unit invoke() {
+                            BotEngine.this.expandSignature = "";
+                            BotEngine.this.service.hold(120L);
+                            return Unit.INSTANCE;
+                        }
+                    });
+                    return Unit.INSTANCE;
+                }
+            });
+            return;
+        }
+        String here = signature(ns);
+        if (here.equals(this.previousSignature)) {
+            // nothing closed on screen and the last fling up changed nothing: this is the top
+            this.previousSignature = "";
+            this.unchanged = 0;
+            this.scrolls = 0;
+            log("sections_expanded", new QuietJson());
+            transition("collect", "단어 양면 수집");
+            return;
+        }
+        this.previousSignature = here;
+        int n = this.scrolls;
+        this.scrolls = n + 1;
+        if (n >= 400) {
+            throw new IllegalStateException("구간 펼치기: 목록 처음을 찾지 못했습니다.".toString());
+        }
+        this.expandSignature = "";
+        this.service.flingCollection(area, false, new Function0<Unit>() {
+            @Override
+            public Unit invoke() {
+                return Unit.INSTANCE;
+            }
+        });
     }
 
     private final Bounds cardBounds(List<UiNode> ns) {
@@ -2504,7 +2635,7 @@ public final class BotEngine {
             if (now - this.started >= runLimitMs()) {
                 throw new IllegalStateException(("실행 제한 시간(" + (runLimitMs() / 1000) + "초)을 초과했습니다.").toString());
             }
-            if (SetsKt.setOf((Object[]) new String[]{"test", "fetch", "collect", "collect_top", "collect_back", "collect_restore"}).contains(this.phase)) {
+            if (SetsKt.setOf((Object[]) new String[]{"test", "fetch", "collect", "collect_top", "collect_back", "collect_restore", "expand_down", "expand_up"}).contains(this.phase)) {
                 obj = "test";
             } else {
                 obj = "test";
@@ -2535,6 +2666,14 @@ public final class BotEngine {
                         return tick$lambda$20$lambda$19;
                     }
                 });
+                return;
+            }
+            if ("expand_down".equals(this.phase)) {
+                expandDown(ns, now);
+                return;
+            }
+            if ("expand_up".equals(this.phase)) {
+                expandUp(ns, now);
                 return;
             }
             String str = this.phase;

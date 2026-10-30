@@ -1442,6 +1442,14 @@ public final class BotService extends AccessibilityService {
         gesture(x, fromY, x + drift, toY, scrollMs, endHold, done);
     }
 
+    /** A big, quick swipe with no hold at the end, so the list flings as far as it goes (구간 펼치기 only). */
+    public final void flingCollection(Bounds bounds, boolean forward, Function0<Unit> after) {
+        float x = bounds.getX();
+        float from = bounds.getTop() + bounds.getHeight() * (forward ? 0.88f : 0.12f);
+        float to = bounds.getTop() + bounds.getHeight() * (forward ? 0.12f : 0.88f);
+        gesture(x, from, x, to, 110L, 0L, after);
+    }
+
     public final void setEngine(BotEngine botEngine) {
         Intrinsics.checkNotNullParameter(botEngine, "<set-?>");
         this.engine = botEngine;

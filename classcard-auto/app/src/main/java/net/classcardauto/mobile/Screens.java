@@ -555,6 +555,8 @@ public final class Screens {
                 parent.addView(panelNote(c, "앱의 대기를 최대한 줄여요. 켜면 사람처럼 입력은 쓰지 않아요."), lp(c, 0));
                 parent.addView(panelSwitch(c, "└ 확인 없이 넘기기", p.getBoolean("turbo_skip_confirm", false), "turbo_skip_confirm", p), lp(c, 4));
                 parent.addView(panelNote(c, "답을 누르자마자 넘겨요. 터치가 안 먹히면 그 문항은 틀려요. 초고속일 때만 동작."), lp(c, 0));
+                parent.addView(panelSwitch(c, "└ 구간 먼저 전부 펼치기", p.getBoolean("turbo_expand_first", false), "turbo_expand_first", p), lp(c, 4));
+                parent.addView(panelNote(c, "수집 전에 맨 아래로 크게 내린 뒤 아래 구간부터 펼치며 올라와요. 초고속일 때만 동작."), lp(c, 0));
                 parent.addView(panelSwitch(c, "사람처럼 입력", p.getBoolean("human_like", false), "human_like", p), lp(c, 8));
                 final TextView estimate = panelNote(c, paceEstimate(p));
                 final LinearLayout meanRow = s.sliderRow(c, "평균 응답 시간", "ms", HumanTiming.MEAN_MIN, HumanTiming.MEAN_MAX, HumanTiming.MEAN_STEP, HumanProfile.meanMs(p, false), new Function1<Integer, Unit>() {
@@ -874,6 +876,13 @@ public final class Screens {
                     @Override
                     public void onCheckedChanged(CompoundButton b, boolean checked) {
                         p.edit().putBoolean("turbo_skip_confirm", checked).apply();
+                    }
+                }), 16);
+                add(humanCard, s.divider(c), 16);
+                add(humanCard, s.switchRow(c, "구간 먼저 전부 펼치기 (초고속 전용)", "단어를 수집하기 전에 목록을 크게 스와이프해 맨 아래까지 내린 뒤, 화면에서 가장 아래 구간부터 눌러 펼치면서 위로 올라옵니다. 맨 위에 도착하면 평소처럼 수집합니다. 아래부터 누르면 위쪽 줄이 밀리지 않아 연달아 누를 수 있습니다.", p.getBoolean("turbo_expand_first", false), new CompoundButton.OnCheckedChangeListener() {
+                    @Override
+                    public void onCheckedChanged(CompoundButton b, boolean checked) {
+                        p.edit().putBoolean("turbo_expand_first", checked).apply();
                     }
                 }), 16);
                 add(humanCard, s.divider(c), 16);
