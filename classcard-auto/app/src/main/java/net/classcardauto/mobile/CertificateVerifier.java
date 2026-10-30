@@ -19,6 +19,27 @@ import org.json.JSONObject;
 public final class CertificateVerifier {
     private final String issuerId;
     private final String publicKey;
+    private String[] phoneRoots = CertificationIssuer.PHONE_ROOTS;
+
+    /** For tests: trusts these phone keys as issuers instead of the build's list. */
+    public CertificateVerifier withPhoneRoots(String[] roots) {
+        this.phoneRoots = roots;
+        return this;
+    }
+
+    /** Short id of a public key (first 8 bytes of the SHA-256 of its DER encoding, hex); names the signing phone in a code. */
+    public static String keyId(String publicKeyBase64) {
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(Base64.getDecoder().decode(publicKeyBase64));
+            StringBuilder out = new StringBuilder();
+            for (int i = 0; i < 8; i++) {
+                out.append(String.format("%02x", digest[i]));
+            }
+            return out.toString();
+        } catch (Exception e) {
+            throw Sneaky.<RuntimeException>rethrow(e);
+        }
+    }
 
     /* JADX WARN: Multi-variable type inference failed */
     public CertificateVerifier() {
@@ -137,6 +158,12 @@ public final class CertificateVerifier {
         if (!check.verify(sig)) {
             throw new IllegalArgumentException("Invalid signature");
         }
+        JSONObject p = checkActivationPayload(body, deviceId, packageName);
+        return new CertifiedDocument(p.getString("issuedAt"), p.getString("number"), "발급자 휴대폰(" + issuer.computerName + " 승인)", "휴대폰 발급", issuer.computerId, deviceId, packageName);
+    }
+
+    /** Common checks of a signed activation payload: kind, device, app, expiry, number. */
+    private final JSONObject checkActivationPayload(byte[] body, String deviceId, String packageName) throws Exception {
         JSONObject p = new JSONObject(new String(body, Charsets.UTF_8));
         if (p.getInt("version") != 1 || !"activation".equals(p.optString("kind", ""))) {
             throw new IllegalArgumentException("Failed requirement.");
@@ -144,8 +171,7 @@ public final class CertificateVerifier {
         if (!Intrinsics.areEqual(p.getString("deviceId"), deviceId) || !Intrinsics.areEqual(p.getString("packageName"), packageName)) {
             throw new IllegalArgumentException("Wrong device or app");
         }
-        String issuedAt = verify$field(p, "issuedAt");
-        OffsetDateTime.parse(issuedAt);
+        OffsetDateTime.parse(verify$field(p, "issuedAt"));
         String expiresAt = p.optString("expiresAt", "");
         if (!expiresAt.isEmpty() && OffsetDateTime.parse(expiresAt).isBefore(OffsetDateTime.now())) {
             throw new IllegalArgumentException("Certificate expired");
@@ -154,13 +180,46 @@ public final class CertificateVerifier {
         if (!Intrinsics.areEqual(UUID.fromString(number).toString(), number)) {
             throw new IllegalArgumentException("Failed requirement.");
         }
-        return new CertifiedDocument(issuedAt, number, "발급자 휴대폰(" + issuer.computerName + " 승인)", "휴대폰 발급", issuer.computerId, deviceId, packageName);
+        return p;
+    }
+
+    /** "MC2." + base64url of {k: key id of the signing phone, p: payload, s: signature}; the phone key is built into the app. */
+    private final CertifiedDocument verifyShortActivation(String code, String deviceId, String packageName) throws Exception {
+        if (code.length() > 4096 || StringsKt.isBlank(deviceId)) {
+            throw new IllegalArgumentException("Failed requirement.");
+        }
+        String raw = code.trim().substring(4).replaceAll("\\s", "");
+        JSONObject outer = new JSONObject(new String(Base64.getUrlDecoder().decode(raw), Charsets.UTF_8));
+        String id = outer.getString("k");
+        String rootKey = null;
+        for (String candidate : this.phoneRoots) {
+            if (keyId(candidate).equals(id)) {
+                rootKey = candidate;
+                break;
+            }
+        }
+        if (rootKey == null) {
+            throw new IllegalArgumentException("Wrong issuing computer");
+        }
+        byte[] body = Base64.getDecoder().decode(outer.getString("p"));
+        byte[] sig = Base64.getDecoder().decode(outer.getString("s"));
+        Signature check = Signature.getInstance("SHA256withECDSA");
+        check.initVerify(KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(Base64.getDecoder().decode(rootKey))));
+        check.update(body);
+        if (!check.verify(sig)) {
+            throw new IllegalArgumentException("Invalid signature");
+        }
+        JSONObject p = checkActivationPayload(body, deviceId, packageName);
+        return new CertifiedDocument(p.getString("issuedAt"), p.getString("number"), "발급자 휴대폰(앱에 등록)", "휴대폰 발급", "phone:" + id, deviceId, packageName);
     }
 
     public final CertifiedDocument verify(String envelope, String deviceId, String packageName) {
         try {
             if (envelope.trim().startsWith("MC1.")) {
                 return verifyActivation(envelope, deviceId, packageName);
+            }
+            if (envelope.trim().startsWith("MC2.")) {
+                return verifyShortActivation(envelope, deviceId, packageName);
             }
             return verify0(envelope, deviceId, packageName);
         } catch (Exception e) {

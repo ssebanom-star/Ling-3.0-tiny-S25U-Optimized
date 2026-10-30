@@ -92,18 +92,36 @@ public final class PhoneIssuer {
         Files.write(certFile(context).toPath(), trimmed.getBytes(StandardCharsets.UTF_8));
     }
 
+    /** True when this phone's key is one of the issuers built into the app, so it can issue short codes without a certificate. */
+    public static boolean isBuiltInIssuer() {
+        try {
+            String mine = publicKey();
+            for (String root : CertificationIssuer.PHONE_ROOTS) {
+                if (root.equals(mine)) {
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
     /** An activation code for {@code targetDevice} (the code the other phone shows), valid for {@code days} (0 = no end). */
     public static String activationCode(Context context, String targetDevice, int days) throws Exception {
         String device = targetDevice.replaceAll("[\\s\\-]", "").toLowerCase(java.util.Locale.ROOT);
         if (!device.matches("[0-9a-z]{8,64}")) {
             throw new IllegalArgumentException("기기 코드 형식이 올바르지 않아요.");
         }
-        File file = certFile(context);
-        if (!file.isFile()) {
-            throw new IllegalStateException("발급자 인증서가 아직 없어요.");
+        boolean builtIn = isBuiltInIssuer();
+        String certText = null;
+        if (!builtIn) {
+            File file = certFile(context);
+            if (!file.isFile()) {
+                throw new IllegalStateException("발급자 인증서가 아직 없어요.");
+            }
+            certText = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+            checkIssuerCert(context, certText);
         }
-        String certText = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
-        checkIssuerCert(context, certText);
         OffsetDateTime now = OffsetDateTime.now().withNano(0);
         JSONObject payload = new JSONObject();
         payload.put("version", 1);
@@ -121,6 +139,13 @@ public final class PhoneIssuer {
         signer.update(body);
         byte[] signature = signer.sign();
         JSONObject outer = new JSONObject();
+        if (builtIn) {
+            // short form: the app already trusts this phone's key, no certificate needs to travel with the code
+            outer.put("k", CertificateVerifier.keyId(publicKey()));
+            outer.put("p", Base64.getEncoder().encodeToString(body));
+            outer.put("s", Base64.getEncoder().encodeToString(signature));
+            return "MC2." + Base64.getUrlEncoder().withoutPadding().encodeToString(outer.toString().getBytes(StandardCharsets.UTF_8));
+        }
         outer.put("issuer", new JSONObject(certText));
         outer.put("payload", Base64.getEncoder().encodeToString(body));
         outer.put("signature", Base64.getEncoder().encodeToString(signature));

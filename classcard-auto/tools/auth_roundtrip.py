@@ -20,10 +20,10 @@ subprocess.run(["javac", "-nowarn", "-d", OUT, "-cp", f"{ROOT}/tools/lib/json.ja
                 f"{ROOT}/solver/src/VerifyMain.java"], check=True, env=env, stderr=subprocess.DEVNULL)
 
 
-def verify(text, device=TARGET_DEVICE, pkg=PKG):
+def verify(text, device=TARGET_DEVICE, pkg=PKG, roots=""):
     path = os.path.join(tmp, "case.txt")
     open(path, "w").write(text)
-    r = subprocess.run(["java", "-cp", f"{OUT}:{ROOT}/tools/lib/json.jar:{KSTD}:{ANDROID}", "net.classcardauto.mobile.VerifyMain", path, device, pkg],
+    r = subprocess.run(["java", "-cp", f"{OUT}:{ROOT}/tools/lib/json.jar:{KSTD}:{ANDROID}", "net.classcardauto.mobile.VerifyMain", path, device, pkg, roots],
                        capture_output=True, text=True, env=env)
     return r.stdout.strip().splitlines()[-1] if r.stdout.strip() else r.stderr.strip()[-200:]
 
@@ -96,5 +96,27 @@ classic = open(os.path.join(tmp, "classic.key")).read()
 check("classic computer key file still accepted", verify(classic), True)
 check("an issuer certificate is not a device key", verify(issuer_cert), False)
 check("garbage rejected", verify("MC1.xxxx"), False)
+
+# ---- short codes ("MC2.") for an owner phone whose key is built into the app: no certificate travels with the code
+roots = pub
+key_id = __import__("hashlib").sha256(base64.b64decode(pub)).hexdigest()[:16]
+
+
+def short_code(device=TARGET_DEVICE, days=7, key=phone, kid=key_id, pkg=PKG, expired=False):
+    payload = {"version": 1, "kind": "activation", "deviceId": device, "packageName": pkg, "issuedAt": now().isoformat(), "number": str(uuid.uuid4())}
+    if days:
+        payload["expiresAt"] = (now() + datetime.timedelta(days=-1 if expired else days)).isoformat()
+    body = json.dumps(payload, separators=(",", ":")).encode()
+    outer = {"k": kid, "p": b64(body), "s": b64(key.sign(body, ec.ECDSA(hashes.SHA256())))}
+    return "MC2." + base64.urlsafe_b64encode(json.dumps(outer, separators=(",", ":")).encode()).decode().rstrip("=")
+
+
+check("short code accepted when the phone key is built in", verify(short_code(), roots=roots), True)
+print("short code length: %d characters" % len(short_code()))
+check("short code rejected when the phone key is NOT built in", verify(short_code(), roots=""), False)
+check("short code for another phone rejected", verify(short_code(), device="1234567890abcdef", roots=roots), False)
+check("short code signed by another key rejected", verify(short_code(key=other), roots=roots), False)
+check("short code with an unknown key id rejected", verify(short_code(kid="0000000000000000"), roots=roots), False)
+check("expired short code rejected", verify(short_code(expired=True), roots=roots), False)
 print("%d/%d passed" % (sum(results), len(results)))
 sys.exit(0 if all(results) else 1)

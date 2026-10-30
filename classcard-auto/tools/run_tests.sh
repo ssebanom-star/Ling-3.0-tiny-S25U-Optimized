@@ -8,7 +8,9 @@ KSTD=${2:-$(find "$HOME/.gradle" -name 'kotlin-stdlib-2.1.0.jar' | head -1)}
 OUT=$(mktemp -d)
 CP="$HERE/tools/lib/json.jar:$KSTD:$ANDROID_JAR"  # real org.json must precede the android.jar stubs
 SRC="$HERE/app/src/main/java"
-for t in MatcherTest HumanTimingTest WrongAnswersTest PauseStateTest FailureLogTest; do
+ZXING=${3:-$(find "$HOME/.gradle" -name 'core-3.5.3.jar' | head -1)}
+CP="$CP:$ZXING"
+for t in MatcherTest HumanTimingTest WrongAnswersTest PauseStateTest FailureLogTest QrCodecTest; do
   javac -nowarn -d "$OUT" -cp "$CP" -sourcepath "$SRC" "$HERE/solver/src/$t.java"
   echo "== $t"; java -cp "$OUT:$CP" "net.classcardauto.mobile.$t" | tail -3
 done
