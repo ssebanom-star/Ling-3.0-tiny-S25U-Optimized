@@ -2355,7 +2355,9 @@ public final class BotEngine {
 
     /** "초고속 모드": shorter waits everywhere the app itself waits; ClassCard's own animations are unchanged. */
     public final boolean isTurbo() {
-        return this.active && this.turbo;
+        // never while collecting: a read counts as settled after two equal reads in a row, so faster polling would
+        // read cards mid-flip and miss words
+        return this.active && this.turbo && (this.phase == null || !this.phase.startsWith("collect"));
     }
 
     public final java.util.Random getRng() {
@@ -2427,7 +2429,7 @@ public final class BotEngine {
 
     private final long scrollInterval() {
         long interval = ScrollSettings.intervalMs(this.storage.getPrefs());
-        return this.turbo && !this.collectionRetried ? Math.max(ScrollSettings.INTERVAL_MIN, interval / 2) : interval;
+        return interval;
     }
 
     public final int getEpoch() {

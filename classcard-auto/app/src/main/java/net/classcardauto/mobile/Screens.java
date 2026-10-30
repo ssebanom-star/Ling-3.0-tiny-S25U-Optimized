@@ -837,7 +837,7 @@ public final class Screens {
         switch (section) {
             case 0: {
                 LinearLayout humanCard = s.card(c);
-                humanCard.addView(s.switchRow(c, "초고속 모드", "화면을 더 자주 읽고(0.1초→0.035초), 앱이 스스로 두는 대기·스와이프 시간·시작 카운트다운(8초→3초)을 줄입니다. 클래스카드 자체 애니메이션은 줄일 수 없습니다. 켜면 사람처럼 입력보다 우선합니다.", p.getBoolean("turbo", false), new CompoundButton.OnCheckedChangeListener() {
+                humanCard.addView(s.switchRow(c, "초고속 모드", "단어 수집이 끝난 뒤부터 화면을 더 자주 읽고(0.1초→0.035초), 앱이 스스로 두는 대기·스와이프 시간·시작 카운트다운(8초→3초)을 줄입니다. 단어 수집은 정확도를 위해 원래 속도로 합니다. 클래스카드 자체 애니메이션은 줄일 수 없습니다. 켜면 사람처럼 입력보다 우선합니다.", p.getBoolean("turbo", false), new CompoundButton.OnCheckedChangeListener() {
                     @Override
                     public void onCheckedChanged(CompoundButton b, boolean checked) {
                         p.edit().putBoolean("turbo", checked).apply();
