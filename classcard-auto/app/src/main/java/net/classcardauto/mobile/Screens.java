@@ -322,6 +322,12 @@ public final class Screens {
         head.addView(t, tp);
         card.addView(head);
         add(card, s.caption(c, "처음 단어를 모을 때 목록을 넘기는 방식입니다. 범위가 너무 크면 단어를 놓칠 수 있어요."), 8);
+        add(card, s.switchRow(c, "끝에서 멈춰 관성 막기", "스와이프 끝에서 손을 바로 떼지 않고 0.15초 멈췄다가 떼서, 목록이 관성으로 더 미끄러지지 않고 설정한 범위만큼만 넘어갑니다.", prefs.getBoolean("collect_end_hold", true), new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton b, boolean checked) {
+                prefs.edit().putBoolean("collect_end_hold", checked).apply();
+            }
+        }), 12);
         addSliders(c, card, prefs, false);
         Button reset = s.button(c, "기본값으로", AppStyle.Tone.TEXT, new Function0<Unit>() {
             @Override
@@ -631,6 +637,8 @@ public final class Screens {
                 break;
             default:
                 parent.addView(panelNote(c, "처음 단어를 모을 때 목록을 넘기는 방식이에요."), lp(c, 8));
+                parent.addView(panelSwitch(c, "끝에서 멈춰 관성 막기", p.getBoolean("collect_end_hold", true), "collect_end_hold", p), lp(c, 6));
+                parent.addView(panelNote(c, "손을 떼기 전 0.15초 멈춰서, 설정한 범위만큼만 넘어가요."), lp(c, 0));
                 addSliders(c, parent, p, true);
                 break;
         }

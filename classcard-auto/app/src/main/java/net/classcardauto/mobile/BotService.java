@@ -658,6 +658,20 @@ public final class BotService extends AccessibilityService {
     }
 
     private final void gesture(float x1, float y1, float x2, float y2, long duration, final Function0<Unit> after) {
+        gesture(x1, y1, x2, y2, duration, 0L, after);
+    }
+
+    /** A pending "hold still at the end" for the gesture being dispatched (continued stroke, Android 8+). */
+    private GestureDescription.StrokeDescription holdStroke;
+    private float holdX;
+    private float holdY;
+    private long holdMs;
+
+    /**
+     * Same, but when {@code endHoldMs > 0} the finger stays still at the end point for that long before lifting, so the
+     * list stops exactly where the swipe ended instead of flinging on.
+     */
+    private final void gesture(float x1, float y1, float x2, float y2, long duration, long endHoldMs, final Function0<Unit> after) {
         if (!UsageConsent.INSTANCE.getAllowed()) {
             throw new IllegalStateException(UsageConsent.INSTANCE.getRequiredMessage().toString());
         }
@@ -670,7 +684,12 @@ public final class BotService extends AccessibilityService {
         if (x1 != x2 || y1 != y2) {
             path.lineTo(x2, y2);
         }
-        final GestureDescription build = new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(path, 0L, duration)).build();
+        GestureDescription.StrokeDescription stroke = new GestureDescription.StrokeDescription(path, 0L, duration, endHoldMs > 0);
+        final GestureDescription build = new GestureDescription.Builder().addStroke(stroke).build();
+        this.holdStroke = endHoldMs > 0 ? stroke : null;
+        this.holdX = x2;
+        this.holdY = y2;
+        this.holdMs = endHoldMs;
         final long begin = this.overlayInputGuard.begin();
         this.busy = true;
         try {
@@ -720,8 +739,37 @@ public final class BotService extends AccessibilityService {
         }
         botService.verifyAborts = 0;
         try {
-            BotService$gesture$3$accepted$1 accepted = new BotService$gesture$3$accepted$1(botService, j, i2, function0);
-            if (botService.dispatchGesture(gestureDescription, accepted, botService.handler)) {
+            final BotService$gesture$3$accepted$1 accepted = new BotService$gesture$3$accepted$1(botService, j, i2, function0);
+            final GestureDescription.StrokeDescription moving = botService.holdStroke;
+            botService.holdStroke = null;
+            AccessibilityService.GestureResultCallback callback = accepted;
+            if (moving != null) {
+                final float hx = botService.holdX;
+                final float hy = botService.holdY;
+                final long hms = botService.holdMs;
+                callback = new AccessibilityService.GestureResultCallback() {
+                    @Override
+                    public void onCompleted(GestureDescription g) {
+                        // the finger is still down at the end point: keep it there, then lift with no speed left
+                        try {
+                            Path still = new Path();
+                            still.moveTo(hx, hy);
+                            GestureDescription rest = new GestureDescription.Builder().addStroke(moving.continueStroke(still, 0L, hms, false)).build();
+                            if (botService.dispatchGesture(rest, accepted, botService.handler)) {
+                                return;
+                            }
+                        } catch (Exception ignored) {
+                        }
+                        accepted.onCancelled(g);
+                    }
+
+                    @Override
+                    public void onCancelled(GestureDescription g) {
+                        accepted.onCancelled(g);
+                    }
+                };
+            }
+            if (botService.dispatchGesture(gestureDescription, callback, botService.handler)) {
                 return;
             }
             botService.finishGesture(j, 150L, new Function0() {
@@ -1329,7 +1377,9 @@ public final class BotService extends AccessibilityService {
             scrollMs = HumanTiming.swipeDurationMs(rng, scrollMs);
             drift = HumanTiming.jitter(rng, 12.0f);
         }
-        gesture(x, bounds.getTop() + (bounds.getHeight() * span[0]), x + drift, bounds.getTop() + (bounds.getHeight() * span[1]), scrollMs, after);
+        // 끝에서 잠깐 멈춘 뒤 떼면 관성(fling) 없이 스와이프한 만큼만 움직인다
+        long endHold = prefs.getBoolean("collect_end_hold", true) ? 150L : 0L;
+        gesture(x, bounds.getTop() + (bounds.getHeight() * span[0]), x + drift, bounds.getTop() + (bounds.getHeight() * span[1]), scrollMs, endHold, after);
     }
 
     public final void setEngine(BotEngine botEngine) {
