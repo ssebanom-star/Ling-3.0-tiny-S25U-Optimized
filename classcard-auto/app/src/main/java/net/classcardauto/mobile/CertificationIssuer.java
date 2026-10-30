@@ -19,10 +19,12 @@ public final class CertificationIssuer {
 
     /**
      * Public keys (X.509 EC P-256, base64) of the "MiMiC Auth" authenticator apps this build accepts. The authenticator
-     * answers a phone's QR with a short code that only the holder of the matching private key can compute. Empty until
-     * an authenticator's key (shown in that app) is added here.
+     * answers a phone's QR with a short code that only the holder of the matching private key can compute. Add
+     * an authenticator's key (shown in that app) here to trust it.
      */
-    public static final String[] AUTHENTICATOR_KEYS = {};
+    public static final String[] AUTHENTICATOR_KEYS = {
+        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEv/RnmkfbUlcFebDmHurz6i2H42XnyysCtj772kU07RmkkXkgZAdrHKdHrf5aPtzEG8HZjISvulaB6lssesUmWg==",
+    };
 
     private CertificationIssuer() {
     }

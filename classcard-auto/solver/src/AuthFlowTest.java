@@ -102,6 +102,19 @@ public class AuthFlowTest {
         try { new CertificateVerifier().withAuthenticatorKeys(new String[0]).verify(record, DEVICE, PKG); noKeys = false; } catch (Throwable t) { noKeys = true; }
         ok("build without authenticator keys rejects", noKeys);
 
+        // the keys built into the app are well-formed EC P-256 public keys
+        boolean builtInOk = CertificationIssuer.AUTHENTICATOR_KEYS.length > 0;
+        for (String key : CertificationIssuer.AUTHENTICATOR_KEYS) {
+            try {
+                java.security.interfaces.ECPublicKey k = (java.security.interfaces.ECPublicKey) java.security.KeyFactory.getInstance("EC")
+                        .generatePublic(new java.security.spec.X509EncodedKeySpec(Base64.getDecoder().decode(key)));
+                builtInOk &= k.getParams().getOrder().bitLength() == 256;
+            } catch (Exception e) {
+                builtInOk = false;
+            }
+        }
+        ok("built-in authenticator keys are valid P-256 keys", builtInOk);
+
         // garbage QR for the authenticator
         boolean garbage;
         try { AuthMath.parse("hello"); garbage = false; } catch (Exception e) { garbage = true; }
