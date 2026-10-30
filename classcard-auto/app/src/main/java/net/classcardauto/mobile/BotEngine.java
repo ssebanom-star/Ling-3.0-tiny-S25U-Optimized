@@ -1947,8 +1947,8 @@ public final class BotEngine {
         String message = null;
         if (this.calThink.size() >= 3) {
             PaceModel.Result result = PaceModel.summarize(this.calThink, this.calReveal, this.calAdvance, this.calNav);
-            HumanProfile.apply(this.storage.getPrefs(), result);
-            message = "내 패턴 반영 (" + this.calThink.size() + "문항) · " + result.describe();
+            HumanProfile.saveMine(this.storage.getPrefs(), result);
+            message = "내 패턴 저장·적용 (" + this.calThink.size() + "문항) · " + result.describe();
         }
         this.calibrating = false;
         clearCalibration();
@@ -2294,8 +2294,8 @@ public final class BotEngine {
             for (UiNode node : choices) {
                 choiceChars += node.getText().length();
             }
-            int mean = this.storage.getPrefs().getInt("human_mean_ms", HumanTiming.MEAN_DEFAULT);
             android.content.SharedPreferences hp = this.storage.getPrefs();
+            int mean = HumanProfile.meanMs(hp);
             long wait = HumanTiming.thinkMillis(this.rng, mean, prompt.length(), choiceChars, this.answered.size(), HumanProfile.sigma(hp), HumanProfile.hesitation(hp), HumanProfile.fatiguePerQuestion(hp));
             due = Long.valueOf(now + wait);
             this.humanDue.put(key, due);
@@ -2326,10 +2326,9 @@ public final class BotEngine {
         }
         Long due = this.humanDue.get(key);
         if (due == null) {
-            int mean = this.storage.getPrefs().getInt("human_mean_ms", HumanTiming.MEAN_DEFAULT);
             android.content.SharedPreferences hp = this.storage.getPrefs();
             // ":prompt" is the pause before opening the choices, ":feedback" the pause before swiping on
-            long median = key.endsWith(":prompt") ? HumanProfile.revealMs(hp, mean) : HumanProfile.advanceMs(hp, mean);
+            long median = key.endsWith(":prompt") ? HumanProfile.revealMs(hp) : HumanProfile.advanceMs(hp);
             due = Long.valueOf(now + HumanTiming.pauseMillis(this.rng, median));
             this.humanDue.put(key, due);
         }

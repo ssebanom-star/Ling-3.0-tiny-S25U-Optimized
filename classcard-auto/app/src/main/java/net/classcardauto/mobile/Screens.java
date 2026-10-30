@@ -367,51 +367,52 @@ public final class Screens {
                 }
             }, false), lp(c, 16));
         } else if (kind == 2) {
-            String measured = HumanProfile.describe(p);
-            card.addView(s.caption(c, "‘사람처럼 입력’의 세부 값입니다. ‘내 속도 측정’을 하면 직접 푼 모습에서 자동으로 채워져요. " + (measured.isEmpty() ? "아직 측정한 값이 없어요." : "측정한 패턴: " + measured + ".") + " 다음 실행부터 적용됩니다."));
-            final int mean = p.getInt("human_mean_ms", HumanTiming.MEAN_DEFAULT);
-            card.addView(s.sliderRow(c, "응답 시간의 변동 폭", "%", HumanProfile.SIGMA_MIN, HumanProfile.SIGMA_MAX, HumanProfile.SIGMA_STEP, (int) Math.round(HumanProfile.sigma(p) * 100), new Function1<Integer, Unit>() {
+            card.addView(s.caption(c, "‘평균·랜덤’ 방식의 세부 값입니다. ‘내 패턴’을 쓰는 동안에는 적용되지 않아요(내 패턴은 따로 저장돼요). 다음 실행부터 적용됩니다."));
+            card.addView(s.sliderRow(c, "응답 시간의 변동 폭", "%", HumanProfile.SIGMA_MIN, HumanProfile.SIGMA_MAX, HumanProfile.SIGMA_STEP, HumanProfile.sigmaPct(p, false), new Function1<Integer, Unit>() {
                 @Override
                 public Unit invoke(Integer v) {
                     p.edit().putInt(HumanProfile.K_SIGMA, v.intValue()).apply();
                     return Unit.INSTANCE;
                 }
             }, false), lp(c, 16));
-            card.addView(s.sliderRow(c, "가끔 더 망설일 확률", "%", HumanProfile.HESITATE_MIN, HumanProfile.HESITATE_MAX, HumanProfile.HESITATE_STEP, (int) Math.round(HumanProfile.hesitation(p) * 100), new Function1<Integer, Unit>() {
+            card.addView(s.sliderRow(c, "가끔 더 망설일 확률", "%", HumanProfile.HESITATE_MIN, HumanProfile.HESITATE_MAX, HumanProfile.HESITATE_STEP, HumanProfile.hesitatePct(p, false), new Function1<Integer, Unit>() {
                 @Override
                 public Unit invoke(Integer v) {
                     p.edit().putInt(HumanProfile.K_HESITATE, v.intValue()).apply();
                     return Unit.INSTANCE;
                 }
             }, false), lp(c, 16));
-            card.addView(s.sliderRow(c, "문항마다 느려지는 정도", "‰", HumanProfile.FATIGUE_MIN, HumanProfile.FATIGUE_MAX, HumanProfile.FATIGUE_STEP, (int) Math.round(HumanProfile.fatiguePerQuestion(p) * 1000), new Function1<Integer, Unit>() {
+            card.addView(s.sliderRow(c, "문항마다 느려지는 정도", "‰", HumanProfile.FATIGUE_MIN, HumanProfile.FATIGUE_MAX, HumanProfile.FATIGUE_STEP, HumanProfile.fatiguePermille(p, false), new Function1<Integer, Unit>() {
                 @Override
                 public Unit invoke(Integer v) {
                     p.edit().putInt(HumanProfile.K_FATIGUE, v.intValue()).apply();
                     return Unit.INSTANCE;
                 }
             }, false), lp(c, 16));
-            card.addView(s.sliderRow(c, "답을 누른 뒤 카드 넘기기 전 멈춤", "ms", HumanProfile.PAUSE_MIN, HumanProfile.PAUSE_MAX, HumanProfile.PAUSE_STEP, (int) HumanProfile.advanceMs(p, mean), new Function1<Integer, Unit>() {
+            card.addView(s.sliderRow(c, "답을 누른 뒤 카드 넘기기 전 멈춤", "ms", HumanProfile.PAUSE_MIN, HumanProfile.PAUSE_MAX, HumanProfile.PAUSE_STEP, (int) HumanProfile.advanceMs(p, false), new Function1<Integer, Unit>() {
                 @Override
                 public Unit invoke(Integer v) {
                     p.edit().putInt(HumanProfile.K_ADVANCE, v.intValue()).apply();
                     return Unit.INSTANCE;
                 }
             }, false), lp(c, 16));
-            card.addView(s.sliderRow(c, "보기를 열기 전 멈춤", "ms", HumanProfile.PAUSE_MIN, HumanProfile.PAUSE_MAX, HumanProfile.PAUSE_STEP, (int) HumanProfile.revealMs(p, mean), new Function1<Integer, Unit>() {
+            card.addView(s.sliderRow(c, "보기를 열기 전 멈춤", "ms", HumanProfile.PAUSE_MIN, HumanProfile.PAUSE_MAX, HumanProfile.PAUSE_STEP, (int) HumanProfile.revealMs(p, false), new Function1<Integer, Unit>() {
                 @Override
                 public Unit invoke(Integer v) {
                     p.edit().putInt(HumanProfile.K_REVEAL, v.intValue()).apply();
                     return Unit.INSTANCE;
                 }
             }, false), lp(c, 16));
-            card.addView(s.sliderRow(c, "시작 버튼 누르기 전 기다림", "ms", HumanProfile.NAV_MIN, HumanProfile.NAV_MAX, HumanProfile.NAV_STEP, (int) HumanProfile.navMs(p), new Function1<Integer, Unit>() {
+            card.addView(s.sliderRow(c, "시작 버튼 누르기 전 기다림", "ms", HumanProfile.NAV_MIN, HumanProfile.NAV_MAX, HumanProfile.NAV_STEP, (int) HumanProfile.navMs(p, false), new Function1<Integer, Unit>() {
                 @Override
                 public Unit invoke(Integer v) {
                     p.edit().putInt(HumanProfile.K_NAV, v.intValue()).apply();
                     return Unit.INSTANCE;
                 }
             }, false), lp(c, 16));
+        } else if (kind == 3) {
+            String mine = HumanProfile.describeMine(p);
+            card.addView(s.caption(c, mine.isEmpty() ? "아직 측정한 내 패턴이 없어요. 시작 전 패널의 ‘내 패턴 측정’으로 직접 테스트를 풀어 만들 수 있어요." : "측정한 내 패턴: " + mine + ". 평균·랜덤 값과 따로 저장되어 있어요."));
         } else {
             card.addView(s.caption(c, "실행이 너무 오래 걸리거나 화면이 멈춘 것처럼 보일 때 언제 포기할지 정합니다. 다음 실행부터 적용됩니다."));
             card.addView(s.sliderRow(c, "실행 제한 시간", "초", AdvancedSettings.RUN_MIN, AdvancedSettings.RUN_MAX, AdvancedSettings.RUN_STEP, AdvancedSettings.runLimitSeconds(p), new Function1<Integer, Unit>() {
@@ -464,13 +465,15 @@ public final class Screens {
                 }
             }, false), lp(c, 16));
         }
-        Button reset = s.button(c, "기본값으로", AppStyle.Tone.TEXT, new Function0<Unit>() {
+        Button reset = s.button(c, kind == 3 ? "내 패턴 지우기" : "기본값으로", AppStyle.Tone.TEXT, new Function0<Unit>() {
             @Override
             public Unit invoke() {
                 if (kind == 0) {
                     AdvancedSettings.resetMatching(p);
                 } else if (kind == 2) {
-                    HumanProfile.reset(p);
+                    HumanProfile.resetDefaults(p);
+                } else if (kind == 3) {
+                    HumanProfile.clearMine(p);
                 } else {
                     AdvancedSettings.resetLimits(p);
                 }
@@ -529,14 +532,25 @@ public final class Screens {
         parent.addView(panelSwitch(c, "멈추면 진동으로 알림", p.getBoolean("vibrate_alerts", true), "vibrate_alerts", p), lp(c, 2));
         final TextView estimate = s.label(c, paceEstimate(p), 10.5f, -1, false);
         estimate.setAlpha(0.7f);
-        parent.addView(s.sliderRow(c, "평균 응답 시간", "ms", HumanTiming.MEAN_MIN, HumanTiming.MEAN_MAX, HumanTiming.MEAN_STEP, p.getInt("human_mean_ms", HumanTiming.MEAN_DEFAULT), new Function1<Integer, Unit>() {
+        final LinearLayout meanRow = s.sliderRow(c, "평균 응답 시간", "ms", HumanTiming.MEAN_MIN, HumanTiming.MEAN_MAX, HumanTiming.MEAN_STEP, HumanProfile.meanMs(p, false), new Function1<Integer, Unit>() {
             @Override
             public Unit invoke(Integer v) {
-                p.edit().putInt("human_mean_ms", v.intValue()).apply();
+                p.edit().putInt(HumanProfile.K_MEAN, v.intValue()).apply();
                 estimate.setText(paceEstimate(p));
                 return Unit.INSTANCE;
             }
-        }, true), lp(c, 8));
+        }, true);
+        parent.addView(s.label(c, "응답 방식 (둘 중 하나)", 12.5f, -1, true), lp(c, 8));
+        parent.addView(sourceChooser(c, p, true, new Function0<Unit>() {
+            @Override
+            public Unit invoke() {
+                dim(meanRow, HumanProfile.usingMine(p));
+                estimate.setText(paceEstimate(p));
+                return Unit.INSTANCE;
+            }
+        }), lp(c, 4));
+        parent.addView(meanRow, lp(c, 6));
+        dim(meanRow, HumanProfile.usingMine(p));
         parent.addView(estimate, lp(c, 2));
         final TextView measure = s.label(c, calibrationLabel(), 12.0f, -1, true);
         measure.setGravity(Gravity.CENTER);
@@ -554,7 +568,7 @@ public final class Screens {
         LinearLayout.LayoutParams mlp = lp(c, 6);
         mlp.height = s.dp(c, 30);
         parent.addView(measure, mlp);
-        String measured = HumanProfile.describe(p);
+        String measured = HumanProfile.describeMine(p);
         if (!measured.isEmpty()) {
             TextView known = s.label(c, "측정한 내 패턴: " + measured, 10.5f, -1, false);
             known.setAlpha(0.7f);
@@ -584,6 +598,70 @@ public final class Screens {
         addSliders(c, parent, p, true);
     }
 
+    /** Greys out (and disables) a group of controls that are not in use. */
+    static void dim(View v, boolean dimmed) {
+        v.setAlpha(dimmed ? 0.35f : 1.0f);
+        v.setEnabled(!dimmed);
+        if (v instanceof android.view.ViewGroup) {
+            android.view.ViewGroup g = (android.view.ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) {
+                dim(g.getChildAt(i), dimmed);
+            }
+        }
+    }
+
+    /**
+     * Two choices that exclude each other: "평균·랜덤" (the hand-made numbers) or "내 패턴" (the measured ones, stored
+     * separately). Choosing "내 패턴" before anything was measured is refused with a hint.
+     */
+    public static LinearLayout sourceChooser(final Context c, final SharedPreferences p, final boolean compact, final Function0<Unit> onChanged) {
+        final AppStyle s = AppStyle.INSTANCE;
+        final LinearLayout row = new LinearLayout(c);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        final TextView[] pills = new TextView[2];
+        String[] labels = {"평균·랜덤", "내 패턴"};
+        for (int i = 0; i < 2; i++) {
+            final int index = i;
+            TextView pill = s.label(c, labels[i], compact ? 11.5f : 13.5f, -1, true);
+            pill.setGravity(Gravity.CENTER);
+            pill.setPadding(dp(c, 12), dp(c, compact ? 6 : 9), dp(c, 12), dp(c, compact ? 6 : 9));
+            pill.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (!HumanProfile.setUseMine(p, index == 1)) {
+                        android.widget.Toast.makeText(c, "먼저 ‘내 패턴 측정’으로 내 패턴을 만들어 주세요.", android.widget.Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    styleChooser(c, p, pills, compact);
+                    if (onChanged != null) {
+                        onChanged.invoke();
+                    }
+                }
+            });
+            pills[i] = pill;
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1.0f);
+            if (i == 1) {
+                lp.leftMargin = dp(c, 6);
+            }
+            row.addView(pill, lp);
+        }
+        styleChooser(c, p, pills, compact);
+        return row;
+    }
+
+    private static void styleChooser(Context c, SharedPreferences p, TextView[] pills, boolean compact) {
+        AppStyle s = AppStyle.INSTANCE;
+        boolean mine = HumanProfile.usingMine(p);
+        for (int i = 0; i < 2; i++) {
+            boolean selected = (i == 1) == mine;
+            pills[i].setTextColor(selected ? -1 : (compact ? android.graphics.Color.argb(200, 255, 255, 255) : s.getInk()));
+            int bg = selected ? s.getAccent() : (compact ? android.graphics.Color.argb(34, 255, 255, 255) : s.getBackground());
+            pills[i].setBackground(s.roundRect(c, bg, 999, selected || compact ? 0 : s.getBorder()));
+            // the measured choice stays visible but looks off until there is a measurement
+            pills[i].setAlpha(i == 1 && !HumanProfile.hasMine(p) ? 0.45f : 1.0f);
+        }
+    }
+
     private static String calibrationLabel() {
         BotService service = BotService.INSTANCE.getInstance();
         boolean on = service != null && service.getEngine().isCalibrating();
@@ -592,7 +670,7 @@ public final class Screens {
 
     /** One line saying how long a test is expected to take with the current settings (a rough estimate). */
     public static String paceEstimate(SharedPreferences p) {
-        long per = HumanTiming.estimatePerQuestionMs(p.getBoolean("human_like", false), p.getInt("human_mean_ms", HumanTiming.MEAN_DEFAULT), AdvancedSettings.gateMs(p));
+        long per = HumanTiming.estimatePerQuestionMs(p.getBoolean("human_like", false), HumanProfile.meanMs(p), AdvancedSettings.gateMs(p));
         return "문항당 약 " + String.format(java.util.Locale.US, "%.1f", per / 1000.0) + "초 · 20문항 약 " + AppStyle.formatClock(per * 20 / 1000) + " · 50문항 약 " + AppStyle.formatClock(per * 50 / 1000);
     }
 
@@ -682,13 +760,24 @@ public final class Screens {
                 p.edit().putBoolean("human_like", checked).apply();
             }
         }));
-        add(humanCard, s.sliderRow(c, "평균 응답 시간", "ms", HumanTiming.MEAN_MIN, HumanTiming.MEAN_MAX, HumanTiming.MEAN_STEP, p.getInt("human_mean_ms", HumanTiming.MEAN_DEFAULT), new Function1<Integer, Unit>() {
+        final LinearLayout appMeanRow = s.sliderRow(c, "평균 응답 시간 (평균·랜덤)", "ms", HumanTiming.MEAN_MIN, HumanTiming.MEAN_MAX, HumanTiming.MEAN_STEP, HumanProfile.meanMs(p, false), new Function1<Integer, Unit>() {
             @Override
             public Unit invoke(Integer v) {
-                p.edit().putInt("human_mean_ms", v.intValue()).apply();
+                p.edit().putInt(HumanProfile.K_MEAN, v.intValue()).apply();
                 return Unit.INSTANCE;
             }
-        }, false), 16);
+        }, false);
+        add(humanCard, s.label(c, "응답 방식 (둘 중 하나)", 15.0f, s.getInk(), true), 16);
+        add(humanCard, sourceChooser(c, p, false, new Function0<Unit>() {
+            @Override
+            public Unit invoke() {
+                dim(appMeanRow, HumanProfile.usingMine(p));
+                return Unit.INSTANCE;
+            }
+        }), 8);
+        add(humanCard, s.caption(c, "‘평균·랜덤’은 아래 평균 응답 시간과 세부 값을 쓰고, ‘내 패턴’은 직접 푼 모습을 측정해 따로 저장한 값을 씁니다. 서로 덮어쓰지 않아요."), 6);
+        add(humanCard, appMeanRow, 16);
+        dim(appMeanRow, HumanProfile.usingMine(p));
         add(humanCard, s.caption(c, "보통 길이의 문제 기준 값이며, 글이 길수록 오래 걸리고 가끔 더 망설입니다. 예상: " + paceEstimate(p) + " (대략적인 추정이며, 실행 중에는 실제 속도로 다시 계산합니다)."), 8);
         add(humanCard, s.divider(c), 18);
         add(humanCard, s.sliderRow(c, "일부러 틀릴 문항 수", "개", AdvancedSettings.WRONG_MIN, AdvancedSettings.WRONG_MAX, AdvancedSettings.WRONG_STEP, AdvancedSettings.wrongCount(p), new Function1<Integer, Unit>() {
@@ -701,8 +790,10 @@ public final class Screens {
         add(humanCard, s.caption(c, "한 번 실행에서 이 개수만큼의 문항을 무작위로 골라 정답이 아닌 보기를 누릅니다. 0이면 모두 맞힙니다. 문항 수보다 크면 전체가 오답이 됩니다."), 8);
         add(content, humanCard, 8);
 
-        add(content, s.sectionLabel(c, "고급 · 내 패턴 세부값"), 24);
+        add(content, s.sectionLabel(c, "고급 · 평균·랜덤 세부값"), 24);
         add(content, advancedCard(c, p, 2), 8);
+        add(content, s.sectionLabel(c, "측정한 내 패턴"), 24);
+        add(content, advancedCard(c, p, 3), 8);
         add(content, s.sectionLabel(c, "고급 · 정답 매칭"), 24);
         add(content, advancedCard(c, p, 0), 8);
         add(content, s.sectionLabel(c, "고급 · 실행 한도"), 24);
