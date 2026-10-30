@@ -727,11 +727,18 @@ public final class BotEngine {
                 }
             }
             ArrayList arrayList14 = arrayList13;
-            if (!arrayList14.isEmpty()) {
-                throw new IllegalStateException(("화면에 보였지만 양면 수집이 누락된 단어가 있습니다: " + CollectionsKt.joinToString(CollectionsKt.take(arrayList14, 5), (CharSequence) ", ", (CharSequence) "", (CharSequence) "", -1, (CharSequence) "...", null) + ". 테스트를 시작하지 않습니다.").toString());
-            }
-            if (!this.collectionCursor.missing().isEmpty()) {
-                throw new IllegalStateException(("목록에서 수집하지 못한 카드 위치가 있습니다: " + CollectionsKt.take(this.collectionCursor.missing(), 5) + ". 테스트를 시작하지 않습니다.").toString());
+            if (!arrayList14.isEmpty() || !this.collectionCursor.missing().isEmpty()) {
+                QuietJson gap = new QuietJson().put("missing_words", arrayList14.size()).put("missing_positions", this.collectionCursor.missing().size()).put("retry", this.collectionRetried);
+                log("collection_gap", gap);
+                if (!this.collectionRetried) {
+                    // once: collect again from the top at normal scroll speed instead of giving up
+                    this.collectionRetried = true;
+                    this.service.setStatus("빠진 단어가 있어 한 번 더 수집해요");
+                    beginCollection(this.collectReturnPhase);
+                    return;
+                }
+                // still incomplete: start anyway; questions the list cannot answer are guessed instead of stopping the test
+                this.collectionIncomplete = true;
             }
             Collection<Card> values2 = this.collected.values();
             Intrinsics.checkNotNullExpressionValue(values2, "<get-values>(...)");
@@ -1495,6 +1502,9 @@ public final class BotEngine {
                 this.active = false;
                 this.epoch++;
                 String wrongNote = this.wrongSet != null ? " · 의도한 오답 " + this.wrongSet.size() + "개 중 " + this.wrongPick.size() + "개 실행" : "";
+                if (this.guessedAnswers > 0) {
+                    wrongNote = wrongNote + " · 단어장에 없어 찍은 문항 " + this.guessedAnswers + "개";
+                }
                 if (!this.timedOut.isEmpty()) {
                     wrongNote = wrongNote + " · 시간 초과 " + this.timedOut.size() + "문항";
                 }
@@ -1710,6 +1720,9 @@ public final class BotEngine {
         this.inlineStability.reset();
         this.natural = this.storage.getPrefs().getBoolean("natural", false);
         this.turbo = this.storage.getPrefs().getBoolean("turbo", false);
+        this.collectionRetried = false;
+        this.collectionIncomplete = false;
+        this.guessedAnswers = 0;
         // 초고속 모드는 사람처럼 입력보다 우선한다 (둘 다 켜져 있으면 초고속)
         this.human = this.storage.getPrefs().getBoolean("human_like", false) && !this.turbo;
         this.wrongSet = null;
@@ -2233,7 +2246,15 @@ public final class BotEngine {
                 log("resume_guess", put);
                 return new ChoiceAnswer(pick, new ArrayList<Card>(), 0);
             }
-            throw e;
+            if (choices.isEmpty()) {
+                throw e;
+            }
+            // the list cannot answer this one (missing or ambiguous word): pick a choice and keep the test going
+            UiNode pick = choices.get(this.rng.nextInt(choices.size()));
+            this.guessPick.put(progress, pick.getText());
+            this.guessedAnswers++;
+            log("unresolved_guess", new QuietJson().put("progress", progress).put("reason", e.getFailure().name()));
+            return new ChoiceAnswer(pick, new ArrayList<Card>(), 0);
         }
         this.guessNext = false;
         int wanted = AdvancedSettings.wrongCount(this.storage.getPrefs());
@@ -2325,6 +2346,12 @@ public final class BotEngine {
     }
 
     private boolean turbo;
+    /** The word list was collected a second time (normal speed) because the first pass missed words. */
+    private boolean collectionRetried;
+    /** The test starts with a list that still misses words. */
+    private boolean collectionIncomplete;
+    /** Questions answered by a guess because the list could not resolve them. */
+    private int guessedAnswers;
 
     /** "초고속 모드": shorter waits everywhere the app itself waits; ClassCard's own animations are unchanged. */
     public final boolean isTurbo() {
@@ -2400,7 +2427,7 @@ public final class BotEngine {
 
     private final long scrollInterval() {
         long interval = ScrollSettings.intervalMs(this.storage.getPrefs());
-        return this.turbo ? Math.max(ScrollSettings.INTERVAL_MIN, interval / 2) : interval;
+        return this.turbo && !this.collectionRetried ? Math.max(ScrollSettings.INTERVAL_MIN, interval / 2) : interval;
     }
 
     public final int getEpoch() {
@@ -2578,7 +2605,11 @@ public final class BotEngine {
                 case -265268866:
                     if (str.equals("finish_collect")) {
                         UiNode id4 = id(ns, "set_name");
-                        if (!Intrinsics.areEqual(id4 != null ? id4.getText() : null, this.name)) {
+                        if (id4 == null) {
+                            // the title is briefly off screen while the list settles; wait for it (the phase limit still applies)
+                            return;
+                        }
+                        if (!Intrinsics.areEqual(id4.getText(), this.name)) {
                             throw new IllegalStateException("수집 후 세트가 바뀌었습니다.".toString());
                         }
                         finishPreparation();
