@@ -382,4 +382,18 @@ class UiPreviewTest {
             if (tab == 1) paparazzi.snapshot(overBackdrop(p), "overlay_after_fail")
         }
     }
+
+    @Test
+    fun swipeGuide() {
+        val frame = FrameLayout(paparazzi.context)
+        frame.setBackgroundColor(Color.rgb(236, 238, 240))
+        val g = net.classcardauto.mobile.SwipeGuide(paparazzi.context)
+        frame.addView(g, FrameLayout.LayoutParams(-1, -1))
+        val d = paparazzi.context.resources.displayMetrics
+        val top = d.heightPixels * 0.18f
+        val h = d.heightPixels * 0.72f
+        val span = net.classcardauto.mobile.ScrollSettings.fractions(45, true)
+        g.show(d.widthPixels / 2f, top + h * span[0], top + h * span[1], 1L, 100000L, "45% · 미리 보기")
+        paparazzi.snapshot(frame, "swipe_guide")
+    }
 }

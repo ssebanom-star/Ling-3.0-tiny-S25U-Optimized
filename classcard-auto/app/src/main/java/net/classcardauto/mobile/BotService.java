@@ -350,6 +350,48 @@ public final class BotService extends AccessibilityService {
      * were added). While locked it swallows every touch, so only the panel can be operated. System gestures, the
      * status bar and hardware buttons are outside what an app window can block.
      */
+    private SwipeGuide swipeGuide;
+    /** The list the last collection swipe moved; the preview draws on it. */
+    private Bounds lastCollectionBounds;
+
+    /** Full-screen, untouchable drawing of the collection swipe (see SwipeGuide). */
+    private final void createSwipeGuide() {
+        SwipeGuide guide = new SwipeGuide(this);
+        // not focusable | not touchable | layout in screen | no limits
+        WindowManager.LayoutParams params = new WindowManager.LayoutParams(-1, -1, 2032, 8 | 16 | 256 | 512, -3);
+        params.gravity = 8388659;
+        ((WindowManager) getSystemService("window")).addView(guide, params);
+        this.swipeGuide = guide;
+    }
+
+    /** Draws the collection swipe on the real screen without swiping (from the panel's 수집 tab). */
+    public final void previewCollectionSwipe() {
+        SwipeGuide guide = this.swipeGuide;
+        if (guide == null || this.storage == null) {
+            return;
+        }
+        android.content.SharedPreferences prefs = getStorage().getPrefs();
+        android.util.DisplayMetrics m = getResources().getDisplayMetrics();
+        Bounds b = this.lastCollectionBounds;
+        float x;
+        float top;
+        float height;
+        boolean rough = b == null;
+        if (b == null) {
+            // no swipe yet: assume the list fills most of the screen under the title bar
+            x = m.widthPixels / 2f;
+            top = m.heightPixels * 0.18f;
+            height = m.heightPixels * 0.72f;
+        } else {
+            x = b.getX();
+            top = b.getTop();
+            height = b.getHeight();
+        }
+        int range = ScrollSettings.rangePercent(prefs);
+        float[] span = ScrollSettings.fractions(range, true);
+        guide.show(x, top + height * span[0], top + height * span[1], ScrollSettings.durationMs(prefs), 1400L, range + "% · 미리 보기" + (rough ? " (대략)" : ""));
+    }
+
     private final void createTouchBlocker() {
         FrameLayout blocker = new FrameLayout(this);
         blocker.setOnTouchListener(new View.OnTouchListener() {
@@ -1335,6 +1377,7 @@ public final class BotService extends AccessibilityService {
         setProfile(new UiProfile(botService));
         setEngine(new BotEngine(this, getStorage()));
         createTouchBlocker();
+        createSwipeGuide();
         createOverlay();
         createTouchWatcher();
         this.handler.post(this.ticker);
@@ -1379,7 +1422,24 @@ public final class BotService extends AccessibilityService {
         }
         // 끝에서 잠깐 멈춘 뒤 떼면 관성(fling) 없이 스와이프한 만큼만 움직인다
         long endHold = prefs.getBoolean("collect_end_hold", true) ? 150L : 0L;
-        gesture(x, bounds.getTop() + (bounds.getHeight() * span[0]), x + drift, bounds.getTop() + (bounds.getHeight() * span[1]), scrollMs, endHold, after);
+        this.lastCollectionBounds = bounds;
+        float fromY = bounds.getTop() + (bounds.getHeight() * span[0]);
+        float toY = bounds.getTop() + (bounds.getHeight() * span[1]);
+        Function0<Unit> done = after;
+        final SwipeGuide guide = this.swipeGuide;
+        if (guide != null && prefs.getBoolean("collect_show_swipe", true)) {
+            guide.show(x, fromY, toY, scrollMs + 32L, endHold + 400L, ScrollSettings.rangePercent(prefs) + "%");
+            final Function0<Unit> original = after;
+            // gone before the engine reads the screen again
+            done = new Function0<Unit>() {
+                @Override
+                public Unit invoke() {
+                    guide.dismiss();
+                    return original.invoke();
+                }
+            };
+        }
+        gesture(x, fromY, x + drift, toY, scrollMs, endHold, done);
     }
 
     public final void setEngine(BotEngine botEngine) {
