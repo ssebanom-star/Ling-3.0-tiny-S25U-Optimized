@@ -239,7 +239,7 @@ public final class MainActivity extends Activity {
     }
 
     private final void privacy() {
-        message("개인정보처리방침\n적용일: 2026년 10월 26일\n\n1. 기기 내부 처리\n화면 글자와 이미지는 실행 중 기기 메모리에서 처리합니다. 수집한 단어·뜻은 완료·중지·오류 종료 시 삭제하며 파일로 저장하지 않습니다.\n\n2. 외부 SDK\nMicrosoft ONNX Runtime Android 1.31.0과 Qota-OCR 모델을 이용해 기기 내부에서 이미지를 인식합니다. 모델은 앱에 포함됩니다. 앱은 인터넷 권한을 요청하지 않으며, 인식 입력·결과를 외부 서버에 전송하는 코드는 없습니다. 분석·광고 SDK는 사용하지 않습니다.\n\n3. 실행 기록\n실행 중 일어난 일은 파일이나 시스템 로그에 기록하지 않습니다. 마지막 실행 결과 요약만 앱이 켜져 있는 동안 메모리에 두고 앱이 종료되면 사라지며, 세트 이름·코드도 포함하지 않습니다. 문항·단어·뜻 원문이나 OCR 이미지는 기록하지 않습니다. 실행 중 화면 터치 잠금을 켜면 눈에 보이지 않는 투명한 막이 화면을 덮어 플로팅 패널 외의 터치를 받아 버리며, 막은 횟수만 세고 위치·내용은 기록하지 않습니다. 시험 중에는 사용자가 화면을 직접 터치한 횟수(위치·내용 제외)만 세어 일시정지 판단에 쓰며 저장하지 않습니다. 실행이 멈춘 시각·이유·문항 번호는 개발 참고용으로 이 휴대폰 안에 최대 100건 저장하며 외부로 전송하지 않습니다. 실패 기록 화면에서 언제든 지울 수 있습니다. 앱 데이터 삭제 또는 앱 제거로 통계를 지울 수 있습니다.\n\n4. QR 촬영\n인증 화면과 발급자 도구의 ‘QR 찍기’는 기기의 카메라 앱으로 사진을 한 장 찍어 QR 글자만 읽습니다. 앱은 카메라 권한을 갖지 않고, 찍은 사진은 읽은 직후 삭제합니다.\n\n5. 접근성 권한\n사용자가 시작한 실행 중 선택한 클래스카드 화면을 읽고 필요한 화면 전환을 수행합니다. 설정에서 권한을 끌 수 있습니다. 클래스카드 자체의 네트워크 처리에는 해당 서비스의 개인정보처리방침이 적용됩니다.\n\n6. 동의\n두 단계 동의를 모두 마친 시각과 약관 버전 확인값을 앱 내부에 저장합니다. 같은 약관에는 다시 동의하지 않아도 됩니다. 약관이 변경되면 다시 동의를 받습니다. 설정의 약관 동의 기록에서 확인하거나 철회할 수 있습니다. 앱 제거 또는 데이터 삭제 시 기록도 삭제됩니다.\n\n무인증 버전의 비밀번호 입력값과 잠금 해제 상태는 파일로 저장하거나 외부로 전송하지 않습니다. 다른 앱·설정에 갔다 돌아오면 잠금 해제를 유지하고, 앱을 닫고 새로 실행하거나 프로세스가 재시작되면 비밀번호를 다시 입력해야 합니다.".concat(Certification.INSTANCE.getRequired() ? "\n\n7. 기기 인증서\n인증 시각·번호·인증 컴퓨터의 이름·기종·식별 번호·휴대폰 식별 번호와 전자서명을 앱 내부에 저장합니다. 인터넷으로 전송하지 않습니다. 앱 데이터 삭제 또는 앱 제거 시 인증서도 삭제됩니다." : ""), "개인정보처리방침");
+        message("개인정보처리방침\n적용일: 2026년 10월 26일\n\n1. 기기 내부 처리\n화면 글자와 이미지는 실행 중 기기 메모리에서 처리합니다. 수집한 단어·뜻은 완료·중지·오류 종료 시 삭제하며 파일로 저장하지 않습니다.\n\n2. 외부 SDK\nMicrosoft ONNX Runtime Android 1.31.0과 Qota-OCR 모델을 이용해 기기 내부에서 이미지를 인식합니다. 모델은 앱에 포함됩니다. 앱은 인터넷 권한을 요청하지 않으며, 인식 입력·결과를 외부 서버에 전송하는 코드는 없습니다. 분석·광고 SDK는 사용하지 않습니다.\n\n3. 실행 기록\n실행 중 일어난 일은 파일이나 시스템 로그에 기록하지 않습니다. 마지막 실행 결과 요약만 앱이 켜져 있는 동안 메모리에 두고 앱이 종료되면 사라지며, 세트 이름·코드도 포함하지 않습니다. 문항·단어·뜻 원문이나 OCR 이미지는 기록하지 않습니다. 실행 중 화면 터치 잠금을 켜면 눈에 보이지 않는 투명한 막이 화면을 덮어 플로팅 패널 외의 터치를 받아 버리며, 막은 횟수만 세고 위치·내용은 기록하지 않습니다. 시험 중에는 사용자가 화면을 직접 터치한 횟수(위치·내용 제외)만 세어 일시정지 판단에 쓰며 저장하지 않습니다. 실행이 멈춘 시각·이유·문항 번호는 개발 참고용으로 이 휴대폰 안에 최대 100건 저장하며 외부로 전송하지 않습니다. 실패 기록 화면에서 언제든 지울 수 있습니다. 앱 데이터 삭제 또는 앱 제거로 통계를 지울 수 있습니다.\n\n4. 접근성 권한\n사용자가 시작한 실행 중 선택한 클래스카드 화면을 읽고 필요한 화면 전환을 수행합니다. 설정에서 권한을 끌 수 있습니다. 클래스카드 자체의 네트워크 처리에는 해당 서비스의 개인정보처리방침이 적용됩니다.\n\n5. 동의\n두 단계 동의를 모두 마친 시각과 약관 버전 확인값을 앱 내부에 저장합니다. 같은 약관에는 다시 동의하지 않아도 됩니다. 약관이 변경되면 다시 동의를 받습니다. 설정의 약관 동의 기록에서 확인하거나 철회할 수 있습니다. 앱 제거 또는 데이터 삭제 시 기록도 삭제됩니다.\n\n무인증 버전의 비밀번호 입력값과 잠금 해제 상태는 파일로 저장하거나 외부로 전송하지 않습니다. 다른 앱·설정에 갔다 돌아오면 잠금 해제를 유지하고, 앱을 닫고 새로 실행하거나 프로세스가 재시작되면 비밀번호를 다시 입력해야 합니다.".concat(Certification.INSTANCE.getRequired() ? "\n\n6. 기기 인증서\n인증 시각·번호·인증 컴퓨터의 이름·기종·식별 번호·휴대폰 식별 번호와 전자서명을 앱 내부에 저장합니다. 인터넷으로 전송하지 않습니다. 앱 데이터 삭제 또는 앱 제거 시 인증서도 삭제됩니다." : ""), "개인정보처리방침");
     }
 
     public final void refreshStatus() {
@@ -369,13 +369,6 @@ public final class MainActivity extends Activity {
             }
         })));
         if (Certification.INSTANCE.getRequired()) {
-            help.add(new Screens.Nav("발급자 도구", "다른 휴대폰의 인증을 이 휴대폰에서 대신 발급", guard(new Function0<Unit>() {
-                @Override
-                public Unit invoke() {
-                    MainActivity.this.showIssuer();
-                    return Unit.INSTANCE;
-                }
-            })));
             help.add(new Screens.Nav("인증서 보기", null, guard(new Function0<Unit>() {
                 @Override
                 public Unit invoke() {
@@ -794,24 +787,6 @@ public final class MainActivity extends Activity {
         }), guard(new Function0<Unit>() {
             @Override
             public Unit invoke() {
-                MainActivity.this.pasteActivationCode();
-                return Unit.INSTANCE;
-            }
-        }), guard(new Function0<Unit>() {
-            @Override
-            public Unit invoke() {
-                MainActivity.this.scanQr(new Function1<String, Unit>() {
-                    @Override
-                    public Unit invoke(String text) {
-                        MainActivity.this.installActivationText(text);
-                        return Unit.INSTANCE;
-                    }
-                });
-                return Unit.INSTANCE;
-            }
-        }), guard(new Function0<Unit>() {
-            @Override
-            public Unit invoke() {
                 MainActivity.this.submitAuthCode();
                 return Unit.INSTANCE;
             }
@@ -828,20 +803,6 @@ public final class MainActivity extends Activity {
         this.handler.postDelayed(this.activationPoll, 2000L);
     }
 
-    /** Reads an activation code from the clipboard (issued by another phone) and installs it. */
-    private final void pasteActivationCode() {
-        Screens.Activation a = this.activation;
-        if (a == null) {
-            return;
-        }
-        String text = IssuerScreen.clipboardText(this);
-        if (text.isEmpty()) {
-            a.status.setText("클립보드가 비어 있어요. 활성화 코드를 먼저 복사하세요.");
-            return;
-        }
-        installActivationText(text);
-    }
-
     /** Checks the code typed from the authenticator app. */
     private final void submitAuthCode() {
         Screens.Activation a = this.activation;
@@ -856,73 +817,6 @@ public final class MainActivity extends Activity {
         this.activation = null;
         this.handler.removeCallbacks(this.activationPoll);
         beginEntry$default(this, false, 1, null);
-    }
-
-    /** Installs an activation code (pasted or read from a QR) and continues into the app when it is valid. */
-    private final void installActivationText(String text) {
-        Screens.Activation a = this.activation;
-        if (a == null) {
-            return;
-        }
-        try {
-            Certification.INSTANCE.install(text);
-        } catch (Throwable t) {
-            a.status.setText(AppStyle.keepWords(Certification.describe(t)));
-            return;
-        }
-        this.activation = null;
-        this.handler.removeCallbacks(this.activationPoll);
-        beginEntry$default(this, false, 1, null);
-    }
-
-    private Function1<String, Unit> qrCallback;
-
-    /** Takes a photo of a QR code with the system camera and passes its text to {@code callback}. */
-    private final void scanQr(Function1<String, Unit> callback) {
-        this.qrCallback = callback;
-        try {
-            QrCapture.start(this);
-        } catch (Throwable t) {
-            this.qrCallback = null;
-            android.widget.Toast.makeText(this, "카메라를 열지 못했어요.", android.widget.Toast.LENGTH_LONG).show();
-        }
-    }
-
-    @Override // android.app.Activity
-    protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != QrCapture.REQUEST) {
-            return;
-        }
-        String text = QrCapture.handle(this, requestCode, resultCode, data);
-        Function1<String, Unit> callback = this.qrCallback;
-        this.qrCallback = null;
-        if (callback == null || resultCode != RESULT_OK) {
-            return;
-        }
-        if (text == null || text.isEmpty()) {
-            android.widget.Toast.makeText(this, "QR을 읽지 못했어요. 화면 전체가 또렷하게 나오게 다시 찍어 보세요.", android.widget.Toast.LENGTH_LONG).show();
-            return;
-        }
-        callback.invoke(text);
-    }
-
-    private final void showIssuer() {
-        this.inSettings = true;
-        this.home = null;
-        setContentView(IssuerScreen.build(this, new Function0<Unit>() {
-            @Override
-            public Unit invoke() {
-                MainActivity.this.showHome();
-                return Unit.INSTANCE;
-            }
-        }, new Function1<Function1<String, Unit>, Unit>() {
-            @Override
-            public Unit invoke(Function1<String, Unit> callback) {
-                MainActivity.this.scanQr(callback);
-                return Unit.INSTANCE;
-            }
-        }));
     }
 
     private final void copyText(String label, String text) {

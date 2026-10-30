@@ -154,9 +154,6 @@ public final class Certification {
         if (m.contains("expired")) {
             return "만료된 인증 키 파일이에요. 새로 발급하세요.";
         }
-        if (m.contains("Not an issuer")) {
-            return "발급자 인증서가 아니에요.";
-        }
         if (t instanceof org.json.JSONException || t instanceof IllegalArgumentException || t instanceof java.time.format.DateTimeParseException) {
             return "파일 형식이 올바르지 않아요.";
         }

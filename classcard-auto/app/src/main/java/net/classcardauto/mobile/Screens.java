@@ -936,7 +936,7 @@ public final class Screens {
      * First-run screen shown until an authorisation file issued for this phone has been dropped into the app folder.
      * {@code code} is this phone's device code, {@code folder} the folder to copy the key file into.
      */
-    public static Activation activation(Context c, String code, String folder, Function0<Unit> onCheck, Function0<Unit> onCopyCode, Function0<Unit> onCopyFolder, Function0<Unit> onPasteCode, Function0<Unit> onScanCode, Function0<Unit> onSubmitAuthCode, Function0<Unit> onClose) {
+    public static Activation activation(Context c, String code, String folder, Function0<Unit> onCheck, Function0<Unit> onCopyCode, Function0<Unit> onCopyFolder, Function0<Unit> onSubmitAuthCode, Function0<Unit> onClose) {
         AppStyle s = AppStyle.INSTANCE;
         Page page = page(c, brandBar(c, null));
         LinearLayout content = page.content;
@@ -956,22 +956,7 @@ public final class Screens {
         LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-2, -2);
         cp.leftMargin = dp(c, 8);
         codeBlock.addView(copyCode, cp);
-        LinearLayout codeWithQr = new LinearLayout(c);
-        codeWithQr.setOrientation(1);
-        codeWithQr.addView(codeBlock);
-        try {
-            android.widget.ImageView qr = new android.widget.ImageView(c);
-            qr.setImageBitmap(QrCodec.render(IssuerScreen.DEVICE_QR_PREFIX + code, 600));
-            qr.setAdjustViewBounds(true);
-            LinearLayout.LayoutParams qp = new LinearLayout.LayoutParams(dp(c, 170), dp(c, 170));
-            qp.topMargin = dp(c, 10);
-            qp.gravity = Gravity.CENTER_HORIZONTAL;
-            codeWithQr.addView(qr, qp);
-            codeWithQr.addView(s.caption(c, "발급자 휴대폰이 이 QR을 찍으면 코드를 입력하지 않아도 돼요."), lp(c, 4));
-        } catch (Exception ignored) {
-            // the code text above is enough
-        }
-        card.addView(stepRow(c, "1", "기기 코드 확인", "이 코드는 이 휴대폰에만 해당돼요.", codeWithQr));
+        card.addView(stepRow(c, "1", "기기 코드 확인", "이 코드는 이 휴대폰에만 해당돼요.", codeBlock));
 
         add(card, stepRow(c, "2", "컴퓨터에서 키 파일 만들기", "issuer 폴더에서 아래처럼 실행하면 classcard-auth.key 가 만들어져요.", codeBox(c, "python issue.py --device " + code, 12.5f)), 22);
 
@@ -986,19 +971,6 @@ public final class Screens {
         folderBlock.addView(copyFolder, fp);
         add(card, stepRow(c, "3", "휴대폰에 넣기", "USB로 컴퓨터에 연결하고 파일 관리자에서 이 폴더를 열어 키 파일을 넣으세요. 폴더가 보이지 않으면 휴대폰을 다시 연결해 보세요.", folderBlock), 22);
         add(content, card, 10);
-
-        add(content, s.sectionLabel(c, "방법 B · 다른 휴대폰에서 활성화 코드 받기"), 22);
-        LinearLayout cardB = s.card(c);
-        cardB.addView(s.label(c, "미리 발급자로 등록해 둔 내 휴대폰에서 위 기기 코드로 활성화 코드를 만든 뒤, 메신저나 메모로 이 휴대폰에 보내 복사하세요. 컴퓨터가 필요 없어요.", 14.0f, s.getMuted(), false));
-        Button paste = s.button(c, "복사한 활성화 코드 붙여넣기", AppStyle.Tone.TONAL, onPasteCode);
-        paste.setMinHeight(dp(c, 48));
-        paste.setMinimumHeight(dp(c, 48));
-        add(cardB, paste, 12);
-        Button scanCode = s.button(c, "QR 찍어서 활성화", AppStyle.Tone.TONAL, onScanCode);
-        scanCode.setMinHeight(dp(c, 48));
-        scanCode.setMinimumHeight(dp(c, 48));
-        add(cardB, scanCode, 8);
-        add(content, cardB, 10);
 
         add(content, s.sectionLabel(c, "방법 C · 인증용 앱(MiMiC Auth)으로 코드 받기"), 22);
         LinearLayout cardC = s.card(c);

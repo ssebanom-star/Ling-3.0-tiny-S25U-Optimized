@@ -24,8 +24,8 @@ public class QrCodecTest {
 
     public static void main(String[] a) throws Exception {
         ok("device qr", ("MCDEV:f881a45eedbd33af").equals(roundTrip("MCDEV:f881a45eedbd33af", 400, 0)));
-        // a code the size of a short activation code
-        StringBuilder sb = new StringBuilder("MC2.");
+        // a code the size of a challenge-sized text
+        StringBuilder sb = new StringBuilder("MCA1:");
         Random r = new Random(1);
         String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
         while (sb.length() < 560) sb.append(alphabet.charAt(r.nextInt(alphabet.length())));
@@ -34,7 +34,7 @@ public class QrCodecTest {
         ok("survives sensor noise", code.equals(roundTrip(code, 900, 40)));
         ok("module count stays moderate", QrCodec.matrix(code).length <= 110);
         // the long certificate-carrying code is much bigger
-        StringBuilder lg = new StringBuilder("MC1.");
+        StringBuilder lg = new StringBuilder("MCA1:");
         while (lg.length() < 2200) lg.append(alphabet.charAt(r.nextInt(alphabet.length())));
         ok("long code still encodes", lg.toString().equals(roundTrip(lg.toString(), 1800, 0)));
         System.out.println("long code modules: " + QrCodec.matrix(lg.toString()).length + ", short: " + QrCodec.matrix(code).length);
