@@ -43,6 +43,8 @@ public final class BotEngine {
     private final Map<String, Integer> actionAttempts;
     private boolean active;
     private final Set<String> answered;
+    /** Questions whose answer time ran out (or that moved on before the answer was confirmed). */
+    private final Set<String> timedOut = new LinkedHashSet<>();
     private String code;
     private String collectReturnPhase;
     private final LinkedHashMap<Pair<String, String>, Card> collected;
@@ -1367,21 +1369,42 @@ public final class BotEngine {
                             text4 = "";
                         }
                         boolean contains$default = StringsKt.contains((CharSequence) text4, (CharSequence) this.service.getProfile().getFeedbackMessage(), false);
-                        if (!(list instanceof Collection) || !list.isEmpty()) {
-                            Iterator<?> it2 = list.iterator();
-                            while (it2.hasNext()) {
-                                if (Intrinsics.areEqual(((UiNode) it2.next()).getId(), "txt_time_over")) {
-                                    throw new IllegalStateException(("답 입력 제한 시간이 지났습니다: " + str).toString());
-                                }
+                        boolean timeOver = false;
+                        for (UiNode node : list) {
+                            if (Intrinsics.areEqual(node.getId(), "txt_time_over")) {
+                                timeOver = true;
+                                break;
                             }
                         }
+                        if (timeOver) {
+                            // ClassCard's answer time ran out on this question: count it as missed and carry on
+                            if (!this.answered.contains(str) && this.timedOut.add(str)) {
+                                log("time_over", new QuietJson().put("progress", str));
+                            }
+                            if (this.pending != null && Intrinsics.areEqual(this.pending.getProgress(), str)) {
+                                this.pending = null;
+                            }
+                            this.service.setStatus(intValue + "/" + intValue2 + " · 시간 초과 · 다음 문항으로");
+                            if (this.natural || !humanAdvanceReady(str + ":timeover", now) || !this.gate.ready(str + ":timeover", cardBounds(ns), now, false, 1)) {
+                                return;
+                            }
+                            this.service.swipeCard(cardBounds(ns), ns);
+                            log("advance", new QuietJson().put("progress", str).put("after", "time_over"));
+                            return;
+                        }
                         Pending pending = this.pending;
+                        if (pending != null && !Intrinsics.areEqual(pending.getProgress(), str)) {
+                            // the question moved on before the answer was confirmed (e.g. its time ran out): treat it as missed
+                            if (!this.answered.contains(pending.getProgress())) {
+                                this.timedOut.add(pending.getProgress());
+                            }
+                            log("moved_on", new QuietJson().put("progress", pending.getProgress()).put("now", str));
+                            this.pending = null;
+                            pending = null;
+                        }
                         if (pending == null) {
                             z = contains$default;
                         } else {
-                            if (!Intrinsics.areEqual(pending.getProgress(), str)) {
-                                throw new IllegalStateException("입력 확인 전에 문항이 바뀌었습니다.".toString());
-                            }
                             if (contains$default) {
                                 this.answered.add(str);
                                 this.pending = null;
@@ -1449,7 +1472,7 @@ public final class BotEngine {
                 }
             }
         } else {
-            if (this.expectedQuestions <= 0 || (!this.intervened && this.answered.size() != this.expectedQuestions)) {
+            if (this.expectedQuestions <= 0 || (!this.intervened && this.answered.size() + this.timedOut.size() != this.expectedQuestions)) {
                 throw new IllegalStateException("전체 문항 입력을 확인하지 못했습니다.".toString());
             }
             if (!(list instanceof Collection) || !list.isEmpty()) {
@@ -1472,6 +1495,9 @@ public final class BotEngine {
                 this.active = false;
                 this.epoch++;
                 String wrongNote = this.wrongSet != null ? " · 의도한 오답 " + this.wrongSet.size() + "개 중 " + this.wrongPick.size() + "개 실행" : "";
+                if (!this.timedOut.isEmpty()) {
+                    wrongNote = wrongNote + " · 시간 초과 " + this.timedOut.size() + "문항";
+                }
                 this.service.alert(2);
                 this.service.setStatus(str3 + " · " + this.answered.size() + "문항 완료" + wrongNote);
             }
@@ -1714,6 +1740,7 @@ public final class BotEngine {
         this.gate = new SwipeGate(AdvancedSettings.gateMs(this.storage.getPrefs()), 2);
         this.contexts.clear();
         this.answered.clear();
+        this.timedOut.clear();
         this.loggedPrompts.clear();
         this.tapTimes.clear();
         this.lastActions.clear();
