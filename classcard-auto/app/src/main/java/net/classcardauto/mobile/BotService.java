@@ -137,6 +137,7 @@ public final class BotService extends AccessibilityService {
                     FloatingPanel clockPanel = BotService.this.floating;
                     if (clockPanel != null) {
                         clockPanel.setRemaining(BotService.this.getEngine().getRemainingSeconds());
+                        clockPanel.setEta(BotService.this.getEngine().getEtaSeconds());
                     }
                     long elapsedRealtime = SystemClock.elapsedRealtime();
                     Object systemService = BotService.this.getSystemService("power");
@@ -176,6 +177,9 @@ public final class BotService extends AccessibilityService {
                             }
                         }
                     }
+                } else if (BotService.this.getEngine().isCalibrating()) {
+                    // measuring the user's own pace: only look at the screen, never touch it
+                    BotService.this.getEngine().observeCalibration(BotService.this.readScreen(), SystemClock.elapsedRealtime());
                 } else {
                     long elapsedRealtime2 = SystemClock.elapsedRealtime();
                     j = BotService.this.idleCheckedAt;
@@ -430,6 +434,31 @@ public final class BotService extends AccessibilityService {
 
     private boolean snappedForTest;
     private long visibleSince;
+
+    /** Starts or ends the personal-pace measurement (the user answers a test by hand while the app only watches). */
+    public final void toggleCalibration() {
+        if (getEngine().getActive()) {
+            return;
+        }
+        if (getEngine().isCalibrating()) {
+            String message = getEngine().finishCalibration();
+            onCalibrationDone(message != null ? message : "측정을 취소했어요 (3문항 이상 필요)");
+            return;
+        }
+        getEngine().startCalibration();
+        setStatus("측정 중 0/" + BotEngine.CALIBRATION_TARGET + " · 시험을 직접 풀어 주세요");
+    }
+
+    public final void onCalibrationDone(String message) {
+        if (message != null && message.startsWith("내 속도")) {
+            alert(2);
+        }
+        FloatingPanel panel = this.floating;
+        if (panel != null) {
+            panel.rebuildSettings();
+        }
+        setStatus(message != null ? message : "측정을 마쳤어요");
+    }
     private UiNode verifyTarget;
     private int verifyAborts;
 
@@ -845,11 +874,14 @@ public final class BotService extends AccessibilityService {
         FloatingPanel panel = this.floating;
         if (panel != null) {
             panel.render(active, this.status, !active || collecting, beforeTest);
+            if (getEngine().isCalibrating()) {
+                panel.getStatusText().setText(this.status);
+            }
             panel.renderRun(getEngine().isPaused(), getEngine().getUserTouches(), getEngine().getTouchLimit(), getEngine().isInTest(), getEngine().isTouchLocked(), getEngine().getBlockedTouches());
         }
         LinearLayout linearLayout = this.overlay;
         if (linearLayout != null) {
-            linearLayout.setVisibility((UsageConsent.INSTANCE.getAllowed() && (active || (this.currentStartAllowed && !this.panelOff)) && !this.overlayDismissed) ? 0 : 8);
+            linearLayout.setVisibility((UsageConsent.INSTANCE.getAllowed() && (active || getEngine().isCalibrating() || (this.currentStartAllowed && !this.panelOff)) && !this.overlayDismissed) ? 0 : 8);
         }
         WindowManager.LayoutParams layoutParams = this.overlayParams;
         if (layoutParams != null) {

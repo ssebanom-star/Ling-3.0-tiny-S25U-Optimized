@@ -82,6 +82,8 @@ public final class FloatingPanel extends LinearLayout {
     private boolean collapsed;
     private boolean minimized;
     private final TextView miniTime;
+    private final TextView miniEta;
+    private long etaSeconds = -1;
     private final TextView miniInfo;
     private final ImageView miniPauseIcon;
     private boolean compact;
@@ -255,6 +257,10 @@ public final class FloatingPanel extends LinearLayout {
         miniTime = s.label(context, "", 12.0f, ON_PANEL, true);
         miniTime.setGravity(Gravity.CENTER);
         mini.addView(miniTime, new LayoutParams(-2, -2));
+        miniEta = s.label(context, "", 9.5f, ON_PANEL_DIM, false);
+        miniEta.setGravity(Gravity.CENTER);
+        miniEta.setVisibility(GONE);
+        mini.addView(miniEta, new LayoutParams(-2, -2));
         LinearLayout miniPause = new LinearLayout(context);
         miniPause.setGravity(Gravity.CENTER);
         GradientDrawable pauseBg = s.roundRect(context, CHIP, 999, 0);
@@ -617,6 +623,28 @@ public final class FloatingPanel extends LinearLayout {
         lp.leftMargin = s.dp(context, 6);
         chip.addView(labelView, lp);
         return chip;
+    }
+
+    /** Estimated seconds until the test is answered completely (from this run's own pace); -1 hides it. */
+    public void setEta(long seconds) {
+        if (seconds == etaSeconds) {
+            return;
+        }
+        etaSeconds = seconds;
+        if (seconds < 0) {
+            miniEta.setVisibility(GONE);
+        } else {
+            miniEta.setText("끝까지 " + AppStyle.formatClock(seconds));
+            miniEta.setVisibility(VISIBLE);
+        }
+    }
+
+    /** Rebuilds the settings list so sliders show values changed elsewhere (e.g. by the pace measurement). */
+    public void rebuildSettings() {
+        if (settingsShown) {
+            sliders.removeAllViews();
+            Screens.addPanelSettings(getContext(), sliders, panelPrefs);
+        }
     }
 
     /** Seconds left before the run limit; shown next to "실행 중" and turns amber in the last minute. */

@@ -253,7 +253,8 @@ public final class MainActivity extends Activity {
         Screens.Link link = companion == null ? Screens.Link.NO_SERVICE : (paused ? Screens.Link.PAUSED : (running ? Screens.Link.RUNNING : Screens.Link.READY));
         if (link == Screens.Link.RUNNING || link == Screens.Link.PAUSED) {
             BotEngine eng = companion.getEngine();
-            String note = eng.isInTest() ? "직접 터치 " + eng.getUserTouches() + " / " + eng.getTouchLimit() + "회 · 한도에 닿으면 자동으로 일시정지해요." : null;
+            long eta = eng.getEtaSeconds();
+            String note = eng.isInTest() ? (eta >= 0 ? "예상 완료까지 약 " + AppStyle.formatClock(eta) + " · " : "") + "직접 터치 " + eng.getUserTouches() + " / " + eng.getTouchLimit() + "회 · 한도에 닿으면 자동으로 일시정지해요." : null;
             if (link == Screens.Link.PAUSED) {
                 note = "직접 터치 " + eng.getUserTouches() + "회. 클래스카드에서 직접 조작한 뒤 화면의 플로팅 버튼 ‘재개’를 누르면 이어서 진행해요. 재개 후 처음 모르는 문제는 대충 찍고, 터치 횟수는 0으로 돌아가요.";
             }

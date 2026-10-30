@@ -254,6 +254,16 @@ class UiPreviewTest {
     }
 
     @Test
+    fun overlayCompactEta() {
+        val p = FloatingPanel(paparazzi.context, MemoryPrefs(), host())
+        p.render(true, "3/20", false, false)
+        p.setRemaining(300)
+        p.setEta(85)
+        p.renderRun(false, 0, 2, true, true, 0)
+        paparazzi.snapshot(overBackdrop(p), "overlay_compact_eta")
+    }
+
+    @Test
     fun overlayIdle() {
         val p = FloatingPanel(paparazzi.context, MemoryPrefs(), host())
         p.render(false, "", true, false)

@@ -1679,6 +1679,7 @@ public final class BotEngine {
         this.natural = this.storage.getPrefs().getBoolean("natural", false);
         this.human = this.storage.getPrefs().getBoolean("human_like", false);
         this.wrongSet = null;
+        this.calibrating = false;
         this.autoPaused = false;
         this.watchStamp = "";
         this.wrongOwed = 0;
@@ -1876,6 +1877,126 @@ public final class BotEngine {
         QuietJson put = new QuietJson().put("paused_ms", pausedFor).put("phase", this.phase);
         log("resumed", put);
         this.service.setStatus(strict ? "재개했어요" : "자동으로 이어서 진행해요");
+    }
+
+    // ---- personal pace: watch the user answer a few questions by hand (memory only, nothing is stored) ----
+
+    public static final int CALIBRATION_TARGET = 8;
+    private boolean calibrating;
+    private final java.util.List<Double> calSamples = new ArrayList<>();
+    private String calProgress = "";
+    private long calSeenAt;
+    private boolean calDone;
+    private int calPromptChars;
+    private int calChoiceChars;
+
+    public final boolean isCalibrating() {
+        return this.calibrating;
+    }
+
+    public final int getCalibrationCount() {
+        return this.calSamples.size();
+    }
+
+    public final void startCalibration() {
+        if (this.active) {
+            return;
+        }
+        this.calibrating = true;
+        this.calSamples.clear();
+        this.calProgress = "";
+        this.calSeenAt = 0L;
+        this.calDone = false;
+    }
+
+    public final void cancelCalibration() {
+        this.calibrating = false;
+        this.calSamples.clear();
+    }
+
+    /**
+     * Ends the measurement. With at least 3 answers the median is turned into the "average response time" setting;
+     * returns a message for the user (or null when nothing was saved).
+     */
+    public final String finishCalibration() {
+        boolean enough = this.calSamples.size() >= 3;
+        String message = null;
+        if (enough) {
+            java.util.List<Double> sorted = new ArrayList<>(this.calSamples);
+            java.util.Collections.sort(sorted);
+            double median = sorted.get(sorted.size() / 2);
+            int mean = HumanTiming.snapMean(median);
+            this.storage.getPrefs().edit().putInt("human_mean_ms", mean).apply();
+            message = "내 속도 반영: 평균 응답 시간 " + AppStyle.formatValue(mean, "ms") + " (" + this.calSamples.size() + "문항 기준)";
+        }
+        this.calibrating = false;
+        this.calSamples.clear();
+        return message;
+    }
+
+    /** Called every tick while measuring: times each question from "choices shown" to "answer accepted". */
+    public final void observeCalibration(List<UiNode> ns, long now) {
+        if (!this.calibrating || this.active) {
+            return;
+        }
+        UiNode current = id(ns, "txt_current_num");
+        UiNode total = id(ns, "txt_total_cnt");
+        if (current == null || total == null) {
+            return;
+        }
+        String progress = current.getText().trim() + " | " + total.getText().trim();
+        if (!progress.equals(this.calProgress)) {
+            this.calProgress = progress;
+            this.calSeenAt = 0L;
+            this.calDone = false;
+        }
+        if (this.calDone) {
+            return;
+        }
+        UiNode message = id(ns, "txt_bottom_msg");
+        String bottom = message != null ? message.getText() : "";
+        int choices = 0;
+        int chars = 0;
+        for (UiNode node : ns) {
+            if (Intrinsics.areEqual(node.getId(), "txt_opt") && !StringsKt.isBlank(node.getText()) && node.getEnabled()) {
+                choices++;
+                chars += node.getText().length();
+            }
+        }
+        if (this.calSeenAt == 0) {
+            if (choices == this.service.getProfile().getChoiceCount() && bottom.equals(this.service.getProfile().getReadyMessage())) {
+                UiNode quest = id(ns, "txt_quest");
+                this.calPromptChars = quest != null ? quest.getText().length() : 0;
+                this.calChoiceChars = chars;
+                this.calSeenAt = now;
+            }
+            return;
+        }
+        if (bottom.contains(this.service.getProfile().getFeedbackMessage())) {
+            long ms = now - this.calSeenAt;
+            this.calDone = true;
+            if (ms >= 300 && ms <= 30000) {
+                this.calSamples.add(Double.valueOf(HumanTiming.meanFromObserved(ms, this.calPromptChars, this.calChoiceChars)));
+                if (this.calSamples.size() >= CALIBRATION_TARGET) {
+                    this.service.onCalibrationDone(finishCalibration());
+                    return;
+                }
+                this.service.setStatus("측정 중 " + this.calSamples.size() + "/" + CALIBRATION_TARGET + " · 계속 직접 풀어 주세요");
+            }
+        }
+    }
+
+    /** Seconds until the test is expected to be answered completely, from this run's own pace; -1 while unknown. */
+    public final long getEtaSeconds() {
+        if (!this.active || this.pauseState.isPaused() || !isInTest() || this.testStarted <= 0 || this.expectedQuestions <= 0) {
+            return -1L;
+        }
+        int done = this.answered.size();
+        if (done < 3 || done >= this.expectedQuestions) {
+            return -1L;
+        }
+        long perQuestion = (SystemClock.elapsedRealtime() - this.testStarted) / done;
+        return (perQuestion * (this.expectedQuestions - done)) / 1000L;
     }
 
     // ---- stability: self-hold when ClassCard is out of sight, watchdog, collection touch resync ----

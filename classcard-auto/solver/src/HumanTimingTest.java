@@ -87,6 +87,22 @@ public class HumanTimingTest {
             ok("fast settings bounded below", bounded);
             ok("0.5s faster than 1s", lo[1500] < fast[1500]);
         }
+        {
+            // the measured value is turned back into a setting: feeding it into thinkMillis gives about the same time
+            long observed = 2400;
+            double mean = HumanTiming.meanFromObserved(observed, 8, 48);
+            long[] tt = new long[4000];
+            Random rr = new Random(11);
+            for (int i = 0; i < tt.length; i++) {
+                tt[i] = HumanTiming.thinkMillis(rr, (int) mean, 8, 48, 0);
+            }
+            java.util.Arrays.sort(tt);
+            ok("measured pace round trip", Math.abs(tt[2000] - observed) < 300);
+            ok("snapMean rounds to the step", HumanTiming.snapMean(1130) == 1250 && HumanTiming.snapMean(1100) == 1000);
+            ok("snapMean clamps", HumanTiming.snapMean(100) == HumanTiming.MEAN_MIN && HumanTiming.snapMean(99999) == HumanTiming.MEAN_MAX);
+            ok("estimate grows with the setting", HumanTiming.estimatePerQuestionMs(true, 500, 650) < HumanTiming.estimatePerQuestionMs(true, 3000, 650));
+            ok("estimate without human mode is the overhead only", HumanTiming.estimatePerQuestionMs(false, 3000, 650) == 1800);
+        }
         System.out.println(pass + " pass / " + fail + " fail");
         System.exit(fail == 0 ? 0 : 1);
     }

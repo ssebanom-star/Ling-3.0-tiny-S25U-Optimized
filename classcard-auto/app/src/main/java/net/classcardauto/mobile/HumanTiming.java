@@ -16,7 +16,7 @@ public final class HumanTiming {
     public static final int MEAN_MIN = 500;
     public static final int MEAN_MAX = 8000;
     public static final int MEAN_DEFAULT = 1000;
-    public static final int MEAN_STEP = 500;
+    public static final int MEAN_STEP = 250;
 
     static final long THINK_MIN_MS = 200;
     static final long THINK_MAX_MS = 20000;
@@ -43,7 +43,7 @@ public final class HumanTiming {
      * @param questionIndex 0-based index of the question in this run
      */
     public static long thinkMillis(Random r, int meanMs, int promptChars, int choiceChars, int questionIndex) {
-        double lengthFactor = clamp(0.6 + 0.25 * (promptChars / 8.0) + 0.15 * (choiceChars / 48.0), 0.7, 1.8);
+        double lengthFactor = lengthFactor(promptChars, choiceChars);
         double median = meanMs * 0.85 * lengthFactor;
         double value = median * Math.exp(THINK_SIGMA * gauss(r));
         value *= 1.0 + Math.min(0.2, 0.003 * Math.max(0, questionIndex));
@@ -51,6 +51,39 @@ public final class HumanTiming {
             value += 800 + r.nextDouble() * 1400;
         }
         return (long) clamp(value, THINK_MIN_MS, THINK_MAX_MS);
+    }
+
+    /** How much longer a question takes to read than an average one (1.0): grows with the text, 0.7..1.8. */
+    public static double lengthFactor(int promptChars, int choiceChars) {
+        return clamp(0.6 + 0.25 * (promptChars / 8.0) + 0.15 * (choiceChars / 48.0), 0.7, 1.8);
+    }
+
+    /**
+     * The "average response time" setting that would make {@link #thinkMillis} give about {@code observedMs} for a
+     * question of this length, i.e. the inverse of the median formula (the 1.063 is the log-normal mean/median ratio).
+     */
+    public static double meanFromObserved(long observedMs, int promptChars, int choiceChars) {
+        return observedMs / (0.85 * lengthFactor(promptChars, choiceChars) * 1.063);
+    }
+
+    /** A setting value: rounded to the slider step and kept inside its range. */
+    public static int snapMean(double mean) {
+        long steps = Math.round(mean / MEAN_STEP);
+        return (int) clamp(steps * MEAN_STEP, MEAN_MIN, MEAN_MAX);
+    }
+
+    /**
+     * Rough time one question takes from the first look to the next card: thinking, the pause before the swipe, and
+     * the two waits for the card to hold still plus screen changes. The constants are estimates, not measurements.
+     */
+    public static long estimatePerQuestionMs(boolean human, int meanMs, int gateMs) {
+        double overhead = 2.0 * gateMs + 500;
+        if (!human) {
+            return (long) overhead;
+        }
+        double think = 1.03 * (0.904 * meanMs + 90);
+        double advance = 0.27 * meanMs;
+        return (long) (think + advance + overhead);
     }
 
     /** Pause after the answer was accepted before the card is swiped on. */

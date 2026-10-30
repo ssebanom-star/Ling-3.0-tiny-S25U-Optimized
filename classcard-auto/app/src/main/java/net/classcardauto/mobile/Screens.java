@@ -479,13 +479,33 @@ public final class Screens {
         parent.addView(panelSwitch(c, "사람처럼 입력", p.getBoolean("human_like", false), "human_like", p), lp(c, 2));
         parent.addView(panelSwitch(c, "실행 중 화면 터치 잠금", p.getBoolean("touch_lock", true), "touch_lock", p), lp(c, 2));
         parent.addView(panelSwitch(c, "멈추면 진동으로 알림", p.getBoolean("vibrate_alerts", true), "vibrate_alerts", p), lp(c, 2));
+        final TextView estimate = s.label(c, paceEstimate(p), 10.5f, -1, false);
+        estimate.setAlpha(0.7f);
         parent.addView(s.sliderRow(c, "평균 응답 시간", "ms", HumanTiming.MEAN_MIN, HumanTiming.MEAN_MAX, HumanTiming.MEAN_STEP, p.getInt("human_mean_ms", HumanTiming.MEAN_DEFAULT), new Function1<Integer, Unit>() {
             @Override
             public Unit invoke(Integer v) {
                 p.edit().putInt("human_mean_ms", v.intValue()).apply();
+                estimate.setText(paceEstimate(p));
                 return Unit.INSTANCE;
             }
         }, true), lp(c, 8));
+        parent.addView(estimate, lp(c, 2));
+        final TextView measure = s.label(c, calibrationLabel(), 12.0f, -1, true);
+        measure.setGravity(Gravity.CENTER);
+        measure.setBackground(s.roundRect(c, android.graphics.Color.argb(34, 255, 255, 255), 999, 0));
+        measure.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                BotService service = BotService.INSTANCE.getInstance();
+                if (service != null) {
+                    service.toggleCalibration();
+                    measure.setText(calibrationLabel());
+                }
+            }
+        });
+        LinearLayout.LayoutParams mlp = lp(c, 6);
+        mlp.height = s.dp(c, 30);
+        parent.addView(measure, mlp);
         parent.addView(s.sliderRow(c, "일부러 틀릴 문항 수", "개", AdvancedSettings.WRONG_MIN, AdvancedSettings.WRONG_MAX, AdvancedSettings.WRONG_STEP, AdvancedSettings.wrongCount(p), new Function1<Integer, Unit>() {
             @Override
             public Unit invoke(Integer v) {
@@ -508,6 +528,18 @@ public final class Screens {
             }
         }, true), lp(c, 6));
         addSliders(c, parent, p, true);
+    }
+
+    private static String calibrationLabel() {
+        BotService service = BotService.INSTANCE.getInstance();
+        boolean on = service != null && service.getEngine().isCalibrating();
+        return on ? "측정 끝내기 (3문항 이상이면 반영)" : "내 속도로 맞추기 (직접 " + BotEngine.CALIBRATION_TARGET + "문항 풀기)";
+    }
+
+    /** One line saying how long a test is expected to take with the current settings (a rough estimate). */
+    public static String paceEstimate(SharedPreferences p) {
+        long per = HumanTiming.estimatePerQuestionMs(p.getBoolean("human_like", false), p.getInt("human_mean_ms", HumanTiming.MEAN_DEFAULT), AdvancedSettings.gateMs(p));
+        return "문항당 약 " + String.format(java.util.Locale.US, "%.1f", per / 1000.0) + "초 · 20문항 약 " + AppStyle.formatClock(per * 20 / 1000) + " · 50문항 약 " + AppStyle.formatClock(per * 50 / 1000);
     }
 
     private static LinearLayout panelSwitch(Context c, String title, boolean checked, final String key, final SharedPreferences p) {
@@ -603,7 +635,7 @@ public final class Screens {
                 return Unit.INSTANCE;
             }
         }, false), 16);
-        add(humanCard, s.caption(c, "보통 길이의 문제 기준 값이며, 글이 길수록 오래 걸리고 가끔 더 망설입니다."), 8);
+        add(humanCard, s.caption(c, "보통 길이의 문제 기준 값이며, 글이 길수록 오래 걸리고 가끔 더 망설입니다. 예상: " + paceEstimate(p) + " (대략적인 추정이며, 실행 중에는 실제 속도로 다시 계산합니다)."), 8);
         add(humanCard, s.divider(c), 18);
         add(humanCard, s.sliderRow(c, "일부러 틀릴 문항 수", "개", AdvancedSettings.WRONG_MIN, AdvancedSettings.WRONG_MAX, AdvancedSettings.WRONG_STEP, AdvancedSettings.wrongCount(p), new Function1<Integer, Unit>() {
             @Override
