@@ -215,7 +215,8 @@ public final class BotService extends AccessibilityService {
                 }
             } finally {
                 BotService.this.getHandler().removeCallbacks(this);
-                BotService.this.getHandler().postDelayed(this, 100L);
+                // 초고속 모드는 화면을 더 자주 읽어 바뀐 화면에 바로 반응한다
+                BotService.this.getHandler().postDelayed(this, BotService.this.engine != null && BotService.this.getEngine().isTurbo() ? 35L : 100L);
             }
         }
     };
@@ -1065,10 +1066,11 @@ public final class BotService extends AccessibilityService {
         if (linearLayout != null) {
             linearLayout.setVisibility(0);
         }
-        long elapsedRealtime = SystemClock.elapsedRealtime() + 8000;
+        long countdown = getStorage().getPrefs().getBoolean("turbo", false) ? 3000L : 8000L;
+        long elapsedRealtime = SystemClock.elapsedRealtime() + countdown;
         this.armUntil = elapsedRealtime;
         this.lastActive = elapsedRealtime;
-        setStatus("8초 후 시작 · 중지 가능");
+        setStatus((countdown / 1000) + "초 후 시작 · 중지 가능");
     }
 
     /** The ClassCard screen counts as "seen now"; used after a pause so a stale timestamp cannot stop the run. */
@@ -1125,6 +1127,9 @@ public final class BotService extends AccessibilityService {
     }
 
     public final void hold(long ms) {
+        if (this.engine != null && getEngine().isTurbo()) {
+            ms = Math.max(40L, ms / 2);
+        }
         this.holdUntil = SystemClock.elapsedRealtime() + ms;
     }
 
@@ -1379,7 +1384,7 @@ public final class BotService extends AccessibilityService {
         engine.log("card_gesture", put);
         float humanDy = 0.0f;
         float humanDx = 0.0f;
-        long swipeMs = 250L;
+        long swipeMs = getEngine().isTurbo() ? 150L : 250L;
         if (getEngine().isHuman()) {
             java.util.Random rng = getEngine().getRng();
             humanDy = HumanTiming.jitter(rng, 6.0f);

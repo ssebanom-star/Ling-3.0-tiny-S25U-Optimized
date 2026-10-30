@@ -545,7 +545,9 @@ public final class Screens {
         AppStyle s = AppStyle.INSTANCE;
         switch (group) {
             case 0: {
-                parent.addView(panelSwitch(c, "사람처럼 입력", p.getBoolean("human_like", false), "human_like", p), lp(c, 6));
+                parent.addView(panelSwitch(c, "초고속 모드", p.getBoolean("turbo", false), "turbo", p), lp(c, 6));
+                parent.addView(panelNote(c, "앱의 대기를 최대한 줄여요. 켜면 사람처럼 입력은 쓰지 않아요."), lp(c, 0));
+                parent.addView(panelSwitch(c, "사람처럼 입력", p.getBoolean("human_like", false), "human_like", p), lp(c, 8));
                 final TextView estimate = panelNote(c, paceEstimate(p));
                 final LinearLayout meanRow = s.sliderRow(c, "평균 응답 시간", "ms", HumanTiming.MEAN_MIN, HumanTiming.MEAN_MAX, HumanTiming.MEAN_STEP, HumanProfile.meanMs(p, false), new Function1<Integer, Unit>() {
                     @Override
@@ -711,6 +713,9 @@ public final class Screens {
 
     /** One line saying how long a test is expected to take with the current settings (a rough estimate). */
     public static String paceEstimate(SharedPreferences p) {
+        if (p.getBoolean("turbo", false)) {
+            return "초고속 모드 · 속도는 클래스카드 화면 전환 속도에 달려 있어요";
+        }
         long per = HumanTiming.estimatePerQuestionMs(p.getBoolean("human_like", false), HumanProfile.meanMs(p), AdvancedSettings.gateMs(p));
         return "문항당 약 " + String.format(java.util.Locale.US, "%.1f", per / 1000.0) + "초 · 20문항 약 " + AppStyle.formatClock(per * 20 / 1000) + " · 50문항 약 " + AppStyle.formatClock(per * 50 / 1000);
     }
@@ -807,6 +812,9 @@ public final class Screens {
     static String sectionSummary(SharedPreferences p, int section) {
         switch (section) {
             case 0:
+                if (p.getBoolean("turbo", false)) {
+                    return "초고속 모드 · 오답 " + AdvancedSettings.wrongCount(p) + "개";
+                }
                 if (!p.getBoolean("human_like", false)) {
                     return "사람처럼 입력 꺼짐 · 오답 " + AdvancedSettings.wrongCount(p) + "개";
                 }
@@ -829,12 +837,19 @@ public final class Screens {
         switch (section) {
             case 0: {
                 LinearLayout humanCard = s.card(c);
-                humanCard.addView(s.switchRow(c, "사람처럼 입력", "문제를 읽는 시간, 터치 위치와 길이, 카드를 넘기는 간격을 사람처럼 무작위로 흔듭니다. 다음 실행부터 적용됩니다.", p.getBoolean("human_like", false), new CompoundButton.OnCheckedChangeListener() {
+                humanCard.addView(s.switchRow(c, "초고속 모드", "화면을 더 자주 읽고(0.1초→0.035초), 앱이 스스로 두는 대기·스와이프 시간·시작 카운트다운(8초→3초)을 줄입니다. 클래스카드 자체 애니메이션은 줄일 수 없습니다. 켜면 사람처럼 입력보다 우선합니다.", p.getBoolean("turbo", false), new CompoundButton.OnCheckedChangeListener() {
+                    @Override
+                    public void onCheckedChanged(CompoundButton b, boolean checked) {
+                        p.edit().putBoolean("turbo", checked).apply();
+                    }
+                }));
+                add(humanCard, s.divider(c), 16);
+                add(humanCard, s.switchRow(c, "사람처럼 입력", "문제를 읽는 시간, 터치 위치와 길이, 카드를 넘기는 간격을 사람처럼 무작위로 흔듭니다. 다음 실행부터 적용됩니다.", p.getBoolean("human_like", false), new CompoundButton.OnCheckedChangeListener() {
                     @Override
                     public void onCheckedChanged(CompoundButton b, boolean checked) {
                         p.edit().putBoolean("human_like", checked).apply();
                     }
-                }));
+                }), 16);
                 add(content, humanCard, 12);
 
                 add(content, s.sectionLabel(c, "응답 속도 기준"), 24);
@@ -1093,7 +1108,7 @@ public final class Screens {
             meta += (meta.isEmpty() ? "" : "  ·  ") + "수집한 단어 " + r.cards + "개";
         }
         if (!r.pace.isEmpty()) {
-            meta += (meta.isEmpty() ? "" : "  ·  ") + (r.pace.equals("human") ? "사람처럼" : r.pace.equals("natural") ? "자연 모드" : "빠른 모드");
+            meta += (meta.isEmpty() ? "" : "  ·  ") + (r.pace.equals("human") ? "사람처럼" : r.pace.equals("natural") ? "자연 모드" : r.pace.equals("turbo") ? "초고속" : "빠른 모드");
         }
         if (!meta.isEmpty()) {
             add(card, s.label(c, meta, 15.0f, s.getInk(), true), 12);

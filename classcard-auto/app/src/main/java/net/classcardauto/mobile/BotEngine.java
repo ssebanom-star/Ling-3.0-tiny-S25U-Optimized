@@ -1636,7 +1636,7 @@ public final class BotEngine {
             errorCode = JSONObject.NULL;
         }
         String source = this.vocabulary != null ? this.vocabulary.getSource() : "";
-        QuietJson summary = new QuietJson().put("status", status).put("reason", StringsKt.isBlank(reason) ? "" : "실행 중지 · 자료 삭제").put("score", score == null ? JSONObject.NULL : score).put("set_name", this.name).put("set_code", this.code).put("answers", this.answered.size()).put("expected_questions", this.expectedQuestions).put("runtime", "android-accessibility").put("requires_adb", false).put("requires_pc", false).put("pace", this.human ? "human" : (this.natural ? "natural" : "fast")).put("total_seconds", (elapsedRealtime - this.started) / 1000.0d).put("test_seconds", testSeconds).put("first_prompt_to_last_tap_seconds", firstToLast).put("read_to_tap_median_ms", median).put("read_to_tap_max_ms", maxOrNull).put("run_directory", this.run != null ? this.run.getName() : null).put("finished_at", Instant.now().toString()).put("mode", this.mode).put("source", source).put("error_code", errorCode).put("last_progress", this.lastProgress).put("collected_cards", this.collected.size()).put("ocr_reads", this.ocrReads).put("inline_pairs", this.inlinePairCount).put("ocr_captures", this.ocrCaptures).put("collection_mode", getInlineCollection() ? "inline" : "flip").put("collection_indexed", this.collectionCursor.getIndexed()).put("collection_reused_rows", this.collectionReusedRows).put("collection_strategy", this.collectionCursor.getStrategy()).put("ocr_mode", "qota-single-model").put("ocr_model", OcrReader.MODEL).put("ocr_only", this.ocrOnly).put("deliberate_wrong", this.wrongPick.size()).put("pauses", this.pauseState.getPauseCount()).put("intervened", this.intervened);
+        QuietJson summary = new QuietJson().put("status", status).put("reason", StringsKt.isBlank(reason) ? "" : "실행 중지 · 자료 삭제").put("score", score == null ? JSONObject.NULL : score).put("set_name", this.name).put("set_code", this.code).put("answers", this.answered.size()).put("expected_questions", this.expectedQuestions).put("runtime", "android-accessibility").put("requires_adb", false).put("requires_pc", false).put("pace", this.human ? "human" : (this.turbo ? "turbo" : (this.natural ? "natural" : "fast"))).put("total_seconds", (elapsedRealtime - this.started) / 1000.0d).put("test_seconds", testSeconds).put("first_prompt_to_last_tap_seconds", firstToLast).put("read_to_tap_median_ms", median).put("read_to_tap_max_ms", maxOrNull).put("run_directory", this.run != null ? this.run.getName() : null).put("finished_at", Instant.now().toString()).put("mode", this.mode).put("source", source).put("error_code", errorCode).put("last_progress", this.lastProgress).put("collected_cards", this.collected.size()).put("ocr_reads", this.ocrReads).put("inline_pairs", this.inlinePairCount).put("ocr_captures", this.ocrCaptures).put("collection_mode", getInlineCollection() ? "inline" : "flip").put("collection_indexed", this.collectionCursor.getIndexed()).put("collection_reused_rows", this.collectionReusedRows).put("collection_strategy", this.collectionCursor.getStrategy()).put("ocr_mode", "qota-single-model").put("ocr_model", OcrReader.MODEL).put("ocr_only", this.ocrOnly).put("deliberate_wrong", this.wrongPick.size()).put("pauses", this.pauseState.getPauseCount()).put("intervened", this.intervened);
         this.active = false;
         this.epoch++;
         this.vocabulary = null;
@@ -1709,7 +1709,9 @@ public final class BotEngine {
         this.ocrCaptures = 0;
         this.inlineStability.reset();
         this.natural = this.storage.getPrefs().getBoolean("natural", false);
-        this.human = this.storage.getPrefs().getBoolean("human_like", false);
+        this.turbo = this.storage.getPrefs().getBoolean("turbo", false);
+        // 초고속 모드는 사람처럼 입력보다 우선한다 (둘 다 켜져 있으면 초고속)
+        this.human = this.storage.getPrefs().getBoolean("human_like", false) && !this.turbo;
         this.wrongSet = null;
         this.calibrating = false;
         this.autoPaused = false;
@@ -2313,13 +2315,20 @@ public final class BotEngine {
         record.message = reason;
         record.progress = this.lastProgress;
         record.phase = this.phase;
-        record.pace = this.human ? "human" : (this.natural ? "natural" : "fast");
+        record.pace = this.human ? "human" : (this.turbo ? "turbo" : (this.natural ? "natural" : "fast"));
         record.cards = this.vocabulary != null ? this.vocabulary.getCards().size() : this.collected.size();
         FailureLog.append(this.storage.getRoot(), record);
     }
 
     public final boolean isHuman() {
         return this.human;
+    }
+
+    private boolean turbo;
+
+    /** "초고속 모드": shorter waits everywhere the app itself waits; ClassCard's own animations are unchanged. */
+    public final boolean isTurbo() {
+        return this.active && this.turbo;
     }
 
     public final java.util.Random getRng() {
@@ -2390,7 +2399,8 @@ public final class BotEngine {
     }
 
     private final long scrollInterval() {
-        return ScrollSettings.intervalMs(this.storage.getPrefs());
+        long interval = ScrollSettings.intervalMs(this.storage.getPrefs());
+        return this.turbo ? Math.max(ScrollSettings.INTERVAL_MIN, interval / 2) : interval;
     }
 
     public final int getEpoch() {
