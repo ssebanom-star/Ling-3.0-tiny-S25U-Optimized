@@ -368,6 +368,13 @@ public final class MainActivity extends Activity {
             }
         })));
         if (Certification.INSTANCE.getRequired()) {
+            help.add(new Screens.Nav("발급자 도구", "다른 휴대폰의 인증을 이 휴대폰에서 대신 발급", guard(new Function0<Unit>() {
+                @Override
+                public Unit invoke() {
+                    MainActivity.this.showIssuer();
+                    return Unit.INSTANCE;
+                }
+            })));
             help.add(new Screens.Nav("인증서 보기", null, guard(new Function0<Unit>() {
                 @Override
                 public Unit invoke() {
@@ -786,6 +793,12 @@ public final class MainActivity extends Activity {
         }), guard(new Function0<Unit>() {
             @Override
             public Unit invoke() {
+                MainActivity.this.pasteActivationCode();
+                return Unit.INSTANCE;
+            }
+        }), guard(new Function0<Unit>() {
+            @Override
+            public Unit invoke() {
                 MainActivity.this.closeApp();
                 return Unit.INSTANCE;
             }
@@ -794,6 +807,40 @@ public final class MainActivity extends Activity {
         setContentView(a.root);
         this.handler.removeCallbacks(this.activationPoll);
         this.handler.postDelayed(this.activationPoll, 2000L);
+    }
+
+    /** Reads an activation code from the clipboard (issued by another phone) and installs it. */
+    private final void pasteActivationCode() {
+        Screens.Activation a = this.activation;
+        if (a == null) {
+            return;
+        }
+        String text = IssuerScreen.clipboardText(this);
+        if (text.isEmpty()) {
+            a.status.setText("클립보드가 비어 있어요. 활성화 코드를 먼저 복사하세요.");
+            return;
+        }
+        try {
+            Certification.INSTANCE.install(text);
+        } catch (Throwable t) {
+            a.status.setText(AppStyle.keepWords(Certification.describe(t)));
+            return;
+        }
+        this.activation = null;
+        this.handler.removeCallbacks(this.activationPoll);
+        beginEntry$default(this, false, 1, null);
+    }
+
+    private final void showIssuer() {
+        this.inSettings = true;
+        this.home = null;
+        setContentView(IssuerScreen.build(this, new Function0<Unit>() {
+            @Override
+            public Unit invoke() {
+                MainActivity.this.showHome();
+                return Unit.INSTANCE;
+            }
+        }));
     }
 
     private final void copyText(String label, String text) {

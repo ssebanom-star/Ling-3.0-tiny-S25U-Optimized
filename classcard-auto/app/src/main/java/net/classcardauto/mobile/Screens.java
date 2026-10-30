@@ -934,12 +934,13 @@ public final class Screens {
      * First-run screen shown until an authorisation file issued for this phone has been dropped into the app folder.
      * {@code code} is this phone's device code, {@code folder} the folder to copy the key file into.
      */
-    public static Activation activation(Context c, String code, String folder, Function0<Unit> onCheck, Function0<Unit> onCopyCode, Function0<Unit> onCopyFolder, Function0<Unit> onClose) {
+    public static Activation activation(Context c, String code, String folder, Function0<Unit> onCheck, Function0<Unit> onCopyCode, Function0<Unit> onCopyFolder, Function0<Unit> onPasteCode, Function0<Unit> onClose) {
         AppStyle s = AppStyle.INSTANCE;
         Page page = page(c, brandBar(c, null));
         LinearLayout content = page.content;
         add(content, s.label(c, "인증이 필요해요", 28.0f, s.getInk(), true), 22);
-        add(content, s.label(c, "이 휴대폰은 아직 인증되지 않았어요. 컴퓨터에서 인증 키 파일을 만들어 아래 폴더에 넣어 주세요.", 15.0f, s.getMuted(), false), 10);
+        add(content, s.label(c, "이 휴대폰은 아직 인증되지 않았어요. 아래 두 방법 중 편한 쪽으로 인증하세요.", 15.0f, s.getMuted(), false), 10);
+        add(content, s.sectionLabel(c, "방법 A · 컴퓨터에서 키 파일 만들기"), 18);
 
         LinearLayout card = s.card(c);
         LinearLayout codeBlock = new LinearLayout(c);
@@ -967,7 +968,16 @@ public final class Screens {
         fp.gravity = Gravity.END;
         folderBlock.addView(copyFolder, fp);
         add(card, stepRow(c, "3", "휴대폰에 넣기", "USB로 컴퓨터에 연결하고 파일 관리자에서 이 폴더를 열어 키 파일을 넣으세요. 폴더가 보이지 않으면 휴대폰을 다시 연결해 보세요.", folderBlock), 22);
-        add(content, card, 22);
+        add(content, card, 10);
+
+        add(content, s.sectionLabel(c, "방법 B · 다른 휴대폰에서 활성화 코드 받기"), 22);
+        LinearLayout cardB = s.card(c);
+        cardB.addView(s.label(c, "미리 발급자로 등록해 둔 내 휴대폰에서 위 기기 코드로 활성화 코드를 만든 뒤, 메신저나 메모로 이 휴대폰에 보내 복사하세요. 컴퓨터가 필요 없어요.", 14.0f, s.getMuted(), false));
+        Button paste = s.button(c, "복사한 활성화 코드 붙여넣기", AppStyle.Tone.TONAL, onPasteCode);
+        paste.setMinHeight(dp(c, 48));
+        paste.setMinimumHeight(dp(c, 48));
+        add(cardB, paste, 12);
+        add(content, cardB, 10);
 
         TextView status = s.label(c, "", 14.0f, s.getDanger(), false);
         add(content, status, 16);

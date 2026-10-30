@@ -125,6 +125,12 @@ class UiPreviewTest {
     }
 
     @Test
+    fun issuerTools() {
+        val v = net.classcardauto.mobile.IssuerScreen.build(paparazzi.context, { })
+        paparazzi.snapshot(v, "issuer_tools")
+    }
+
+    @Test
     fun password() {
         val p = Screens.password(paparazzi.context, { }, { })
         p.error.text = "비밀번호가 맞지 않습니다. 다시 입력해주세요."
@@ -136,7 +142,7 @@ class UiPreviewTest {
         val a = Screens.activation(
             paparazzi.context, "3f9a1c2b7d4e8a60",
             "내장 메모리/Android/data/net.classcardauto.mobile.nocert/files/auth",
-            { }, { }, { }, { },
+            { }, { }, { }, { }, { },
         )
         a.status.text = "classcard-auth.key: 다른 휴대폰(또는 다른 앱)용으로 발급된 파일이에요."
         paparazzi.snapshot(a.root, "activation")
