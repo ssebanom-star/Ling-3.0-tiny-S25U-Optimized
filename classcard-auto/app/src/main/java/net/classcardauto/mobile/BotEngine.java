@@ -975,6 +975,16 @@ public final class BotEngine {
     /* JADX INFO: Access modifiers changed from: private */
     public static final Unit inputAnswer$lambda$51(BotEngine botEngine, String str, String str2, ChoiceAnswer choiceAnswer, long j, int i) {
         long now = SystemClock.elapsedRealtime();
+        if (botEngine.skipConfirm()) {
+            // 확인 없이 넘기기: count the answer as given right away; the next tick swipes without waiting for feedback
+            botEngine.answered.add(str);
+            botEngine.pending = null;
+            botEngine.tapTimes.add(Double.valueOf(now - j));
+            botEngine.lastTap = now;
+            botEngine.log("tap", new QuietJson().put("progress", str).put("attempt", i).put("confirm", false));
+            botEngine.gate.resetObservation();
+            return Unit.INSTANCE;
+        }
         botEngine.pending = new Pending(str, str2, choiceAnswer, now, now - j, i);
         QuietJson put = new QuietJson().put("progress", str).put("answer", choiceAnswer.getTarget().getText()).put("attempt", i);
         Intrinsics.checkNotNullExpressionValue(put, "put(...)");
@@ -1464,7 +1474,7 @@ public final class BotEngine {
                             QuietJson adopted = new QuietJson().put("progress", str);
                             log("adopted_user_answer", adopted);
                         }
-                        if (!z || !this.answered.contains(str)) {
+                        if ((!z && !skipConfirm()) || !this.answered.contains(str)) {
                             this.gate.resetObservation();
                             return;
                         }
@@ -2354,6 +2364,11 @@ public final class BotEngine {
     private int guessedAnswers;
 
     /** "초고속 모드": shorter waits everywhere the app itself waits; ClassCard's own animations are unchanged. */
+    /** 초고속 + "확인 없이 넘기기": after tapping an answer, swipe on without waiting for ClassCard's feedback. */
+    final boolean skipConfirm() {
+        return isTurbo() && "test".equals(this.phase) && this.storage.getPrefs().getBoolean("turbo_skip_confirm", false);
+    }
+
     public final boolean isTurbo() {
         // never while collecting: a read counts as settled after two equal reads in a row, so faster polling would
         // read cards mid-flip and miss words

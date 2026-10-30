@@ -547,6 +547,8 @@ public final class Screens {
             case 0: {
                 parent.addView(panelSwitch(c, "초고속 모드", p.getBoolean("turbo", false), "turbo", p), lp(c, 6));
                 parent.addView(panelNote(c, "앱의 대기를 최대한 줄여요. 켜면 사람처럼 입력은 쓰지 않아요."), lp(c, 0));
+                parent.addView(panelSwitch(c, "└ 확인 없이 넘기기", p.getBoolean("turbo_skip_confirm", false), "turbo_skip_confirm", p), lp(c, 4));
+                parent.addView(panelNote(c, "답을 누르자마자 넘겨요. 터치가 안 먹히면 그 문항은 틀려요. 초고속일 때만 동작."), lp(c, 0));
                 parent.addView(panelSwitch(c, "사람처럼 입력", p.getBoolean("human_like", false), "human_like", p), lp(c, 8));
                 final TextView estimate = panelNote(c, paceEstimate(p));
                 final LinearLayout meanRow = s.sliderRow(c, "평균 응답 시간", "ms", HumanTiming.MEAN_MIN, HumanTiming.MEAN_MAX, HumanTiming.MEAN_STEP, HumanProfile.meanMs(p, false), new Function1<Integer, Unit>() {
@@ -843,6 +845,13 @@ public final class Screens {
                         p.edit().putBoolean("turbo", checked).apply();
                     }
                 }));
+                add(humanCard, s.divider(c), 16);
+                add(humanCard, s.switchRow(c, "확인 없이 넘기기 (초고속 전용)", "답을 누른 뒤 정답/오답 표시를 기다리지 않고 바로 다음 문항으로 넘깁니다. 터치가 반영되지 않아도 다시 누르지 않으므로 그 문항은 틀릴 수 있습니다. 초고속 모드가 켜져 있을 때만 동작합니다.", p.getBoolean("turbo_skip_confirm", false), new CompoundButton.OnCheckedChangeListener() {
+                    @Override
+                    public void onCheckedChanged(CompoundButton b, boolean checked) {
+                        p.edit().putBoolean("turbo_skip_confirm", checked).apply();
+                    }
+                }), 16);
                 add(humanCard, s.divider(c), 16);
                 add(humanCard, s.switchRow(c, "사람처럼 입력", "문제를 읽는 시간, 터치 위치와 길이, 카드를 넘기는 간격을 사람처럼 무작위로 흔듭니다. 다음 실행부터 적용됩니다.", p.getBoolean("human_like", false), new CompoundButton.OnCheckedChangeListener() {
                     @Override
