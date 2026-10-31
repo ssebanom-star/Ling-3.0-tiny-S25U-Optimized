@@ -1865,7 +1865,8 @@ public final class BotEngine {
         this.collectionIncomplete = false;
         this.guessedAnswers = 0;
         // 초고속 모드는 사람처럼 입력보다 우선한다 (둘 다 켜져 있으면 초고속)
-        this.human = this.storage.getPrefs().getBoolean("human_like", false) && !this.turbo;
+        // 초고속의 "시험 빠르게"가 켜져 있으면 사람처럼 입력보다 우선; 수집만 빠르게면 시험은 사람처럼 푼다
+        this.human = this.storage.getPrefs().getBoolean("human_like", false) && !(this.turbo && TurboParts.scopeOn(this.storage.getPrefs(), false));
         this.wrongSet = null;
         this.calibrating = false;
         this.autoPaused = false;
@@ -2483,6 +2484,10 @@ public final class BotEngine {
     }
 
     public final boolean isHuman() {
+        // while collecting fast, gestures are not jittered like a person's (the test still is)
+        if (this.human && this.turbo && this.phase != null && (this.phase.startsWith("collect") || this.phase.startsWith("expand")) && TurboParts.scopeOn(this.storage.getPrefs(), true)) {
+            return false;
+        }
         return this.human;
     }
 

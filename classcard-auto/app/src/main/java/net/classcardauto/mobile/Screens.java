@@ -552,8 +552,10 @@ public final class Screens {
         switch (group) {
             case 0: {
                 parent.addView(panelSwitch(c, "사람처럼 입력", p.getBoolean("human_like", false), "human_like", p), lp(c, 6));
-                if (p.getBoolean("turbo", false)) {
-                    parent.addView(panelNote(c, "지금은 ‘속도’ 탭의 초고속이 켜져 있어 사람처럼 입력은 쓰지 않아요."), lp(c, 0));
+                if (p.getBoolean("turbo", false) && p.getBoolean(TurboParts.SCOPE_TEST, true)) {
+                    parent.addView(panelNote(c, "지금은 ‘속도’ 탭에서 시험 빠르게가 켜져 있어 사람처럼 입력은 쓰지 않아요. 시험 빠르게를 끄면 수집만 빠르게, 시험은 사람처럼 해요."), lp(c, 0));
+                } else if (p.getBoolean("turbo", false)) {
+                    parent.addView(panelNote(c, "수집은 초고속, 시험은 사람처럼 입력으로 해요."), lp(c, 0));
                 }
                 final TextView estimate = panelNote(c, paceEstimate(p));
                 final LinearLayout meanRow = s.sliderRow(c, "평균 응답 시간", "ms", HumanTiming.MEAN_MIN, HumanTiming.MEAN_MAX, HumanTiming.MEAN_STEP, HumanProfile.meanMs(p, false), new Function1<Integer, Unit>() {
@@ -644,11 +646,11 @@ public final class Screens {
                     }
                 });
                 parent.addView((View) master.getTag(), lp(c, 6));
-                parent.addView(panelNote(c, "켜면 사람처럼 입력은 쓰지 않아요. 아래에서 필요한 것만 고르세요."), lp(c, 0));
+                parent.addView(panelNote(c, "시험 빠르게를 끄면 시험은 사람처럼 입력(켜져 있을 때)으로 풀어요."), lp(c, 0));
                 parts.addView(panelHeading(c, "어디에 쓸까"), lp(c, 8));
                 parts.addView(panelSwitch(c, "수집 빠르게", p.getBoolean(TurboParts.SCOPE_COLLECT, true), TurboParts.SCOPE_COLLECT, p), lp(c, 4));
                 parts.addView(panelSwitch(c, "시험 빠르게", p.getBoolean(TurboParts.SCOPE_TEST, true), TurboParts.SCOPE_TEST, p), lp(c, 2));
-                parts.addView(panelNote(c, "끈 쪽에서는 아래 항목이 모두 일반 속도로 동작해요 (시작 대기 제외)."), lp(c, 0));
+                parts.addView(panelNote(c, "끈 쪽은 일반 속도로, 시험을 끄면 사람처럼 입력을 써요 (시작 대기 제외)."), lp(c, 0));
                 parts.addView(panelHeading(c, "항목"), lp(c, 12));
                 for (Object[] part : TurboParts.PARTS) {
                     String key = (String) part[0];
@@ -763,7 +765,7 @@ public final class Screens {
 
     /** One line saying how long a test is expected to take with the current settings (a rough estimate). */
     public static String paceEstimate(SharedPreferences p) {
-        if (p.getBoolean("turbo", false)) {
+        if (p.getBoolean("turbo", false) && p.getBoolean(TurboParts.SCOPE_TEST, true)) {
             return "초고속 모드 · 속도는 클래스카드 화면 전환 속도에 달려 있어요";
         }
         long per = HumanTiming.estimatePerQuestionMs(p.getBoolean("human_like", false), HumanProfile.meanMs(p), AdvancedSettings.gateMs(p));
@@ -893,7 +895,7 @@ public final class Screens {
     static String sectionSummary(SharedPreferences p, int section) {
         switch (section) {
             case 0:
-                if (p.getBoolean("turbo", false)) {
+                if (p.getBoolean("turbo", false) && p.getBoolean(TurboParts.SCOPE_TEST, true)) {
                     return "초고속 모드 · 오답 " + AdvancedSettings.wrongCount(p) + "개";
                 }
                 if (!p.getBoolean("human_like", false)) {
@@ -1009,7 +1011,7 @@ public final class Screens {
                 LinearLayout master = s.card(c);
                 final LinearLayout partsCard = s.card(c);
                 final LinearLayout scopeCard = s.card(c);
-                master.addView(s.switchRow(c, "초고속 모드", "앱이 스스로 두는 대기를 줄입니다. 클래스카드 자체 애니메이션은 줄일 수 없습니다. 켜면 사람처럼 입력은 쓰지 않습니다. 아래에서 적용할 항목만 고르세요.", p.getBoolean("turbo", false), new CompoundButton.OnCheckedChangeListener() {
+                master.addView(s.switchRow(c, "초고속 모드", "앱이 스스로 두는 대기를 줄입니다. 클래스카드 자체 애니메이션은 줄일 수 없습니다. ‘시험 빠르게’가 켜져 있으면 사람처럼 입력은 쓰지 않습니다. 수집만 빠르게 하고 시험은 사람처럼 풀려면 ‘시험 빠르게’를 끄고 입력 방식에서 사람처럼 입력을 켜세요.", p.getBoolean("turbo", false), new CompoundButton.OnCheckedChangeListener() {
                     @Override
                     public void onCheckedChanged(CompoundButton b, boolean checked) {
                         p.edit().putBoolean("turbo", checked).apply();
@@ -1026,7 +1028,7 @@ public final class Screens {
                     }
                 }));
                 add(scopeCard, s.divider(c), 16);
-                add(scopeCard, s.switchRow(c, "시험 빠르게", "테스트를 여는 순간부터 문항을 푸는 동안 초고속을 씁니다.", p.getBoolean(TurboParts.SCOPE_TEST, true), new CompoundButton.OnCheckedChangeListener() {
+                add(scopeCard, s.switchRow(c, "시험 빠르게", "테스트를 여는 순간부터 문항을 푸는 동안 초고속을 씁니다. 끄면 시험은 일반 속도, 사람처럼 입력이 켜져 있으면 사람처럼 풉니다.", p.getBoolean(TurboParts.SCOPE_TEST, true), new CompoundButton.OnCheckedChangeListener() {
                     @Override
                     public void onCheckedChanged(CompoundButton b, boolean checked) {
                         p.edit().putBoolean(TurboParts.SCOPE_TEST, checked).apply();
