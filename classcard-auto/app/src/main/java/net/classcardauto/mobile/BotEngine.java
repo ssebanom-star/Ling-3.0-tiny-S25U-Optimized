@@ -2508,7 +2508,17 @@ public final class BotEngine {
 
     /** One piece of 초고속 (see TurboParts) during a run. */
     public final boolean turboPart(String key) {
-        return this.active && this.turbo && this.storage.getPrefs().getBoolean(key, TurboParts.defaultOf(key));
+        android.content.SharedPreferences p = this.storage.getPrefs();
+        if (!this.active || !this.turbo || !p.getBoolean(key, TurboParts.defaultOf(key))) {
+            return false;
+        }
+        if (TurboParts.COUNTDOWN.equals(key)) {
+            return true;
+        }
+        Boolean scope = TurboParts.scopeOf(key);
+        // parts that act everywhere (빠른 반응) follow the phase: collection (incl. 구간 펼치기) or the rest (test)
+        boolean collecting = scope != null ? scope.booleanValue() : (this.phase != null && (this.phase.startsWith("collect") || this.phase.startsWith("expand")));
+        return TurboParts.scopeOn(p, collecting);
     }
 
     public final java.util.Random getRng() {

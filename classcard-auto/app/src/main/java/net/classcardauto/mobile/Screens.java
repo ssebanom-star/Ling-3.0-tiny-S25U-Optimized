@@ -645,6 +645,11 @@ public final class Screens {
                 });
                 parent.addView((View) master.getTag(), lp(c, 6));
                 parent.addView(panelNote(c, "켜면 사람처럼 입력은 쓰지 않아요. 아래에서 필요한 것만 고르세요."), lp(c, 0));
+                parts.addView(panelHeading(c, "어디에 쓸까"), lp(c, 8));
+                parts.addView(panelSwitch(c, "수집 빠르게", p.getBoolean(TurboParts.SCOPE_COLLECT, true), TurboParts.SCOPE_COLLECT, p), lp(c, 4));
+                parts.addView(panelSwitch(c, "시험 빠르게", p.getBoolean(TurboParts.SCOPE_TEST, true), TurboParts.SCOPE_TEST, p), lp(c, 2));
+                parts.addView(panelNote(c, "끈 쪽에서는 아래 항목이 모두 일반 속도로 동작해요 (시작 대기 제외)."), lp(c, 0));
+                parts.addView(panelHeading(c, "항목"), lp(c, 12));
                 for (Object[] part : TurboParts.PARTS) {
                     String key = (String) part[0];
                     parts.addView(panelSwitch(c, (String) part[1], p.getBoolean(key, (Boolean) part[3]), key, p), lp(c, 8));
@@ -898,7 +903,12 @@ public final class Screens {
             case 1:
                 return "잠금 " + (p.getBoolean("touch_lock", true) ? "켜짐" : "꺼짐") + " · 진동 " + (p.getBoolean("vibrate_alerts", true) ? "켜짐" : "꺼짐") + " · 최대 " + AppStyle.formatClock(AdvancedSettings.runLimitSeconds(p));
             case 4:
-                return p.getBoolean("turbo", false) ? "켜짐 · 항목 " + TurboParts.count(p) + " 사용" : "꺼짐";
+                if (!p.getBoolean("turbo", false)) {
+                    return "꺼짐";
+                }
+                boolean sc = p.getBoolean(TurboParts.SCOPE_COLLECT, true);
+                boolean st = p.getBoolean(TurboParts.SCOPE_TEST, true);
+                return "켜짐 · " + (sc && st ? "수집+시험" : sc ? "수집만" : st ? "시험만" : "적용 구간 없음") + " · 항목 " + TurboParts.count(p);
             case 2:
                 return (p.getBoolean("image_collection", false) ? "이미지로 읽기" : "화면 글자 우선") + " · 넘김 " + ScrollSettings.rangePercent(p) + "%";
             default:
@@ -998,14 +1008,32 @@ public final class Screens {
             case 4: {
                 LinearLayout master = s.card(c);
                 final LinearLayout partsCard = s.card(c);
+                final LinearLayout scopeCard = s.card(c);
                 master.addView(s.switchRow(c, "초고속 모드", "앱이 스스로 두는 대기를 줄입니다. 클래스카드 자체 애니메이션은 줄일 수 없습니다. 켜면 사람처럼 입력은 쓰지 않습니다. 아래에서 적용할 항목만 고르세요.", p.getBoolean("turbo", false), new CompoundButton.OnCheckedChangeListener() {
                     @Override
                     public void onCheckedChanged(CompoundButton b, boolean checked) {
                         p.edit().putBoolean("turbo", checked).apply();
                         dim(partsCard, !checked);
+                        dim(scopeCard, !checked);
                     }
                 }));
                 add(content, master, 12);
+                add(content, s.sectionLabel(c, "어디에 쓸까"), 24);
+                scopeCard.addView(s.switchRow(c, "수집 빠르게", "처음 단어를 모으는 동안(구간 펼치기 포함) 초고속을 씁니다.", p.getBoolean(TurboParts.SCOPE_COLLECT, true), new CompoundButton.OnCheckedChangeListener() {
+                    @Override
+                    public void onCheckedChanged(CompoundButton b, boolean checked) {
+                        p.edit().putBoolean(TurboParts.SCOPE_COLLECT, checked).apply();
+                    }
+                }));
+                add(scopeCard, s.divider(c), 16);
+                add(scopeCard, s.switchRow(c, "시험 빠르게", "테스트를 여는 순간부터 문항을 푸는 동안 초고속을 씁니다.", p.getBoolean(TurboParts.SCOPE_TEST, true), new CompoundButton.OnCheckedChangeListener() {
+                    @Override
+                    public void onCheckedChanged(CompoundButton b, boolean checked) {
+                        p.edit().putBoolean(TurboParts.SCOPE_TEST, checked).apply();
+                    }
+                }), 16);
+                add(scopeCard, s.caption(c, "끈 쪽에서는 아래 항목이 모두 일반 속도로 동작합니다. 시작 카운트다운만 예외입니다."), 12);
+                add(content, scopeCard, 8);
                 add(content, s.sectionLabel(c, "적용할 항목"), 24);
                 for (int i = 0; i < TurboParts.PARTS.length; i++) {
                     Object[] part = TurboParts.PARTS[i];
@@ -1025,6 +1053,7 @@ public final class Screens {
                 }
                 add(content, partsCard, 8);
                 dim(partsCard, !p.getBoolean("turbo", false));
+                dim(scopeCard, !p.getBoolean("turbo", false));
                 break;
             }
             default: {

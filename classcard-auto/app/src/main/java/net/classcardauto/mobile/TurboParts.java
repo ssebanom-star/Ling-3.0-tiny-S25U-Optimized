@@ -13,6 +13,9 @@ public final class TurboParts {
     public static final String COUNTDOWN = "turbo_countdown";
     public static final String SKIP_CONFIRM = "turbo_skip_confirm";
     public static final String EXPAND_FIRST = "turbo_expand_first";
+    /** Where 초고속 applies at all: during word collection, during the test (both on by default). */
+    public static final String SCOPE_COLLECT = "turbo_scope_collect";
+    public static final String SCOPE_TEST = "turbo_scope_test";
 
     /** key, title, description, default — in the order they are shown. */
     public static final Object[][] PARTS = {
@@ -27,6 +30,21 @@ public final class TurboParts {
     private TurboParts() {
     }
 
+    /** Which scope a part belongs to: true = collection, false = test, null = both (it follows the current phase). */
+    public static Boolean scopeOf(String key) {
+        if (COLLECT.equals(key) || EXPAND_FIRST.equals(key)) {
+            return Boolean.TRUE;
+        }
+        if (TEST.equals(key) || SKIP_CONFIRM.equals(key)) {
+            return Boolean.FALSE;
+        }
+        return null;
+    }
+
+    public static boolean scopeOn(SharedPreferences p, boolean collecting) {
+        return p.getBoolean(collecting ? SCOPE_COLLECT : SCOPE_TEST, true);
+    }
+
     public static boolean defaultOf(String key) {
         for (Object[] part : PARTS) {
             if (part[0].equals(key)) {
@@ -38,7 +56,8 @@ public final class TurboParts {
 
     /** The part is on and so is the master switch. */
     public static boolean on(SharedPreferences p, String key) {
-        return p.getBoolean("turbo", false) && p.getBoolean(key, defaultOf(key));
+        Boolean scope = scopeOf(key);
+        return p.getBoolean("turbo", false) && p.getBoolean(key, defaultOf(key)) && (scope == null || scopeOn(p, scope.booleanValue()));
     }
 
     /** "4/6 켜짐" style count for summaries. */

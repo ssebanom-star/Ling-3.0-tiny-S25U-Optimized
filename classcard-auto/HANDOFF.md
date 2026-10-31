@@ -112,3 +112,4 @@
 - 위 1.x 이력은 이 규칙 이전의 내부 번호.
 
 (구 1.27 = 현 V1.0) 초고속 항목별 켜기(TurboParts): 마스터 `turbo` + 항목 `turbo_react`(화면 읽기 35ms·hold 절반), `turbo_collect`(수집 읽기 간격 200ms·스크롤 간격≤250ms·수집 스와이프≤220ms/끝 멈춤 110ms), `turbo_test`(시험 카드 스와이프 150ms), `turbo_countdown`(시작 1초) — 기본 켜짐; `turbo_skip_confirm`, `turbo_expand_first` — 기본 꺼짐. BotEngine.turboPart(key)/TurboParts.on(prefs,key). UI: 패널 5번째 탭 ‘속도’(Screens.addPanelGroup group 4), 설정 메뉴 ‘초고속 모드’(SECTIONS[4], 메뉴 순서 SECTION_ORDER). 입력 방식 페이지·입력 탭에서 초고속 항목 제거.
+(V1.0 유지) 초고속 적용 구간: `turbo_scope_collect`(수집·구간 펼치기), `turbo_scope_test`(테스트 열기~시험) 둘 다 기본 켜짐. TurboParts.scopeOf: 빠른 수집·구간 펼치기=수집, 빠른 카드 넘기기·확인 없이 넘기기=시험, 빠른 반응=현재 phase 따라(collect*/expand* → 수집), 짧은 시작 대기=구간 무관. BotEngine.turboPart가 구간까지 확인. UI: 패널 ‘속도’ 탭·설정>초고속 모드의 "어디에 쓸까".
