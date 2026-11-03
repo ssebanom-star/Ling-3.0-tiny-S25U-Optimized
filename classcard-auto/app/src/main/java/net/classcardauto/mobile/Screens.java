@@ -288,12 +288,7 @@ public final class Screens {
         // what the next run will do, in short; tapping opens the settings
         LinearLayout summary = s.card(c);
         summary.setPadding(dp(c, 20), dp(c, 6), dp(c, 12), dp(c, 6));
-        for (int i = 0; i < 2; i++) {
-            if (i > 0) {
-                summary.addView(s.divider(c));
-            }
-            summary.addView(s.navRow(c, SECTIONS[i][0], sectionSummary(prefs, i), onSettings));
-        }
+        summary.addView(s.navRow(c, "실행 모드 · " + ModePreset.title(prefs), "오답 " + AdvancedSettings.wrongCount(prefs) + "개 · 눌러서 바꾸기", onSettings));
         add(content, s.sectionLabel(c, "다음 실행"), 24);
         add(content, summary, 8);
 
@@ -427,7 +422,7 @@ public final class Screens {
             }, false), lp(c, 16));
         } else if (kind == 3) {
             String mine = HumanProfile.describeMine(p);
-            card.addView(s.caption(c, mine.isEmpty() ? "아직 측정한 내 패턴이 없어요. 시작 전 패널의 ‘입력’ 탭의 ‘측정 시작’으로 직접 테스트를 풀어 만들 수 있어요." : "측정한 내 패턴: " + mine + ". 평균·랜덤 값과 따로 저장되어 있어요."));
+            card.addView(s.caption(c, mine.isEmpty() ? "아직 측정한 내 패턴이 없어요. 위의 ‘내 패턴 측정 시작’으로 직접 테스트를 풀어 만들 수 있어요." : "측정한 내 패턴: " + mine + ". 평균·랜덤 값과 따로 저장되어 있어요."));
         } else {
             card.addView(s.caption(c, "실행이 너무 오래 걸리거나 화면이 멈춘 것처럼 보일 때 언제 포기할지 정합니다. 다음 실행부터 적용됩니다."));
             card.addView(s.sliderRow(c, "실행 제한 시간", "초", AdvancedSettings.RUN_MIN, AdvancedSettings.RUN_MAX, AdvancedSettings.RUN_STEP, AdvancedSettings.runLimitSeconds(p), new Function1<Integer, Unit>() {
@@ -543,147 +538,85 @@ public final class Screens {
         }, compact), lp(c, top));
     }
 
-    /**
-     * One tab of the dark floating panel's settings (0 입력 · 1 시험 · 2 안전 · 3 수집). The values live in the same
-     * preferences as the app's own settings screens.
-     */
-    public static void addPanelGroup(final Context c, LinearLayout parent, final SharedPreferences p, int group) {
+    /** The floating panel's whole settings area: the run mode, the number of deliberate mistakes, a way to the rest. */
+    public static void addPanelMain(final Context c, LinearLayout parent, final SharedPreferences p) {
         AppStyle s = AppStyle.INSTANCE;
-        switch (group) {
-            case 0: {
-                parent.addView(panelSwitch(c, "사람처럼 입력", p.getBoolean("human_like", false), "human_like", p), lp(c, 6));
-                if (p.getBoolean("turbo", false) && p.getBoolean(TurboParts.SCOPE_TEST, true)) {
-                    parent.addView(panelNote(c, "지금은 ‘속도’ 탭에서 시험 빠르게가 켜져 있어 사람처럼 입력은 쓰지 않아요. 시험 빠르게를 끄면 수집만 빠르게, 시험은 사람처럼 해요."), lp(c, 0));
-                } else if (p.getBoolean("turbo", false)) {
-                    parent.addView(panelNote(c, "수집은 초고속, 시험은 사람처럼 입력으로 해요."), lp(c, 0));
-                }
-                final TextView estimate = panelNote(c, paceEstimate(p));
-                final LinearLayout meanRow = s.sliderRow(c, "평균 응답 시간", "ms", HumanTiming.MEAN_MIN, HumanTiming.MEAN_MAX, HumanTiming.MEAN_STEP, HumanProfile.meanMs(p, false), new Function1<Integer, Unit>() {
-                    @Override
-                    public Unit invoke(Integer v) {
-                        p.edit().putInt(HumanProfile.K_MEAN, v.intValue()).apply();
-                        estimate.setText(paceEstimate(p));
-                        return Unit.INSTANCE;
-                    }
-                }, true);
-                parent.addView(panelHeading(c, "응답 속도 기준"), lp(c, 10));
-                parent.addView(sourceChooser(c, p, true, new Function0<Unit>() {
-                    @Override
-                    public Unit invoke() {
-                        dim(meanRow, HumanProfile.usingMine(p));
-                        estimate.setText(paceEstimate(p));
-                        return Unit.INSTANCE;
-                    }
-                }), lp(c, 6));
-                parent.addView(meanRow, lp(c, 8));
-                dim(meanRow, HumanProfile.usingMine(p));
-                parent.addView(estimate, lp(c, 2));
-                String measured = HumanProfile.describeMine(p);
-                parent.addView(panelHeading(c, "내 패턴"), lp(c, 12));
-                parent.addView(panelNote(c, measured.isEmpty() ? "아직 측정하지 않았어요. 측정을 누른 뒤 클래스카드에서 직접 풀면 속도를 기록해요." : measured), lp(c, 2));
-                TextView measure = s.label(c, measured.isEmpty() ? "측정 시작" : "다시 측정", 12.0f, -1, true);
-                measure.setGravity(Gravity.CENTER);
-                measure.setBackground(s.roundRect(c, android.graphics.Color.argb(34, 255, 255, 255), 999, 0));
-                measure.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        BotService service = BotService.INSTANCE.getInstance();
-                        if (service != null) {
-                            service.toggleCalibration();
-                        }
-                    }
-                });
-                LinearLayout.LayoutParams mlp = lp(c, 8);
-                mlp.height = dp(c, 30);
-                parent.addView(measure, mlp);
-                break;
+        parent.addView(panelHeading(c, "실행 모드"), lp(c, 8));
+        parent.addView(modeChooser(c, p, true, null), lp(c, 6));
+        parent.addView(s.sliderRow(c, "일부러 틀릴 문항 수", "개", AdvancedSettings.WRONG_MIN, AdvancedSettings.WRONG_MAX, AdvancedSettings.WRONG_STEP, AdvancedSettings.wrongCount(p), new Function1<Integer, Unit>() {
+            @Override
+            public Unit invoke(Integer v) {
+                AdvancedSettings.setWrongCount(p, v.intValue());
+                return Unit.INSTANCE;
             }
-            case 1:
-                parent.addView(s.sliderRow(c, "일부러 틀릴 문항 수", "개", AdvancedSettings.WRONG_MIN, AdvancedSettings.WRONG_MAX, AdvancedSettings.WRONG_STEP, AdvancedSettings.wrongCount(p), new Function1<Integer, Unit>() {
-                    @Override
-                    public Unit invoke(Integer v) {
-                        AdvancedSettings.setWrongCount(p, v.intValue());
-                        return Unit.INSTANCE;
-                    }
-                }, true), lp(c, 8));
-                parent.addView(panelNote(c, "실제 시험에 나온 문항 중에서 무작위로 골라 틀려요."), lp(c, 2));
-                parent.addView(s.sliderRow(c, "문항당 최대 응답 시간", "초", AdvancedSettings.QCAP_MIN, AdvancedSettings.QCAP_MAX, AdvancedSettings.QCAP_STEP, AdvancedSettings.questionCapSeconds(p), new Function1<Integer, Unit>() {
-                    @Override
-                    public Unit invoke(Integer v) {
-                        AdvancedSettings.setQuestionCapSeconds(p, v.intValue());
-                        return Unit.INSTANCE;
-                    }
-                }, true), lp(c, 10));
-                parent.addView(panelNote(c, "랜덤 시간이 길게 뽑혀도 이 안에 답해요. 클래스카드 문항 제한시간보다 짧게 두세요."), lp(c, 2));
-                parent.addView(s.sliderRow(c, "최대 실행 시간", "초", AdvancedSettings.RUN_MIN, AdvancedSettings.RUN_MAX, AdvancedSettings.RUN_STEP, AdvancedSettings.runLimitSeconds(p), new Function1<Integer, Unit>() {
-                    @Override
-                    public Unit invoke(Integer v) {
-                        AdvancedSettings.setRunLimitSeconds(p, v.intValue());
-                        return Unit.INSTANCE;
-                    }
-                }, true), lp(c, 10));
-                parent.addView(panelNote(c, paceEstimate(p)), lp(c, 2));
-                break;
-            case 2:
-                parent.addView(panelSwitch(c, "실행 중 화면 터치 잠금", p.getBoolean("touch_lock", true), "touch_lock", p), lp(c, 6));
-                parent.addView(panelSwitch(c, "멈추면 진동으로 알림", p.getBoolean("vibrate_alerts", true), "vibrate_alerts", p), lp(c, 2));
-                parent.addView(s.sliderRow(c, "터치 몇 번에 일시정지", "회", AdvancedSettings.TOUCH_MIN, AdvancedSettings.TOUCH_MAX, AdvancedSettings.TOUCH_STEP, AdvancedSettings.touchPauseCount(p), new Function1<Integer, Unit>() {
-                    @Override
-                    public Unit invoke(Integer v) {
-                        AdvancedSettings.setTouchPauseCount(p, v.intValue());
-                        return Unit.INSTANCE;
-                    }
-                }, true), lp(c, 8));
-                parent.addView(panelNote(c, "잠금이 꺼져 있을 때, 시험 중 화면을 직접 이만큼 누르면 멈춰요."), lp(c, 2));
-                break;
-            case 4: {
-                final LinearLayout parts = new LinearLayout(c);
-                parts.setOrientation(LinearLayout.VERTICAL);
-                final android.widget.CompoundButton master = panelSwitchView(c, "초고속 모드", p.getBoolean("turbo", false), "turbo", p, new Runnable() {
-                    @Override
-                    public void run() {
-                        dim(parts, !p.getBoolean("turbo", false));
-                    }
-                });
-                parent.addView((View) master.getTag(), lp(c, 6));
-                parent.addView(panelNote(c, "시험 빠르게를 끄면 시험은 사람처럼 입력(켜져 있을 때)으로 풀어요."), lp(c, 0));
-                parts.addView(panelHeading(c, "어디에 쓸까"), lp(c, 8));
-                parts.addView(panelSwitch(c, "수집 빠르게", p.getBoolean(TurboParts.SCOPE_COLLECT, true), TurboParts.SCOPE_COLLECT, p), lp(c, 4));
-                parts.addView(panelSwitch(c, "시험 빠르게", p.getBoolean(TurboParts.SCOPE_TEST, true), TurboParts.SCOPE_TEST, p), lp(c, 2));
-                parts.addView(panelNote(c, "끈 쪽은 일반 속도로, 시험을 끄면 사람처럼 입력을 써요 (시작 대기 제외)."), lp(c, 0));
-                parts.addView(panelHeading(c, "항목"), lp(c, 12));
-                for (Object[] part : TurboParts.PARTS) {
-                    String key = (String) part[0];
-                    parts.addView(panelSwitch(c, (String) part[1], p.getBoolean(key, (Boolean) part[3]), key, p), lp(c, 8));
-                    parts.addView(panelNote(c, (String) part[2]), lp(c, 0));
-                }
-                parent.addView(parts, lp(c, 4));
-                dim(parts, !p.getBoolean("turbo", false));
-                break;
+        }, true), lp(c, 12));
+        TextView more = s.label(c, "고급 설정 열기", 12.0f, -1, true);
+        more.setGravity(Gravity.CENTER);
+        more.setBackground(s.roundRect(c, android.graphics.Color.argb(34, 255, 255, 255), 999, 0));
+        more.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                android.content.Intent open = new android.content.Intent(c, MainActivity.class);
+                open.putExtra("open_settings", true);
+                open.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                c.startActivity(open);
             }
-            default:
-                parent.addView(panelNote(c, "처음 단어를 모을 때 목록을 넘기는 방식이에요."), lp(c, 8));
-                parent.addView(panelSwitch(c, "끝에서 멈춰 관성 막기", p.getBoolean("collect_end_hold", true), "collect_end_hold", p), lp(c, 6));
-                parent.addView(panelNote(c, "손을 떼기 전 0.15초 멈춰서, 설정한 범위만큼만 넘어가요."), lp(c, 0));
-                parent.addView(panelSwitch(c, "수집 중 스와이프 표시", p.getBoolean("collect_show_swipe", false), "collect_show_swipe", p), lp(c, 6));
-                TextView preview = s.label(c, "화면에서 미리 보기", 12.0f, -1, true);
-                preview.setGravity(Gravity.CENTER);
-                preview.setBackground(s.roundRect(c, android.graphics.Color.argb(34, 255, 255, 255), 999, 0));
-                preview.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        BotService service = BotService.INSTANCE.getInstance();
-                        if (service != null) {
-                            service.previewCollectionSwipe();
-                        }
+        });
+        LinearLayout.LayoutParams mp = lp(c, 12);
+        mp.height = dp(c, 30);
+        parent.addView(more, mp);
+    }
+
+    /**
+     * Three modes as pills with the selected mode's description under them. Choosing one sets the underlying switches
+     * (see ModePreset); when they match none of the three, nothing is selected and the caption says so.
+     */
+    public static LinearLayout modeChooser(final Context c, final SharedPreferences p, final boolean compact, final Function0<Unit> onChanged) {
+        final AppStyle s = AppStyle.INSTANCE;
+        final LinearLayout box = new LinearLayout(c);
+        box.setOrientation(LinearLayout.VERTICAL);
+        final LinearLayout row = new LinearLayout(c);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        final TextView[] pills = new TextView[ModePreset.INFO.length];
+        final TextView desc = compact ? panelNote(c, "") : s.caption(c, "");
+        for (int i = 0; i < pills.length; i++) {
+            final int mode = i;
+            TextView pill = s.label(c, ModePreset.INFO[i][0], compact ? 11.5f : 13.5f, -1, true);
+            pill.setGravity(Gravity.CENTER);
+            pill.setPadding(dp(c, 6), dp(c, compact ? 6 : 9), dp(c, 6), dp(c, compact ? 6 : 9));
+            pill.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    ModePreset.apply(p, mode);
+                    styleModeChooser(c, p, pills, desc, compact);
+                    if (onChanged != null) {
+                        onChanged.invoke();
                     }
-                });
-                LinearLayout.LayoutParams plp = lp(c, 8);
-                plp.height = dp(c, 30);
-                parent.addView(preview, plp);
-                addSliders(c, parent, p, true);
-                break;
+                }
+            });
+            pills[i] = pill;
+            LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(0, -2, 1.0f);
+            if (i > 0) {
+                plp.leftMargin = dp(c, 6);
+            }
+            row.addView(pill, plp);
         }
+        box.addView(row);
+        box.addView(desc, lp(c, 6));
+        styleModeChooser(c, p, pills, desc, compact);
+        return box;
+    }
+
+    private static void styleModeChooser(Context c, SharedPreferences p, TextView[] pills, TextView desc, boolean compact) {
+        AppStyle s = AppStyle.INSTANCE;
+        int current = ModePreset.current(p);
+        for (int i = 0; i < pills.length; i++) {
+            boolean selected = i == current;
+            pills[i].setTextColor(selected ? -1 : (compact ? android.graphics.Color.argb(200, 255, 255, 255) : s.getInk()));
+            int bg = selected ? s.getAccent() : (compact ? android.graphics.Color.argb(34, 255, 255, 255) : s.getBackground());
+            pills[i].setBackground(s.roundRect(c, bg, 999, selected || compact ? 0 : s.getBorder()));
+        }
+        desc.setText(current == ModePreset.CUSTOM ? "세부 설정으로 직접 맞춘 상태예요. 모드를 고르면 해당 조합으로 바뀝니다." : ModePreset.INFO[current][1]);
     }
 
     private static TextView panelHeading(Context c, String text) {
@@ -730,7 +663,7 @@ public final class Screens {
                 @Override
                 public void onClick(View v) {
                     if (!HumanProfile.setUseMine(p, index == 1)) {
-                        android.widget.Toast.makeText(c, "먼저 패널 ‘입력’ 탭의 ‘측정 시작’으로 내 패턴을 만들어 주세요.", android.widget.Toast.LENGTH_SHORT).show();
+                        android.widget.Toast.makeText(c, "먼저 설정의 ‘내 패턴 측정 시작’으로 내 패턴을 만들어 주세요.", android.widget.Toast.LENGTH_SHORT).show();
                         return;
                     }
                     styleChooser(c, p, pills, compact);
@@ -772,57 +705,6 @@ public final class Screens {
         return "문항당 약 " + String.format(java.util.Locale.US, "%.1f", per / 1000.0) + "초 · 20문항 약 " + AppStyle.formatClock(per * 20 / 1000) + " · 50문항 약 " + AppStyle.formatClock(per * 50 / 1000);
     }
 
-    /** Like panelSwitch, with a callback after the value changed; the row is the returned switch's tag. */
-    private static android.widget.CompoundButton panelSwitchView(Context c, String title, boolean checked, final String key, final SharedPreferences p, final Runnable changed) {
-        AppStyle s = AppStyle.INSTANCE;
-        LinearLayout row = new LinearLayout(c);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.addView(s.label(c, title, 12.5f, -1, true), new LinearLayout.LayoutParams(0, -2, 1.0f));
-        final android.widget.CompoundButton sw = s.toggle(c, checked, new android.widget.CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(android.widget.CompoundButton b, boolean on) {
-                p.edit().putBoolean(key, on).apply();
-                changed.run();
-            }
-        });
-        sw.setScaleX(0.8f);
-        sw.setScaleY(0.8f);
-        row.addView(sw, new LinearLayout.LayoutParams(-2, -2));
-        row.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                sw.toggle();
-            }
-        });
-        sw.setTag(row);
-        return sw;
-    }
-
-    private static LinearLayout panelSwitch(Context c, String title, boolean checked, final String key, final SharedPreferences p) {
-        AppStyle s = AppStyle.INSTANCE;
-        LinearLayout row = new LinearLayout(c);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.addView(s.label(c, title, 12.5f, -1, true), new LinearLayout.LayoutParams(0, -2, 1.0f));
-        final android.widget.CompoundButton sw = s.toggle(c, checked, new android.widget.CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(android.widget.CompoundButton b, boolean on) {
-                p.edit().putBoolean(key, on).apply();
-            }
-        });
-        sw.setScaleX(0.8f);
-        sw.setScaleY(0.8f);
-        row.addView(sw, new LinearLayout.LayoutParams(-2, -2));
-        row.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                sw.toggle();
-            }
-        });
-        return row;
-    }
-
     // ------------------------------------------------------------ settings
 
     public static final class Nav {
@@ -839,11 +721,11 @@ public final class Screens {
 
     /** Settings categories, in menu order: title, one-line description. */
     public static final String[][] SECTIONS = {
-            {"입력 방식", "사람처럼 입력 · 응답 속도 · 내 패턴 · 오답 수"},
+            {"응답 속도 · 내 패턴", "평균 응답 시간 · 내 패턴 측정 · 세부값"},
             {"안전 · 잠금", "터치 잠금 · 진동 알림 · 실행 한도"},
             {"단어 읽기 · 수집", "화면 이미지로 읽기 · 스크롤"},
             {"정답 매칭", "보기를 고르는 기준 (고급)"},
-            {"초고속 모드", "빠르게 하는 항목을 골라 켜기"},
+            {"초고속 세부 항목", "초고속에서 어떤 대기를 줄일지 고르기"},
     };
 
     /** Menu order of SECTIONS. */
@@ -855,7 +737,23 @@ public final class Screens {
         Page page = page(c, titleBar(c, "설정", onBack));
         LinearLayout content = page.content;
 
-        add(content, s.sectionLabel(c, "실행 설정"), 12);
+        final SharedPreferences p = prefs;
+        add(content, s.sectionLabel(c, "실행 모드"), 12);
+        LinearLayout modeCard = s.card(c);
+        modeCard.addView(modeChooser(c, p, false, null));
+        add(modeCard, s.divider(c), 16);
+        add(modeCard, s.sliderRow(c, "일부러 틀릴 문항 수", "개", AdvancedSettings.WRONG_MIN, AdvancedSettings.WRONG_MAX, AdvancedSettings.WRONG_STEP, AdvancedSettings.wrongCount(p), new Function1<Integer, Unit>() {
+            @Override
+            public Unit invoke(Integer v) {
+                AdvancedSettings.setWrongCount(p, v.intValue());
+                return Unit.INSTANCE;
+            }
+        }, false), 16);
+        add(modeCard, s.caption(c, "실제 시험에 나온 문항 중에서 무작위로 골라 정답이 아닌 보기를 누릅니다. 0이면 모두 맞힙니다."), 8);
+        add(content, modeCard, 8);
+        add(content, s.caption(c, "이 두 가지는 클래스카드 위 플로팅 패널에서도 바꿀 수 있어요. 아래는 평소에 거의 바꾸지 않는 고급 설정입니다."), 10);
+
+        add(content, s.sectionLabel(c, "고급 설정"), 24);
         LinearLayout menu = s.card(c);
         menu.setPadding(dp(c, 20), dp(c, 6), dp(c, 12), dp(c, 6));
         for (int k = 0; k < SECTION_ORDER.length; k++) {
@@ -871,7 +769,6 @@ public final class Screens {
             }));
         }
         add(content, menu, 8);
-        add(content, s.caption(c, "자주 바꾸는 값은 클래스카드 위 플로팅 패널에서도 바로 바꿀 수 있어요. 두 곳은 같은 값을 씁니다."), 10);
 
         add(content, s.sectionLabel(c, "안내 및 기록"), 24);
         LinearLayout list = s.card(c);
@@ -895,22 +792,11 @@ public final class Screens {
     static String sectionSummary(SharedPreferences p, int section) {
         switch (section) {
             case 0:
-                if (p.getBoolean("turbo", false) && p.getBoolean(TurboParts.SCOPE_TEST, true)) {
-                    return "초고속 모드 · 오답 " + AdvancedSettings.wrongCount(p) + "개";
-                }
-                if (!p.getBoolean("human_like", false)) {
-                    return "사람처럼 입력 꺼짐 · 오답 " + AdvancedSettings.wrongCount(p) + "개";
-                }
-                return (HumanProfile.usingMine(p) ? "내 패턴" : "평균 " + AppStyle.formatValue(HumanProfile.meanMs(p, false), "ms")) + " · 오답 " + AdvancedSettings.wrongCount(p) + "개";
+                return HumanProfile.usingMine(p) ? "내 패턴 사용 중" : "평균 " + AppStyle.formatValue(HumanProfile.meanMs(p, false), "ms");
             case 1:
                 return "잠금 " + (p.getBoolean("touch_lock", true) ? "켜짐" : "꺼짐") + " · 진동 " + (p.getBoolean("vibrate_alerts", true) ? "켜짐" : "꺼짐") + " · 최대 " + AppStyle.formatClock(AdvancedSettings.runLimitSeconds(p));
             case 4:
-                if (!p.getBoolean("turbo", false)) {
-                    return "꺼짐";
-                }
-                boolean sc = p.getBoolean(TurboParts.SCOPE_COLLECT, true);
-                boolean st = p.getBoolean(TurboParts.SCOPE_TEST, true);
-                return "켜짐 · " + (sc && st ? "수집+시험" : sc ? "수집만" : st ? "시험만" : "적용 구간 없음") + " · 항목 " + TurboParts.count(p);
+                return "항목 " + TurboParts.count(p) + " 사용";
             case 2:
                 return (p.getBoolean("image_collection", false) ? "이미지로 읽기" : "화면 글자 우선") + " · 넘김 " + ScrollSettings.rangePercent(p) + "%";
             default:
@@ -926,16 +812,8 @@ public final class Screens {
         final SharedPreferences p = prefs;
         switch (section) {
             case 0: {
-                LinearLayout humanCard = s.card(c);
-                humanCard.addView(s.switchRow(c, "사람처럼 입력", "문제를 읽는 시간, 터치 위치와 길이, 카드를 넘기는 간격을 사람처럼 무작위로 흔듭니다. 다음 실행부터 적용됩니다.", p.getBoolean("human_like", false), new CompoundButton.OnCheckedChangeListener() {
-                    @Override
-                    public void onCheckedChanged(CompoundButton b, boolean checked) {
-                        p.edit().putBoolean("human_like", checked).apply();
-                    }
-                }));
-                add(content, humanCard, 12);
-
-                add(content, s.sectionLabel(c, "응답 속도 기준"), 24);
+                add(content, s.caption(c, "‘사람처럼’·‘하이브리드’ 모드에서 시험을 푸는 속도입니다."), 12);
+                add(content, s.sectionLabel(c, "응답 속도 기준"), 16);
                 LinearLayout paceCard = s.card(c);
                 final LinearLayout appMeanRow = s.sliderRow(c, "평균 응답 시간", "ms", HumanTiming.MEAN_MIN, HumanTiming.MEAN_MAX, HumanTiming.MEAN_STEP, HumanProfile.meanMs(p, false), new Function1<Integer, Unit>() {
                     @Override
@@ -957,20 +835,21 @@ public final class Screens {
                 add(paceCard, s.caption(c, "보통 길이의 문제 기준이며 글이 길수록 오래 걸립니다. 예상: " + paceEstimate(p)), 8);
                 add(content, paceCard, 8);
 
-                add(content, s.sectionLabel(c, "오답"), 24);
-                LinearLayout wrongCard = s.card(c);
-                wrongCard.addView(s.sliderRow(c, "일부러 틀릴 문항 수", "개", AdvancedSettings.WRONG_MIN, AdvancedSettings.WRONG_MAX, AdvancedSettings.WRONG_STEP, AdvancedSettings.wrongCount(p), new Function1<Integer, Unit>() {
+                add(content, s.sectionLabel(c, "측정한 내 패턴"), 24);
+                add(content, s.button(c, "내 패턴 측정 시작", AppStyle.Tone.TONAL, new Function0<Unit>() {
                     @Override
-                    public Unit invoke(Integer v) {
-                        AdvancedSettings.setWrongCount(p, v.intValue());
+                    public Unit invoke() {
+                        BotService service = BotService.INSTANCE.getInstance();
+                        if (service == null) {
+                            android.widget.Toast.makeText(c, "접근성 서비스를 먼저 켜 주세요.", android.widget.Toast.LENGTH_SHORT).show();
+                        } else {
+                            service.toggleCalibration();
+                            android.widget.Toast.makeText(c, "클래스카드로 이동해 ‘테스트 시작’부터 직접 풀어 주세요.", android.widget.Toast.LENGTH_LONG).show();
+                        }
                         return Unit.INSTANCE;
                     }
-                }, false));
-                add(wrongCard, s.caption(c, "실제 시험에 나온 문항 중에서 무작위로 골라 정답이 아닌 보기를 누릅니다. 0이면 모두 맞힙니다."), 8);
-                add(content, wrongCard, 8);
-
-                add(content, s.sectionLabel(c, "측정한 내 패턴"), 24);
-                add(content, advancedCard(c, p, 3), 8);
+                }), 8);
+                add(content, advancedCard(c, p, 3), 12);
                 add(content, s.sectionLabel(c, "고급 · 평균·랜덤 세부값"), 24);
                 add(content, advancedCard(c, p, 2), 8);
                 break;
@@ -1008,35 +887,8 @@ public final class Screens {
                 break;
             }
             case 4: {
-                LinearLayout master = s.card(c);
                 final LinearLayout partsCard = s.card(c);
-                final LinearLayout scopeCard = s.card(c);
-                master.addView(s.switchRow(c, "초고속 모드", "앱이 스스로 두는 대기를 줄입니다. 클래스카드 자체 애니메이션은 줄일 수 없습니다. ‘시험 빠르게’가 켜져 있으면 사람처럼 입력은 쓰지 않습니다. 수집만 빠르게 하고 시험은 사람처럼 풀려면 ‘시험 빠르게’를 끄고 입력 방식에서 사람처럼 입력을 켜세요.", p.getBoolean("turbo", false), new CompoundButton.OnCheckedChangeListener() {
-                    @Override
-                    public void onCheckedChanged(CompoundButton b, boolean checked) {
-                        p.edit().putBoolean("turbo", checked).apply();
-                        dim(partsCard, !checked);
-                        dim(scopeCard, !checked);
-                    }
-                }));
-                add(content, master, 12);
-                add(content, s.sectionLabel(c, "어디에 쓸까"), 24);
-                scopeCard.addView(s.switchRow(c, "수집 빠르게", "처음 단어를 모으는 동안(구간 펼치기 포함) 초고속을 씁니다.", p.getBoolean(TurboParts.SCOPE_COLLECT, true), new CompoundButton.OnCheckedChangeListener() {
-                    @Override
-                    public void onCheckedChanged(CompoundButton b, boolean checked) {
-                        p.edit().putBoolean(TurboParts.SCOPE_COLLECT, checked).apply();
-                    }
-                }));
-                add(scopeCard, s.divider(c), 16);
-                add(scopeCard, s.switchRow(c, "시험 빠르게", "테스트를 여는 순간부터 문항을 푸는 동안 초고속을 씁니다. 끄면 시험은 일반 속도, 사람처럼 입력이 켜져 있으면 사람처럼 풉니다.", p.getBoolean(TurboParts.SCOPE_TEST, true), new CompoundButton.OnCheckedChangeListener() {
-                    @Override
-                    public void onCheckedChanged(CompoundButton b, boolean checked) {
-                        p.edit().putBoolean(TurboParts.SCOPE_TEST, checked).apply();
-                    }
-                }), 16);
-                add(scopeCard, s.caption(c, "끈 쪽에서는 아래 항목이 모두 일반 속도로 동작합니다. 시작 카운트다운만 예외입니다."), 12);
-                add(content, scopeCard, 8);
-                add(content, s.sectionLabel(c, "적용할 항목"), 24);
+                add(content, s.caption(c, "초고속이 쓰이는 곳(초고속 모드 전체, 하이브리드의 수집)에서 아래 항목만 적용됩니다. 모드는 설정 첫 화면이나 패널에서 고르세요."), 12);
                 for (int i = 0; i < TurboParts.PARTS.length; i++) {
                     Object[] part = TurboParts.PARTS[i];
                     final String key = (String) part[0];
@@ -1054,8 +906,6 @@ public final class Screens {
                     }), i == 0 ? 0 : 16);
                 }
                 add(content, partsCard, 8);
-                dim(partsCard, !p.getBoolean("turbo", false));
-                dim(scopeCard, !p.getBoolean("turbo", false));
                 break;
             }
             default: {

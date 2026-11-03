@@ -178,6 +178,11 @@ public final class MainActivity extends Activity {
             return;
         }
         if (UsageConsent.INSTANCE.getAllowed()) {
+            if (getIntent().getBooleanExtra("open_settings", false)) {
+                getIntent().removeExtra("open_settings");
+                showSettings();
+                return;
+            }
             showHome();
             return;
         }

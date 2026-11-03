@@ -19,7 +19,7 @@ import android.widget.TextView;
 /**
  * The card that floats above ClassCard. It shows exactly one of five layouts at a time:
  * <ul>
- *   <li>CARD — idle: header (move · status · 시작), a toolbar (작게 · 끄기 · 설정) and the settings, split into tabs;</li>
+ *   <li>CARD — idle: header (move · status · 시작), a toolbar (작게 · 끄기 · 설정) and the settings (run mode, mistakes, a way to the advanced settings);</li>
  *   <li>START — idle, minimized: only the start button;</li>
  *   <li>TAB — idle, folded into a small tab on the screen edge;</li>
  *   <li>MEASURE — the personal pace measurement is running: what to do and a button that ends it;</li>
@@ -62,8 +62,6 @@ public final class FloatingPanel extends LinearLayout {
     static final int ON_PANEL_DIM = Color.argb(165, 255, 255, 255);
     static final int CHIP = Color.argb(30, 255, 255, 255);
     static final int AMBER = Color.rgb(255, 196, 92);
-    private static final String K_TAB = "panel_tab";
-    private static final String[] TABS = {"입력", "시험", "안전", "수집", "속도"};
 
     private final Host host;
     private final SharedPreferences prefs;
@@ -77,7 +75,6 @@ public final class FloatingPanel extends LinearLayout {
     private final Button primary;
     private final TextView settingsToggle;
     private final LinearLayout settingsBox;
-    private final TextView[] tabViews = new TextView[TABS.length];
     private final LinearLayout groupBody;
     private final ScrollView groupScroll;
     // START / TAB
@@ -100,7 +97,6 @@ public final class FloatingPanel extends LinearLayout {
     private boolean minimized;
     private boolean collapsed;
     private boolean settingsOpen = true;
-    private int tab;
     private long remainingSeconds = -1;
     private long etaSeconds = -1;
     private Mode mode;
@@ -111,7 +107,6 @@ public final class FloatingPanel extends LinearLayout {
         this.prefs = prefs;
         final AppStyle s = AppStyle.INSTANCE;
         setOrientation(VERTICAL);
-        tab = Math.max(0, Math.min(TABS.length - 1, prefs.getInt(K_TAB, 0)));
 
         // ---------------------------------------------------------------- CARD
         LinearLayout card = new LinearLayout(context);
@@ -186,33 +181,9 @@ public final class FloatingPanel extends LinearLayout {
         tbp.topMargin = dp(6);
         card.addView(toolbar, tbp);
 
-        // settings: one tab at a time so nothing has to be scrolled far
+        // settings: the run mode and the mistake count; everything else lives in the app
         settingsBox = new LinearLayout(context);
         settingsBox.setOrientation(VERTICAL);
-        LinearLayout tabs = new LinearLayout(context);
-        tabs.setOrientation(HORIZONTAL);
-        tabs.setPadding(dp(3), dp(3), dp(3), dp(3));
-        tabs.setBackground(s.roundRect(context, Color.argb(20, 255, 255, 255), 999, 0));
-        for (int i = 0; i < TABS.length; i++) {
-            final int index = i;
-            TextView t = s.label(context, TABS[i], 12.0f, ON_PANEL, true);
-            t.setGravity(Gravity.CENTER);
-            t.setOnClickListener(new OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    if (tab != index) {
-                        tab = index;
-                        prefs().edit().putInt(K_TAB, index).apply();
-                        fillGroup();
-                    }
-                }
-            });
-            tabViews[i] = t;
-            tabs.addView(t, new LayoutParams(0, dp(28), 1.0f));
-        }
-        LayoutParams tsp = new LayoutParams(-1, -2);
-        tsp.topMargin = dp(10);
-        settingsBox.addView(tabs, tsp);
         groupBody = new LinearLayout(context);
         groupBody.setOrientation(VERTICAL);
         groupBody.setPadding(dp(4), 0, dp(4), dp(4));
@@ -520,7 +491,7 @@ public final class FloatingPanel extends LinearLayout {
         }
     }
 
-    /** Rebuilds the open settings tab so it shows values changed elsewhere (e.g. by the pace measurement). */
+    /** Rebuilds the open settings so it shows values changed elsewhere (e.g. by the pace measurement). */
     public void rebuildSettings() {
         fillGroup();
     }
@@ -609,19 +580,13 @@ public final class FloatingPanel extends LinearLayout {
         }
     }
 
-    /** Fills the settings area with the selected tab's controls (read fresh from the preferences). */
+    /** Fills the settings area (read fresh from the preferences). */
     private void fillGroup() {
-        AppStyle s = AppStyle.INSTANCE;
-        for (int i = 0; i < tabViews.length; i++) {
-            boolean selected = i == tab;
-            tabViews[i].setTextColor(selected ? ON_PANEL : ON_PANEL_DIM);
-            tabViews[i].setBackground(selected ? s.roundRect(getContext(), s.getAccent(), 999, 0) : null);
-        }
         if (!settingsOpen) {
             return;
         }
         groupBody.removeAllViews();
-        Screens.addPanelGroup(getContext(), groupBody, prefs, tab);
+        Screens.addPanelMain(getContext(), groupBody, prefs);
         groupScroll.scrollTo(0, 0);
     }
 
