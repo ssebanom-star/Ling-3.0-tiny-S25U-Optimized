@@ -26,8 +26,8 @@ import android.widget.TextView;
 /**
  * The card that floats above ClassCard. It shows exactly one of five layouts at a time:
  * <ul>
- *   <li>CARD — idle: header (move · status · 시작), a toolbar (작게 · 끄기 · 설정) and the settings (run mode, mistakes, a way to the advanced settings);</li>
- *   <li>START — idle, minimized: only the start button;</li>
+ *   <li>CARD — idle: header (move · status · 시작), the settings (run mode, mistakes) and a footer (끄기 · 고급 설정); tapping the header closes it;</li>
+ *   <li>START — idle, the resting capsule (name + 시작); tapping the name opens the card;</li>
  *   <li>TAB — idle, folded into a small tab on the screen edge;</li>
  *   <li>MEASURE — the personal pace measurement is running: what to do and a button that ends it;</li>
  *   <li>STRIP — a run is going: a narrow vertical strip (time, pause, stop, touches).</li>
@@ -86,12 +86,12 @@ public final class FloatingPanel extends LinearLayout {
     private final TextView caption;
     private final TextView statusText;
     private final Button primary;
-    private final TextView settingsToggle;
     private final LinearLayout settingsBox;
     private final LinearLayout groupBody;
     private final ScrollView groupScroll;
     // START / TAB
     private final LinearLayout startOnly;
+    private View capsuleDot;
     private final LinearLayout edgeTab;
     private final ImageView edgeArrow;
     // MEASURE
@@ -107,9 +107,9 @@ public final class FloatingPanel extends LinearLayout {
     private boolean running;
     private boolean pausedNow;
     private boolean calibrating;
-    private boolean minimized;
+    /** Idle, the panel rests as a small capsule; a tap on its name opens the card, a tap on the card's header closes it. */
+    private boolean minimized = true;
     private boolean collapsed;
-    private boolean settingsOpen = true;
     private long remainingSeconds = -1;
     private long etaSeconds = -1;
     private Mode mode;
@@ -152,6 +152,15 @@ public final class FloatingPanel extends LinearLayout {
         LayoutParams stp0 = new LayoutParams(-2, -2);
         stp0.topMargin = dp(1);
         texts.addView(statusText, stp0);
+        texts.setClickable(true);
+        texts.setContentDescription("패널 작게");
+        texts.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                minimized = true;
+                applyMode();
+            }
+        });
         header.addView(texts, new LayoutParams(0, -2, 1.0f));
         primary = pill(context, "시작", s.getAccent(), 13.0f, 18);
         primary.setOnClickListener(new OnClickListener() {
@@ -166,53 +175,6 @@ public final class FloatingPanel extends LinearLayout {
         pp.leftMargin = dp(8);
         header.addView(primary, pp);
         card.addView(header, new LayoutParams(-1, -2));
-
-        // toolbar: quiet text actions under a hairline
-        View rule = new View(context);
-        rule.setBackgroundColor(HAIRLINE);
-        LayoutParams rp = new LayoutParams(-1, dp(1));
-        rp.topMargin = dp(6);
-        rp.leftMargin = dp(4);
-        rp.rightMargin = dp(4);
-        card.addView(rule, rp);
-        LinearLayout toolbar = new LinearLayout(context);
-        toolbar.setOrientation(HORIZONTAL);
-        toolbar.setGravity(Gravity.CENTER_VERTICAL);
-        TextView small = tool(context, "작게");
-        small.setContentDescription("시작 버튼만 남기기");
-        small.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                minimized = true;
-                applyMode();
-            }
-        });
-        TextView off = tool(context, "끄기");
-        off.setContentDescription("앱을 다시 열 때까지 패널 끄기");
-        off.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                host.onTurnOff();
-            }
-        });
-        settingsToggle = tool(context, "");
-        settingsToggle.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (host.isBlocked()) {
-                    return;
-                }
-                settingsOpen = !settingsOpen;
-                applySettings();
-            }
-        });
-        toolbar.addView(small, toolParams());
-        toolbar.addView(off, toolParams());
-        View spacer = new View(context);
-        toolbar.addView(spacer, new LayoutParams(0, 1, 1.0f));
-        toolbar.addView(settingsToggle, toolParams());
-        LayoutParams tbp = new LayoutParams(-1, dp(34));
-        card.addView(toolbar, tbp);
 
         // settings: the run mode and the mistake count; everything else lives in the app
         settingsBox = new LinearLayout(context);
@@ -233,6 +195,33 @@ public final class FloatingPanel extends LinearLayout {
         gsp.topMargin = dp(4);
         settingsBox.addView(groupScroll, gsp);
         card.addView(settingsBox, new LayoutParams(-1, -2));
+
+        LinearLayout footer = new LinearLayout(context);
+        footer.setOrientation(HORIZONTAL);
+        footer.setGravity(Gravity.CENTER_VERTICAL);
+        TextView off = tool(context, "끄기");
+        off.setContentDescription("앱을 다시 열 때까지 패널 끄기");
+        off.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                host.onTurnOff();
+            }
+        });
+        footer.addView(off, new LayoutParams(-2, -1));
+        footer.addView(new View(context), new LayoutParams(0, 1, 1.0f));
+        TextView advanced = tool(context, "고급 설정 ›");
+        advanced.setContentDescription("앱의 고급 설정 열기");
+        advanced.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                android.content.Intent open = new android.content.Intent(getContext(), MainActivity.class);
+                open.putExtra("open_settings", true);
+                open.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                getContext().startActivity(open);
+            }
+        });
+        footer.addView(advanced, new LayoutParams(-2, -1));
+        card.addView(footer, new LayoutParams(-1, dp(32)));
 
         cardRow = new LinearLayout(context);
         cardRow.setOrientation(HORIZONTAL);
@@ -270,22 +259,26 @@ public final class FloatingPanel extends LinearLayout {
             }
         });
         startOnly.addView(startBtn, new LayoutParams(-2, dp(36)));
-        ImageView expand = new ImageView(context);
-        expand.setImageResource(R.drawable.ic_tune);
-        expand.setColorFilter(ON_PANEL);
-        expand.setPadding(dp(7), dp(7), dp(7), dp(7));
-        expand.setBackground(ripple(CHIP, 999));
-        expand.setContentDescription("패널 크게 보기");
-        expand.setOnClickListener(new OnClickListener() {
+        capsuleDot = s.dot(context, s.getAccent(), 7);
+        LinearLayout name = new LinearLayout(context);
+        name.setGravity(Gravity.CENTER_VERTICAL);
+        name.setPadding(dp(4), 0, dp(10), 0);
+        name.setClickable(true);
+        name.setContentDescription("패널 크게 보기");
+        LayoutParams cd = new LayoutParams(dp(7), dp(7));
+        cd.rightMargin = dp(6);
+        name.addView(capsuleDot, cd);
+        TextView brand = s.label(context, "MiMiC", 12.0f, ON_PANEL, true);
+        brand.setLetterSpacing(0.04f);
+        name.addView(brand);
+        name.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
                 minimized = false;
                 applyMode();
             }
         });
-        LayoutParams exp = new LayoutParams(dp(34), dp(34));
-        exp.leftMargin = dp(6);
-        startOnly.addView(expand, exp);
+        startOnly.addView(name, 1, new LayoutParams(-2, dp(36)));
         body.addView(startOnly, new LayoutParams(-2, -2));
 
         // ----------------------------------------------------------------- TAB
@@ -441,6 +434,7 @@ public final class FloatingPanel extends LinearLayout {
         primary.setContentDescription(active ? "자동 풀이 중지" : "현재 화면에서 자동 수집과 테스트 시작");
         primary.setBackground(ripple(active ? s.getDanger() : s.getAccent(), 999));
         s.setDotColor(dot, active ? s.getInfo() : s.getAccent());
+        s.setDotColor(capsuleDot, active ? s.getInfo() : s.getAccent());
         if (active) {
             collapsed = false;
         }
@@ -748,32 +742,11 @@ public final class FloatingPanel extends LinearLayout {
     }
 
     private void applySettings() {
-        if (canMorph() && settingsBox.getVisibility() != (settingsOpen ? VISIBLE : GONE)) {
-            morph(new Runnable() {
-                @Override
-                public void run() {
-                    applySettingsNow();
-                }
-            });
-            return;
-        }
-        applySettingsNow();
-    }
-
-    private void applySettingsNow() {
-        settingsBox.setVisibility(settingsOpen ? VISIBLE : GONE);
-        settingsToggle.setText(settingsOpen ? "설정 접기" : "설정 열기");
-        settingsToggle.setContentDescription(settingsOpen ? "설정 접기" : "설정 펼치기");
-        if (settingsOpen) {
-            fillGroup();
-        }
+        fillGroup();
     }
 
     /** Fills the settings area (read fresh from the preferences). */
     private void fillGroup() {
-        if (!settingsOpen) {
-            return;
-        }
         groupBody.removeAllViews();
         Screens.addPanelMain(getContext(), groupBody, prefs);
         groupScroll.scrollTo(0, 0);

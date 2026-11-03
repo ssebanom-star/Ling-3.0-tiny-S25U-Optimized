@@ -549,21 +549,6 @@ public final class Screens {
                 return Unit.INSTANCE;
             }
         }, true), lp(c, 14));
-        TextView more = s.label(c, "고급 설정 ›", 12.0f, -1, false);
-        more.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        more.setAlpha(0.65f);
-        more.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                android.content.Intent open = new android.content.Intent(c, MainActivity.class);
-                open.putExtra("open_settings", true);
-                open.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                c.startActivity(open);
-            }
-        });
-        LinearLayout.LayoutParams mp = lp(c, 6);
-        mp.height = dp(c, 30);
-        parent.addView(more, mp);
     }
 
     /**

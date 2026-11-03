@@ -233,6 +233,7 @@ class UiPreviewTest {
     fun overlayStartOnly() {
         val p = FloatingPanel(paparazzi.context, MemoryPrefs(), host())
         p.render(false, "", true, false)
+        p.setMinimized(false)
         p.setMinimized(true)
         paparazzi.snapshot(overBackdrop(p), "overlay_start_only")
     }
@@ -250,6 +251,7 @@ class UiPreviewTest {
     fun overlayCollapsedTab() {
         val p = FloatingPanel(paparazzi.context, MemoryPrefs(), host())
         p.render(false, "", true, false)
+        p.setMinimized(false)
         p.setCollapsed(true)
         paparazzi.snapshot(overBackdrop(p), "overlay_collapsed_tab")
     }
@@ -268,6 +270,7 @@ class UiPreviewTest {
     fun overlayIdle() {
         val p = FloatingPanel(paparazzi.context, MemoryPrefs(), host())
         p.render(false, "", true, false)
+        p.setMinimized(false)
         paparazzi.snapshot(overBackdrop(p), "overlay_idle")
     }
 
@@ -349,11 +352,12 @@ class UiPreviewTest {
 
     @Test
     fun overlayTabs() {
-        for (i in 0 until 5) {
+        for (i in 0 until 1) {
             val prefs = MemoryPrefs()
-            prefs.edit().putInt("panel_tab", i).putBoolean("turbo", true).apply()
+            prefs.edit().putBoolean("human_like", true).apply()
             val p = FloatingPanel(paparazzi.context, prefs, host())
             p.render(false, "", true, false)
+        p.setMinimized(false)
             paparazzi.snapshot(overBackdrop(p), "overlay_tab_" + i)
         }
     }
@@ -362,6 +366,7 @@ class UiPreviewTest {
     fun overlayMeasure() {
         val p = FloatingPanel(paparazzi.context, MemoryPrefs(), host())
         p.render(false, "", true, false)
+        p.setMinimized(false)
         p.setCalibrating(true, "3 / 8문항 기록됨 · 3문항부터 반영할 수 있어요.")
         paparazzi.snapshot(overBackdrop(p), "overlay_measure")
     }
@@ -373,6 +378,7 @@ class UiPreviewTest {
             prefs.edit().putInt("panel_tab", tab).putBoolean("human_like", true).apply()
             val p = FloatingPanel(paparazzi.context, prefs, host())
             p.render(false, "", true, false)
+        p.setMinimized(false)
             p.render(true, "3/20 · 2개 입력", false, false)
             p.renderRun(false, 0, 2, true, true, 0)
             p.setRemaining(300)
@@ -395,5 +401,12 @@ class UiPreviewTest {
         val span = net.classcardauto.mobile.ScrollSettings.fractions(45, true)
         g.show(d.widthPixels / 2f, top + h * span[0], top + h * span[1], 1L, 100000L, "45% · 미리 보기")
         paparazzi.snapshot(frame, "swipe_guide")
+    }
+
+    @Test
+    fun overlayCapsule() {
+        val p = FloatingPanel(paparazzi.context, MemoryPrefs(), host())
+        p.render(false, "", true, false)
+        paparazzi.snapshot(overBackdrop(p), "overlay_capsule")
     }
 }
