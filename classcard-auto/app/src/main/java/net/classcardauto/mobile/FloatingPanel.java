@@ -1,11 +1,18 @@
 package net.classcardauto.mobile;
 
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.transition.Fade;
+import android.transition.TransitionManager;
+import android.transition.TransitionSet;
+import android.view.WindowManager;
+import android.view.animation.PathInterpolator;
 import android.graphics.drawable.RippleDrawable;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -66,6 +73,11 @@ public final class FloatingPanel extends LinearLayout {
 
     private final Host host;
     private final SharedPreferences prefs;
+    /** Carries the background and all five layouts; the panel itself is only the transparent window root. */
+    private final LinearLayout body;
+    private final GradientDrawable bodyBg;
+    private ValueAnimator morphAnim;
+    private Boolean foldRight;
 
     // CARD
     private final LinearLayout cardRow;
@@ -108,6 +120,12 @@ public final class FloatingPanel extends LinearLayout {
         this.prefs = prefs;
         final AppStyle s = AppStyle.INSTANCE;
         setOrientation(VERTICAL);
+        body = new LinearLayout(context);
+        body.setOrientation(VERTICAL);
+        bodyBg = s.roundRect(context, PANEL, 22, HAIRLINE);
+        body.setBackground(bodyBg);
+        body.setElevation(dp(8));
+        super.addView(body, new LayoutParams(-2, -2));
 
         // ---------------------------------------------------------------- CARD
         LinearLayout card = new LinearLayout(context);
@@ -234,7 +252,7 @@ public final class FloatingPanel extends LinearLayout {
             }
         });
         cardRow.addView(card, new LayoutParams(dp(248), -2));
-        addView(cardRow, new LayoutParams(-2, -2));
+        body.addView(cardRow, new LayoutParams(-2, -2));
 
         // --------------------------------------------------------------- START
         startOnly = new LinearLayout(context);
@@ -268,7 +286,7 @@ public final class FloatingPanel extends LinearLayout {
         LayoutParams exp = new LayoutParams(dp(34), dp(34));
         exp.leftMargin = dp(6);
         startOnly.addView(expand, exp);
-        addView(startOnly, new LayoutParams(-2, -2));
+        body.addView(startOnly, new LayoutParams(-2, -2));
 
         // ----------------------------------------------------------------- TAB
         edgeTab = new LinearLayout(context);
@@ -288,7 +306,7 @@ public final class FloatingPanel extends LinearLayout {
                 host.onLayoutChanged();
             }
         });
-        addView(edgeTab, new LayoutParams(dp(24), dp(96)));
+        body.addView(edgeTab, new LayoutParams(dp(24), dp(96)));
 
         // ------------------------------------------------------------- MEASURE
         measure = new LinearLayout(context);
@@ -324,7 +342,7 @@ public final class FloatingPanel extends LinearLayout {
         LayoutParams emp = new LayoutParams(-1, dp(34));
         emp.topMargin = dp(8);
         measure.addView(endMeasure, emp);
-        addView(measure, new LayoutParams(dp(220), -2));
+        body.addView(measure, new LayoutParams(dp(220), -2));
 
         // --------------------------------------------------------------- STRIP
         strip = new LinearLayout(context);
@@ -380,7 +398,7 @@ public final class FloatingPanel extends LinearLayout {
         LayoutParams sip = new LayoutParams(-2, -2);
         sip.topMargin = dp(4);
         strip.addView(stripInfo, sip);
-        addView(strip, new LayoutParams(-2, -2));
+        body.addView(strip, new LayoutParams(-2, -2));
 
         applySettings();
         applyMode();
@@ -544,8 +562,22 @@ public final class FloatingPanel extends LinearLayout {
     }
 
     private void applyMode() {
-        AppStyle s = AppStyle.INSTANCE;
-        mode = pickMode();
+        Mode next = pickMode();
+        if (mode != null && next != mode && canMorph()) {
+            final Mode target = next;
+            morph(new Runnable() {
+                @Override
+                public void run() {
+                    applyModeNow(target);
+                }
+            });
+            return;
+        }
+        applyModeNow(next);
+    }
+
+    private void applyModeNow(Mode next) {
+        mode = next;
         cardRow.setVisibility(mode == Mode.CARD ? VISIBLE : GONE);
         startOnly.setVisibility(mode == Mode.START ? VISIBLE : GONE);
         edgeTab.setVisibility(mode == Mode.TAB ? VISIBLE : GONE);
@@ -556,42 +588,179 @@ public final class FloatingPanel extends LinearLayout {
         // the fold tab sits on the card's inner side and points at the edge it folds into; the edge tab points back
         foldTab.setRotation(right ? 0 : 180);
         edgeArrow.setRotation(right ? 180 : 0);
-        cardRow.removeView(foldTab);
-        LayoutParams ftp = new LayoutParams(dp(18), dp(60));
-        ftp.topMargin = dp(4);
-        if (right) {
-            ftp.rightMargin = dp(6);
-            cardRow.addView(foldTab, 0, ftp);
-        } else {
-            ftp.leftMargin = dp(6);
-            cardRow.addView(foldTab, ftp);
+        if (foldRight == null || foldRight != right) {
+            foldRight = right;
+            cardRow.removeView(foldTab);
+            LayoutParams ftp = new LayoutParams(dp(18), dp(60));
+            ftp.topMargin = dp(4);
+            if (right) {
+                ftp.rightMargin = dp(6);
+                cardRow.addView(foldTab, 0, ftp);
+            } else {
+                ftp.leftMargin = dp(6);
+                cardRow.addView(foldTab, ftp);
+            }
         }
 
-        if (mode == Mode.TAB) {
-            setBackground(null);
-            setElevation(0);
-            setPadding(0, 0, 0, 0);
-            return;
-        }
-        setBackground(s.roundRect(getContext(), PANEL, mode == Mode.STRIP || mode == Mode.START ? 22 : 20, HAIRLINE));
-        setElevation(dp(8));
+        // the bar disappears behind the edge tab instead of popping away
+        bodyBg.setAlpha(mode == Mode.TAB ? 0 : 255);
         switch (mode) {
+            case TAB:
+                body.setPadding(0, 0, 0, 0);
+                break;
             case STRIP:
-                setPadding(dp(4), dp(4), dp(4), dp(6));
+                body.setPadding(dp(4), dp(4), dp(4), dp(6));
                 break;
             case START:
-                setPadding(dp(4), dp(4), dp(6), dp(4));
+                body.setPadding(dp(4), dp(4), dp(6), dp(4));
                 break;
             case MEASURE:
-                setPadding(dp(8), dp(8), dp(12), dp(10));
+                body.setPadding(dp(8), dp(8), dp(12), dp(10));
                 break;
             default:
-                setPadding(dp(8), dp(8), dp(10), dp(8));
+                body.setPadding(dp(8), dp(8), dp(10), dp(8));
                 break;
         }
     }
 
+    // ------------------------------------------------------------------ motion
+
+    /** True when the panel is on screen as a window and animations are not switched off in the system. */
+    private boolean canMorph() {
+        return isAttachedToWindow() && body.isLaidOut() && getVisibility() == VISIBLE && body.getWidth() > 0
+                && getLayoutParams() instanceof WindowManager.LayoutParams && ValueAnimator.areAnimatorsEnabled();
+    }
+
+    private void stopMorph() {
+        if (morphAnim != null) {
+            morphAnim.removeAllListeners();
+            morphAnim.removeAllUpdateListeners();
+            morphAnim.cancel();
+            morphAnim = null;
+        }
+    }
+
+    /**
+     * Applies {@code change} (which switches what is shown) while the card grows or shrinks from its old size to the
+     * new one, like an island: the outgoing layout fades, the incoming one fades in a beat later, and the size
+     * follows a soft spring. The window is held at the larger of the two sizes while it runs and the card stays
+     * glued to the screen edge it is docked to.
+     */
+    private void morph(Runnable change) {
+        stopMorph();
+        final boolean right = host.isDockedRight();
+        final int ow = body.getWidth();
+        final int oh = body.getHeight();
+        TransitionSet fades = new TransitionSet();
+        fades.setOrdering(TransitionSet.ORDERING_TOGETHER);
+        Fade out = new Fade(Fade.OUT);
+        out.setDuration(120);
+        Fade in = new Fade(Fade.IN);
+        in.setStartDelay(130);
+        in.setDuration(240);
+        fades.addTransition(out);
+        fades.addTransition(in);
+        TransitionManager.beginDelayedTransition(body, fades);
+
+        final LinearLayout.LayoutParams blp = (LinearLayout.LayoutParams) body.getLayoutParams();
+        blp.width = -2;
+        blp.height = -2;
+        blp.gravity = right ? Gravity.END : Gravity.START;
+        change.run();
+        android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
+        body.measure(MeasureSpec.makeMeasureSpec(dm.widthPixels, MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(dm.heightPixels, MeasureSpec.AT_MOST));
+        final int nw = body.getMeasuredWidth();
+        final int nh = body.getMeasuredHeight();
+        if (nw == ow && nh == oh) {
+            body.setLayoutParams(blp);
+            return;
+        }
+        blp.width = ow;
+        blp.height = oh;
+        body.setLayoutParams(blp);
+        int pad = dp(12);
+        setWindowSize(Math.max(ow, nw) + pad, Math.max(oh, nh) + pad, right);
+
+        morphAnim = ValueAnimator.ofFloat(0f, 1f);
+        morphAnim.setDuration(460);
+        morphAnim.setInterpolator(new PathInterpolator(0.34f, 1.45f, 0.64f, 1f));
+        morphAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator a) {
+                float t = (Float) a.getAnimatedValue();
+                blp.width = Math.max(1, ow + Math.round((nw - ow) * t));
+                blp.height = Math.max(1, oh + Math.round((nh - oh) * t));
+                body.setLayoutParams(blp);
+            }
+        });
+        morphAnim.addListener(new android.animation.AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(android.animation.Animator a) {
+                morphAnim = null;
+                blp.width = -2;
+                blp.height = -2;
+                body.setLayoutParams(blp);
+                setWindowSize(-2, -2, right);
+                host.onLayoutChanged();
+            }
+        });
+        morphAnim.start();
+    }
+
+    /** Resizes the overlay window; when it is docked to the left edge, the left edge stays where it is. */
+    private void setWindowSize(int w, int h, boolean dockedRight) {
+        if (!(getLayoutParams() instanceof WindowManager.LayoutParams)) {
+            return;
+        }
+        WindowManager.LayoutParams lp = (WindowManager.LayoutParams) getLayoutParams();
+        int curW = getWidth();
+        int newW = w == -2 ? body.getMeasuredWidth() : w;
+        if (!dockedRight && curW > 0) {
+            // gravity is top|end: x counts from the right edge
+            lp.x = Math.max(0, lp.x + curW - newW);
+        }
+        lp.width = w;
+        lp.height = h;
+        try {
+            ((WindowManager) getContext().getSystemService(Context.WINDOW_SERVICE)).updateViewLayout(this, lp);
+        } catch (Exception ignored) {
+        }
+    }
+
+    @Override
+    public void setVisibility(int visibility) {
+        boolean appearing = visibility == VISIBLE && getVisibility() != VISIBLE;
+        super.setVisibility(visibility);
+        if (appearing && isAttachedToWindow() && ValueAnimator.areAnimatorsEnabled()) {
+            // it rises out of the edge it is docked to
+            body.post(new Runnable() {
+                @Override
+                public void run() {
+                    body.setPivotX(host.isDockedRight() ? body.getWidth() : 0);
+                    body.setPivotY(0);
+                    body.setScaleX(0.86f);
+                    body.setScaleY(0.86f);
+                    body.setAlpha(0f);
+                    body.animate().scaleX(1f).scaleY(1f).alpha(1f).setDuration(320).setInterpolator(new PathInterpolator(0.34f, 1.35f, 0.64f, 1f)).start();
+                }
+            });
+        }
+    }
+
     private void applySettings() {
+        if (canMorph() && settingsBox.getVisibility() != (settingsOpen ? VISIBLE : GONE)) {
+            morph(new Runnable() {
+                @Override
+                public void run() {
+                    applySettingsNow();
+                }
+            });
+            return;
+        }
+        applySettingsNow();
+    }
+
+    private void applySettingsNow() {
         settingsBox.setVisibility(settingsOpen ? VISIBLE : GONE);
         settingsToggle.setText(settingsOpen ? "설정 접기" : "설정 열기");
         settingsToggle.setContentDescription(settingsOpen ? "설정 접기" : "설정 펼치기");

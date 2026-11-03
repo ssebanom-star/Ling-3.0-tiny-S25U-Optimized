@@ -607,26 +607,40 @@ public final class BotService extends AccessibilityService {
         if (view == null || lp == null) {
             return;
         }
-        view.postDelayed(new Runnable() { // after the panel has re-laid out at its compact size
+        view.postDelayed(new Runnable() { // after the panel has finished morphing to its new size
             @Override
             public void run() {
+                if (BotService.this.dragging) {
+                    return;
+                }
                 android.util.DisplayMetrics metrics = BotService.this.getResources().getDisplayMetrics();
                 int maxX = Math.max(0, metrics.widthPixels - view.getWidth());
                 // gravity is top|end, so x counts from the right edge
-                lp.x = lp.x <= maxX / 2 ? 0 : maxX;
-                try {
-                    ((WindowManager) BotService.this.getSystemService("window")).updateViewLayout(view, lp);
-                } catch (Exception ignored) {
+                int target = lp.x <= maxX / 2 ? 0 : maxX;
+                if (target == lp.x) {
+                    return;
                 }
+                android.animation.ValueAnimator glide = android.animation.ValueAnimator.ofInt(lp.x, target);
+                glide.setDuration(220);
+                glide.setInterpolator(new android.view.animation.DecelerateInterpolator(1.6f));
+                glide.addUpdateListener(new android.animation.ValueAnimator.AnimatorUpdateListener() {
+                    @Override
+                    public void onAnimationUpdate(android.animation.ValueAnimator a) {
+                        if (BotService.this.dragging) {
+                            a.cancel();
+                            return;
+                        }
+                        lp.x = (Integer) a.getAnimatedValue();
+                        try {
+                            ((WindowManager) BotService.this.getSystemService("window")).updateViewLayout(view, lp);
+                        } catch (Exception ignored) {
+                        }
+                    }
+                });
+                glide.start();
             }
-        }, 200L);
+        }, 520L);
     }
-
-
-
-
-
-
 
     private static final int createOverlay$dp(float f, int i) {
         return (int) (i * f);
