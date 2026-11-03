@@ -237,7 +237,6 @@ public final class FloatingPanel extends LinearLayout {
             public void onClick(View v) {
                 collapsed = true;
                 applyMode();
-                host.onLayoutChanged();
             }
         });
         cardRow.addView(card, new LayoutParams(dp(248), -2));
@@ -296,7 +295,6 @@ public final class FloatingPanel extends LinearLayout {
             public void onClick(View v) {
                 collapsed = false;
                 applyMode();
-                host.onLayoutChanged();
             }
         });
         body.addView(edgeTab, new LayoutParams(dp(24), dp(96)));
@@ -458,7 +456,6 @@ public final class FloatingPanel extends LinearLayout {
                 fillGroup();
             }
             applyMode();
-            host.onLayoutChanged();
         }
     }
 
@@ -555,9 +552,15 @@ public final class FloatingPanel extends LinearLayout {
         return minimized ? Mode.START : Mode.CARD;
     }
 
+    /** True while the panel is in a layout that docks to the screen edge (the run strip, the folded tab). */
+    public boolean atEdge() {
+        return mode == Mode.STRIP || mode == Mode.TAB;
+    }
+
     private void applyMode() {
         Mode next = pickMode();
-        if (mode != null && next != mode && canMorph()) {
+        boolean changed = mode != null && next != mode;
+        if (changed && canMorph()) {
             final Mode target = next;
             morph(new Runnable() {
                 @Override
@@ -568,6 +571,9 @@ public final class FloatingPanel extends LinearLayout {
             return;
         }
         applyModeNow(next);
+        if (changed) {
+            host.onLayoutChanged();
+        }
     }
 
     private void applyModeNow(Mode next) {

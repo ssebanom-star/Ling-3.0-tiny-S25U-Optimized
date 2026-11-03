@@ -582,7 +582,7 @@ public final class BotService extends AccessibilityService {
             getEngine().resyncAfterChange();
             hold(1200L);
         }
-        snapPanelToEdge();
+        snapPanelToEdge(true);
     }
     private boolean panelPassThrough;
 
@@ -602,6 +602,11 @@ public final class BotService extends AccessibilityService {
 
     /** The narrow test strip sits against the nearest side edge so it stays out of the middle of the screen. */
     private final void snapPanelToEdge() {
+        snapPanelToEdge(false);
+    }
+
+    /** Glides the panel to the nearest screen edge, but only layouts meant to sit on an edge unless {@code force}. */
+    private final void snapPanelToEdge(final boolean force) {
         final LinearLayout view = this.overlay;
         final WindowManager.LayoutParams lp = this.overlayParams;
         if (view == null || lp == null) {
@@ -610,14 +615,15 @@ public final class BotService extends AccessibilityService {
         view.postDelayed(new Runnable() { // after the panel has finished morphing to its new size
             @Override
             public void run() {
-                if (BotService.this.dragging) {
+                FloatingPanel panel = BotService.this.floating;
+                if (BotService.this.dragging || (!force && panel != null && !panel.atEdge())) {
                     return;
                 }
                 android.util.DisplayMetrics metrics = BotService.this.getResources().getDisplayMetrics();
                 int maxX = Math.max(0, metrics.widthPixels - view.getWidth());
                 // gravity is top|end, so x counts from the right edge
                 int target = lp.x <= maxX / 2 ? 0 : maxX;
-                if (target == lp.x) {
+                if (Math.abs(target - lp.x) < 3) {
                     return;
                 }
                 android.animation.ValueAnimator glide = android.animation.ValueAnimator.ofInt(lp.x, target);
@@ -639,7 +645,7 @@ public final class BotService extends AccessibilityService {
                 });
                 glide.start();
             }
-        }, 520L);
+        }, 80L);
     }
 
     private static final int createOverlay$dp(float f, int i) {
@@ -992,8 +998,8 @@ public final class BotService extends AccessibilityService {
         updateTouchLock();
         boolean inTestNow = active;
         if (inTestNow && !this.snappedForTest) {
+            // the panel docks itself when its layout changes to the run strip (see Host.onLayoutChanged)
             this.snappedForTest = true;
-            snapPanelToEdge();
         } else if (!inTestNow) {
             this.snappedForTest = false;
         }
