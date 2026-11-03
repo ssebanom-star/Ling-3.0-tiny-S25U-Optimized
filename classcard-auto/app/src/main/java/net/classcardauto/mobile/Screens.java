@@ -541,18 +541,17 @@ public final class Screens {
     /** The floating panel's whole settings area: the run mode, the number of deliberate mistakes, a way to the rest. */
     public static void addPanelMain(final Context c, LinearLayout parent, final SharedPreferences p) {
         AppStyle s = AppStyle.INSTANCE;
-        parent.addView(panelHeading(c, "실행 모드"), lp(c, 8));
-        parent.addView(modeChooser(c, p, true, null), lp(c, 6));
+        parent.addView(modeChooser(c, p, true, null), lp(c, 10));
         parent.addView(s.sliderRow(c, "일부러 틀릴 문항 수", "개", AdvancedSettings.WRONG_MIN, AdvancedSettings.WRONG_MAX, AdvancedSettings.WRONG_STEP, AdvancedSettings.wrongCount(p), new Function1<Integer, Unit>() {
             @Override
             public Unit invoke(Integer v) {
                 AdvancedSettings.setWrongCount(p, v.intValue());
                 return Unit.INSTANCE;
             }
-        }, true), lp(c, 12));
-        TextView more = s.label(c, "고급 설정 열기", 12.0f, -1, true);
-        more.setGravity(Gravity.CENTER);
-        more.setBackground(s.roundRect(c, android.graphics.Color.argb(34, 255, 255, 255), 999, 0));
+        }, true), lp(c, 14));
+        TextView more = s.label(c, "고급 설정 ›", 12.0f, -1, false);
+        more.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        more.setAlpha(0.65f);
         more.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -562,7 +561,7 @@ public final class Screens {
                 c.startActivity(open);
             }
         });
-        LinearLayout.LayoutParams mp = lp(c, 12);
+        LinearLayout.LayoutParams mp = lp(c, 6);
         mp.height = dp(c, 30);
         parent.addView(more, mp);
     }
@@ -577,13 +576,17 @@ public final class Screens {
         box.setOrientation(LinearLayout.VERTICAL);
         final LinearLayout row = new LinearLayout(c);
         row.setOrientation(LinearLayout.HORIZONTAL);
+        if (compact) {
+            row.setPadding(dp(c, 3), dp(c, 3), dp(c, 3), dp(c, 3));
+            row.setBackground(s.roundRect(c, android.graphics.Color.argb(22, 255, 255, 255), 999, 0));
+        }
         final TextView[] pills = new TextView[ModePreset.INFO.length];
         final TextView desc = compact ? panelNote(c, "") : s.caption(c, "");
         for (int i = 0; i < pills.length; i++) {
             final int mode = i;
             TextView pill = s.label(c, ModePreset.INFO[i][0], compact ? 11.5f : 13.5f, -1, true);
             pill.setGravity(Gravity.CENTER);
-            pill.setPadding(dp(c, 6), dp(c, compact ? 6 : 9), dp(c, 6), dp(c, compact ? 6 : 9));
+            pill.setPadding(dp(c, 6), dp(c, compact ? 7 : 9), dp(c, 6), dp(c, compact ? 7 : 9));
             pill.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -596,7 +599,7 @@ public final class Screens {
             });
             pills[i] = pill;
             LinearLayout.LayoutParams plp = new LinearLayout.LayoutParams(0, -2, 1.0f);
-            if (i > 0) {
+            if (i > 0 && !compact) {
                 plp.leftMargin = dp(c, 6);
             }
             row.addView(pill, plp);
@@ -612,9 +615,13 @@ public final class Screens {
         int current = ModePreset.current(p);
         for (int i = 0; i < pills.length; i++) {
             boolean selected = i == current;
-            pills[i].setTextColor(selected ? -1 : (compact ? android.graphics.Color.argb(200, 255, 255, 255) : s.getInk()));
-            int bg = selected ? s.getAccent() : (compact ? android.graphics.Color.argb(34, 255, 255, 255) : s.getBackground());
-            pills[i].setBackground(s.roundRect(c, bg, 999, selected || compact ? 0 : s.getBorder()));
+            pills[i].setTextColor(selected ? -1 : (compact ? android.graphics.Color.argb(170, 255, 255, 255) : s.getInk()));
+            if (compact && !selected) {
+                pills[i].setBackground(null);
+            } else {
+                int bg = selected ? s.getAccent() : s.getBackground();
+                pills[i].setBackground(s.roundRect(c, bg, 999, selected ? 0 : s.getBorder()));
+            }
         }
         desc.setText(current == ModePreset.CUSTOM ? "세부 설정으로 직접 맞춘 상태예요. 모드를 고르면 해당 조합으로 바뀝니다." : ModePreset.INFO[current][1]);
     }

@@ -57,10 +57,11 @@ public final class FloatingPanel extends LinearLayout {
 
     private enum Mode { CARD, START, TAB, MEASURE, STRIP }
 
-    static final int PANEL = Color.argb(240, 17, 26, 24);
+    static final int PANEL = Color.argb(244, 15, 21, 20);
     static final int ON_PANEL = Color.WHITE;
-    static final int ON_PANEL_DIM = Color.argb(165, 255, 255, 255);
-    static final int CHIP = Color.argb(30, 255, 255, 255);
+    static final int ON_PANEL_DIM = Color.argb(150, 255, 255, 255);
+    static final int CHIP = Color.argb(22, 255, 255, 255);
+    static final int HAIRLINE = Color.argb(24, 255, 255, 255);
     static final int AMBER = Color.rgb(255, 196, 92);
 
     private final Host host;
@@ -116,20 +117,25 @@ public final class FloatingPanel extends LinearLayout {
         header.setOrientation(HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.addView(handle(context, false), new LayoutParams(dp(24), dp(40)));
-        dot = s.dot(context, s.getAccent(), 8);
-        LayoutParams dotParams = new LayoutParams(dp(8), dp(8));
-        dotParams.leftMargin = dp(4);
-        dotParams.rightMargin = dp(8);
-        header.addView(dot, dotParams);
+        dot = s.dot(context, s.getAccent(), 7);
         LinearLayout texts = new LinearLayout(context);
         texts.setOrientation(VERTICAL);
-        caption = s.label(context, "MiMiC", 10.5f, ON_PANEL_DIM, false);
-        texts.addView(caption);
-        statusText = s.label(context, "", 12.5f, ON_PANEL, true);
+        LinearLayout brandRow = new LinearLayout(context);
+        brandRow.setGravity(Gravity.CENTER_VERTICAL);
+        LayoutParams dotParams = new LayoutParams(dp(7), dp(7));
+        dotParams.rightMargin = dp(6);
+        brandRow.addView(dot, dotParams);
+        caption = s.label(context, "MiMiC", 10.5f, ON_PANEL_DIM, true);
+        caption.setLetterSpacing(0.06f);
+        brandRow.addView(caption);
+        texts.addView(brandRow);
+        statusText = s.label(context, "", 13.0f, ON_PANEL, true);
         statusText.setMaxLines(2);
-        texts.addView(statusText);
+        LayoutParams stp0 = new LayoutParams(-2, -2);
+        stp0.topMargin = dp(1);
+        texts.addView(statusText, stp0);
         header.addView(texts, new LayoutParams(0, -2, 1.0f));
-        primary = pill(context, "시작", s.getAccent(), 13.0f, 16);
+        primary = pill(context, "시작", s.getAccent(), 13.0f, 18);
         primary.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -138,14 +144,22 @@ public final class FloatingPanel extends LinearLayout {
                 }
             }
         });
-        LayoutParams pp = new LayoutParams(-2, dp(38));
+        LayoutParams pp = new LayoutParams(-2, dp(36));
         pp.leftMargin = dp(8);
         header.addView(primary, pp);
         card.addView(header, new LayoutParams(-1, -2));
 
-        // toolbar: three equal buttons
+        // toolbar: quiet text actions under a hairline
+        View rule = new View(context);
+        rule.setBackgroundColor(HAIRLINE);
+        LayoutParams rp = new LayoutParams(-1, dp(1));
+        rp.topMargin = dp(6);
+        rp.leftMargin = dp(4);
+        rp.rightMargin = dp(4);
+        card.addView(rule, rp);
         LinearLayout toolbar = new LinearLayout(context);
         toolbar.setOrientation(HORIZONTAL);
+        toolbar.setGravity(Gravity.CENTER_VERTICAL);
         TextView small = tool(context, "작게");
         small.setContentDescription("시작 버튼만 남기기");
         small.setOnClickListener(new OnClickListener() {
@@ -174,11 +188,12 @@ public final class FloatingPanel extends LinearLayout {
                 applySettings();
             }
         });
-        toolbar.addView(small, toolParams(false));
-        toolbar.addView(off, toolParams(true));
-        toolbar.addView(settingsToggle, toolParams(true));
-        LayoutParams tbp = new LayoutParams(-1, dp(32));
-        tbp.topMargin = dp(6);
+        toolbar.addView(small, toolParams());
+        toolbar.addView(off, toolParams());
+        View spacer = new View(context);
+        toolbar.addView(spacer, new LayoutParams(0, 1, 1.0f));
+        toolbar.addView(settingsToggle, toolParams());
+        LayoutParams tbp = new LayoutParams(-1, dp(34));
         card.addView(toolbar, tbp);
 
         // settings: the run mode and the mistake count; everything else lives in the app
@@ -186,7 +201,7 @@ public final class FloatingPanel extends LinearLayout {
         settingsBox.setOrientation(VERTICAL);
         groupBody = new LinearLayout(context);
         groupBody.setOrientation(VERTICAL);
-        groupBody.setPadding(dp(4), 0, dp(4), dp(4));
+        groupBody.setPadding(dp(6), dp(2), dp(6), dp(4));
         groupScroll = new ScrollView(context) {
             @Override
             protected void onMeasure(int widthSpec, int heightSpec) {
@@ -206,8 +221,9 @@ public final class FloatingPanel extends LinearLayout {
         foldTab = new ImageView(context);
         foldTab.setImageResource(R.drawable.ic_chevron);
         foldTab.setColorFilter(ON_PANEL);
-        foldTab.setPadding(dp(2), dp(20), dp(2), dp(20));
-        foldTab.setBackground(ripple(CHIP, 10));
+        foldTab.setPadding(dp(3), dp(22), dp(3), dp(22));
+        foldTab.setAlpha(0.7f);
+        foldTab.setBackground(ripple(CHIP, 999));
         foldTab.setContentDescription("패널을 화면 가장자리로 접기");
         foldTab.setOnClickListener(new OnClickListener() {
             @Override
@@ -217,7 +233,7 @@ public final class FloatingPanel extends LinearLayout {
                 host.onLayoutChanged();
             }
         });
-        cardRow.addView(card, new LayoutParams(dp(256), -2));
+        cardRow.addView(card, new LayoutParams(dp(248), -2));
         addView(cardRow, new LayoutParams(-2, -2));
 
         // --------------------------------------------------------------- START
@@ -329,7 +345,7 @@ public final class FloatingPanel extends LinearLayout {
         stripPauseIcon = new ImageView(context);
         stripPauseIcon.setImageResource(R.drawable.ic_pause);
         stripPauseIcon.setColorFilter(ON_PANEL);
-        pause.addView(stripPauseIcon, new LayoutParams(dp(18), dp(18)));
+        pause.addView(stripPauseIcon, new LayoutParams(dp(20), dp(20)));
         pause.setContentDescription("일시정지");
         pause.setOnClickListener(new OnClickListener() {
             @Override
@@ -339,10 +355,14 @@ public final class FloatingPanel extends LinearLayout {
                 }
             }
         });
-        LayoutParams spp = new LayoutParams(dp(40), dp(32));
-        spp.topMargin = dp(4);
+        LayoutParams spp = new LayoutParams(dp(38), dp(38));
+        spp.topMargin = dp(6);
         strip.addView(pause, spp);
-        Button stop = pill(context, "중지", s.getDanger(), 11.0f, 0);
+        ImageView stop = new ImageView(context);
+        stop.setImageResource(R.drawable.ic_stop);
+        stop.setColorFilter(Color.WHITE);
+        stop.setPadding(dp(10), dp(10), dp(10), dp(10));
+        stop.setBackground(ripple(s.getDanger(), 999));
         stop.setContentDescription("자동 풀이 중지");
         stop.setOnClickListener(new OnClickListener() {
             @Override
@@ -352,8 +372,8 @@ public final class FloatingPanel extends LinearLayout {
                 }
             }
         });
-        LayoutParams stp = new LayoutParams(dp(40), dp(28));
-        stp.topMargin = dp(4);
+        LayoutParams stp = new LayoutParams(dp(38), dp(38));
+        stp.topMargin = dp(6);
         strip.addView(stop, stp);
         stripInfo = s.label(context, "", 10.0f, ON_PANEL_DIM, true);
         stripInfo.setGravity(Gravity.CENTER);
@@ -537,7 +557,7 @@ public final class FloatingPanel extends LinearLayout {
         foldTab.setRotation(right ? 0 : 180);
         edgeArrow.setRotation(right ? 180 : 0);
         cardRow.removeView(foldTab);
-        LayoutParams ftp = new LayoutParams(dp(22), dp(64));
+        LayoutParams ftp = new LayoutParams(dp(18), dp(60));
         ftp.topMargin = dp(4);
         if (right) {
             ftp.rightMargin = dp(6);
@@ -553,8 +573,8 @@ public final class FloatingPanel extends LinearLayout {
             setPadding(0, 0, 0, 0);
             return;
         }
-        setBackground(s.roundRect(getContext(), PANEL, mode == Mode.STRIP || mode == Mode.START ? 18 : 22, Color.argb(40, 255, 255, 255)));
-        setElevation(dp(6));
+        setBackground(s.roundRect(getContext(), PANEL, mode == Mode.STRIP || mode == Mode.START ? 22 : 20, HAIRLINE));
+        setElevation(dp(8));
         switch (mode) {
             case STRIP:
                 setPadding(dp(4), dp(4), dp(4), dp(6));
@@ -566,14 +586,14 @@ public final class FloatingPanel extends LinearLayout {
                 setPadding(dp(8), dp(8), dp(12), dp(10));
                 break;
             default:
-                setPadding(dp(8), dp(8), dp(10), dp(10));
+                setPadding(dp(8), dp(8), dp(10), dp(8));
                 break;
         }
     }
 
     private void applySettings() {
         settingsBox.setVisibility(settingsOpen ? VISIBLE : GONE);
-        settingsToggle.setText(settingsOpen ? "설정 ▴" : "설정 ▾");
+        settingsToggle.setText(settingsOpen ? "설정 접기" : "설정 열기");
         settingsToggle.setContentDescription(settingsOpen ? "설정 접기" : "설정 펼치기");
         if (settingsOpen) {
             fillGroup();
@@ -635,20 +655,17 @@ public final class FloatingPanel extends LinearLayout {
     }
 
     private TextView tool(Context context, String text) {
-        TextView t = AppStyle.INSTANCE.label(context, text, 12.0f, ON_PANEL, true);
+        TextView t = AppStyle.INSTANCE.label(context, text, 12.0f, ON_PANEL_DIM, false);
         t.setGravity(Gravity.CENTER);
-        t.setBackground(ripple(CHIP, 999));
+        t.setPadding(dp(10), 0, dp(10), 0);
+        t.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(40, 255, 255, 255)), null, AppStyle.INSTANCE.roundRect(context, Color.WHITE, 999, 0)));
         t.setClickable(true);
         t.setFocusable(true);
         return t;
     }
 
-    private LayoutParams toolParams(boolean gap) {
-        LayoutParams lp = new LayoutParams(0, -1, 1.0f);
-        if (gap) {
-            lp.leftMargin = dp(6);
-        }
-        return lp;
+    private LayoutParams toolParams() {
+        return new LayoutParams(-2, -1);
     }
 
     private ImageView handle(Context context, boolean vertical) {
