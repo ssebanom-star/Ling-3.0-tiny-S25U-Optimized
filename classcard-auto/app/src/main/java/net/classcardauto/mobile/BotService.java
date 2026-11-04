@@ -734,10 +734,28 @@ public final class BotService extends AccessibilityService {
      * list stops exactly where the swipe ended instead of flinging on.
      */
     /** A second stroke added to the next gesture (tap + card swipe in one go); cleared when used. */
-    private Path extraPath;
-    private long extraStart;
-    private long extraDuration;
-    private float extraX1, extraY1, extraX2, extraY2;
+    private static final class Extra {
+        Path path;
+        long start;
+        long duration;
+        float x1, y1, x2, y2;
+    }
+
+    private final java.util.List<Extra> extras = new java.util.ArrayList<>();
+
+    private final void addExtra(float x1, float y1, float x2, float y2, long start, long duration) {
+        Extra e = new Extra();
+        e.path = new Path();
+        e.path.moveTo(x1, y1);
+        e.path.lineTo(x2, y2);
+        e.start = start;
+        e.duration = duration;
+        e.x1 = x1;
+        e.y1 = y1;
+        e.x2 = x2;
+        e.y2 = y2;
+        this.extras.add(e);
+    }
 
     /** 개발 > 빠른 제스처: shorter waits around a gesture and no second look at the target before tapping. */
     final boolean devFast() {
@@ -761,10 +779,14 @@ public final class BotService extends AccessibilityService {
         }
         GestureDescription.StrokeDescription stroke = new GestureDescription.StrokeDescription(path, 0L, duration, endHoldMs > 0);
         GestureDescription.Builder builder = new GestureDescription.Builder().addStroke(stroke);
-        final boolean hasExtra = this.extraPath != null;
-        if (hasExtra) {
-            builder.addStroke(new GestureDescription.StrokeDescription(this.extraPath, this.extraStart, this.extraDuration));
+        final java.util.List<Extra> extraNow = new java.util.ArrayList<>(this.extras);
+        this.extras.clear();
+        boolean extraHitsPanel = false;
+        for (Extra e : extraNow) {
+            builder.addStroke(new GestureDescription.StrokeDescription(e.path, e.start, e.duration));
+            extraHitsPanel = extraHitsPanel || pathHitsPanel(e.x1, e.y1, e.x2, e.y2);
         }
+        final boolean extraHits = extraHitsPanel;
         final GestureDescription build = builder.build();
         this.holdStroke = endHoldMs > 0 ? stroke : null;
         this.holdX = x2;
@@ -773,8 +795,7 @@ public final class BotService extends AccessibilityService {
         final long begin = this.overlayInputGuard.begin();
         this.busy = true;
         try {
-            this.panelPassThrough = pathHitsPanel(x1, y1, x2, y2) || (hasExtra && pathHitsPanel(this.extraX1, this.extraY1, this.extraX2, this.extraY2));
-            this.extraPath = null;
+            this.panelPassThrough = pathHitsPanel(x1, y1, x2, y2) || extraHits;
             setOverlayTouchable(false);
             this.handler.postDelayed(new Runnable() { // from class: net.classcardauto.mobile.BotService$$ExternalSyntheticLambda10
                 @Override // java.lang.Runnable
@@ -1590,24 +1611,25 @@ public final class BotService extends AccessibilityService {
      * 개발 > 탭+넘기기 한 번에: the tap on the answer and the swipe that moves the card on go out as one gesture (two
      * strokes, the swipe starting shortly after the tap), saving the round trip between them.
      */
-    public final void tapThenAdvance(UiNode target, Bounds card, List<UiNode> ns, Function0<Unit> after) {
+    public final void tapThenAdvance(UiNode target, Bounds card, List<UiNode> ns, boolean withReveal, Function0<Unit> after) {
+        android.content.SharedPreferences p = getStorage().getPrefs();
         SwipePath sp = CoreKt.safeSwipePath(card, ns);
-        Path swipe = new Path();
-        swipe.moveTo(sp.getStartX(), sp.getY());
-        swipe.lineTo(sp.getEndX(), sp.getY());
-        this.extraPath = swipe;
-        this.extraStart = 170L;
-        this.extraDuration = getEngine().turboPart(TurboParts.TEST) ? 150L : 250L;
-        this.extraX1 = sp.getStartX();
-        this.extraY1 = sp.getY();
-        this.extraX2 = sp.getEndX();
-        this.extraY2 = sp.getY();
+        long gap = p.getInt("dev_batch_gap", 170);
+        long swipeMs = p.getInt("dev_batch_swipe", 150);
+        this.extras.clear();
+        // the swipe that moves the card on, a little after the tap
+        addExtra(sp.getStartX(), sp.getY(), sp.getEndX(), sp.getY(), gap, swipeMs);
+        long reveal = p.getInt("dev_batch_reveal", 0);
+        if (withReveal && reveal > 0) {
+            // and the one that opens the choices of the next question, a fixed time after the card has moved on
+            addExtra(sp.getStartX(), sp.getY(), sp.getEndX(), sp.getY(), gap + swipeMs + reveal, swipeMs);
+        }
         try {
             tap(target, after, false);
         } finally {
-            this.extraPath = null;
+            this.extras.clear();
         }
-        getEngine().log("batch_tap_advance", new QuietJson());
+        getEngine().log("batch_tap_advance", new QuietJson().put("reveal", withReveal && reveal > 0));
     }
 
     public final void tap(UiNode target, Function0<Unit> after) {

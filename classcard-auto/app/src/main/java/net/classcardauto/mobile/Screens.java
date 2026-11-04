@@ -646,6 +646,29 @@ public final class Screens {
         parent.addView(panelNote(c, "화면이 바뀌면 바로 확인해요. 일정 간격 확인은 보조로만 써요."), lp(c, 0));
         parent.addView(panelSwitch(c, "탭+넘기기 한 번에", p.getBoolean("dev_batch", false), "dev_batch", p), lp(c, 8));
         parent.addView(panelNote(c, "답 누르기와 카드 넘기기를 한 제스처로 보내요. 고급 설정 > 초고속 세부 항목의 ‘확인 없이 넘기기’가 켜져 있어야 해요."), lp(c, 0));
+        parent.addView(panelHeading(c, "탭+넘기기 세부"), lp(c, 12));
+        parent.addView(s.sliderRow(c, "탭 → 넘기기 시차", "ms", 40, 300, 10, p.getInt("dev_batch_gap", 170), new Function1<Integer, Unit>() {
+            @Override
+            public Unit invoke(Integer v) {
+                p.edit().putInt("dev_batch_gap", v.intValue()).apply();
+                return Unit.INSTANCE;
+            }
+        }, true), lp(c, 4));
+        parent.addView(s.sliderRow(c, "넘기기 스와이프 시간", "ms", 80, 300, 10, p.getInt("dev_batch_swipe", 150), new Function1<Integer, Unit>() {
+            @Override
+            public Unit invoke(Integer v) {
+                p.edit().putInt("dev_batch_swipe", v.intValue()).apply();
+                return Unit.INSTANCE;
+            }
+        }, true), lp(c, 6));
+        parent.addView(s.sliderRow(c, "다음 문제 보기 열기 포함 (0=끔)", "ms", 0, 800, 50, p.getInt("dev_batch_reveal", 0), new Function1<Integer, Unit>() {
+            @Override
+            public Unit invoke(Integer v) {
+                p.edit().putInt("dev_batch_reveal", v.intValue()).apply();
+                return Unit.INSTANCE;
+            }
+        }, true), lp(c, 6));
+        parent.addView(panelNote(c, "넘긴 카드가 보이기까지 이 시간을 두고 보기 열기 스와이프를 같은 제스처로 보내요. 너무 짧으면 문항을 건너뛸 수 있어요."), lp(c, 0));
         parent.addView(panelHeading(c, "시간이 어디서 쓰이나"), lp(c, 12));
         final TextView stats = panelNote(c, DevStats.summary());
         parent.addView(stats, lp(c, 2));

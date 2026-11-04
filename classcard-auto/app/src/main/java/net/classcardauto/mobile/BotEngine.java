@@ -1092,6 +1092,7 @@ public final class BotEngine {
             Solver solver = this.solver;
             Intrinsics.checkNotNull(solver);
             final ChoiceAnswer answer = decideAnswer(solver, prompt, choices, progress);
+            DevStats.tap(SystemClock.elapsedRealtime());
             Function0<Unit> done = new Function0() { // from class: net.classcardauto.mobile.BotEngine$$ExternalSyntheticLambda20
                 @Override // kotlin.jvm.functions.Function0
                 public final Object invoke() {
@@ -1102,7 +1103,12 @@ public final class BotEngine {
             };
             this.lastBatch = tries == 1 && skipConfirm() && this.storage.getPrefs().getBoolean("dev_batch", false);
             if (this.lastBatch) {
-                this.service.tapThenAdvance(answer.getTarget(), cardBounds(ns), ns, done);
+                boolean reveal = this.storage.getPrefs().getInt("dev_batch_reveal", 0) > 0;
+                String next = nextProgress(progress);
+                if (reveal && next != null) {
+                    this.revealBatchAt.put(next, Long.valueOf(SystemClock.elapsedRealtime()));
+                }
+                this.service.tapThenAdvance(answer.getTarget(), cardBounds(ns), ns, reveal && next != null, done);
             } else {
                 this.service.tap(answer.getTarget(), done, tries > 1);
             }
@@ -1112,7 +1118,7 @@ public final class BotEngine {
     /* JADX INFO: Access modifiers changed from: private */
     public static final Unit inputAnswer$lambda$51(BotEngine botEngine, String str, String str2, ChoiceAnswer choiceAnswer, long j, int i) {
         long now = SystemClock.elapsedRealtime();
-        DevStats.tap(now);
+        DevStats.done(now);
         if (botEngine.skipConfirm()) {
             // 확인 없이 넘기기: count the answer as given right away; the next tick swipes without waiting for feedback
             botEngine.answered.add(str);
@@ -1121,9 +1127,8 @@ public final class BotEngine {
             botEngine.lastTap = now;
             botEngine.log("tap", new QuietJson().put("progress", str).put("attempt", i).put("confirm", false));
             if (botEngine.lastBatch) {
-                // the card was swiped in the same gesture: give the next question a moment to appear before looking again
+                // the card was swiped in the same gesture: the plain swipe waits for that to show (no fixed pause)
                 botEngine.batchAt.put(str, Long.valueOf(now));
-                botEngine.service.hold(800L);
             }
             botEngine.gate.resetObservation();
             return Unit.INSTANCE;
@@ -1605,6 +1610,10 @@ public final class BotEngine {
                             }
                             return;
                         }
+                        Long revealedAt = this.revealBatchAt.get(str);
+                        if (revealedAt != null && sortedWith.isEmpty() && now - revealedAt.longValue() < 1500) {
+                            return;
+                        }
                         if (id4 != null && sortedWith.isEmpty() && !this.answered.contains(str)) {
                             if (this.natural || !humanAdvanceReady(str + ":prompt", now) || !SwipeGate.ready$default(this.gate, str + ":prompt", id4.getBounds(), now, false, 0, 24, null)) {
                                 return;
@@ -1882,6 +1891,7 @@ public final class BotEngine {
         this.turbo = this.storage.getPrefs().getBoolean("turbo", false);
         DevStats.reset();
         this.batchAt.clear();
+        this.revealBatchAt.clear();
         this.collectionRetried = false;
         this.collectionIncomplete = false;
         this.guessedAnswers = 0;
@@ -2517,6 +2527,23 @@ public final class BotEngine {
     private boolean lastBatch;
     /** When the answer to a question was sent together with its card swipe; the plain swipe waits for that to show. */
     private final java.util.Map<String, Long> batchAt = new java.util.HashMap<>();
+    /** The next question whose choices the batched gesture opens by itself; the plain reveal swipe waits for that. */
+    private final java.util.Map<String, Long> revealBatchAt = new java.util.HashMap<>();
+
+    /** "3 | 20" -> "4 | 20"; null at the last question or when the text is not of that form. */
+    private static String nextProgress(String progress) {
+        String[] parts = progress.split(" \\| ");
+        if (parts.length != 2) {
+            return null;
+        }
+        try {
+            int n = Integer.parseInt(parts[0].trim());
+            int total = Integer.parseInt(parts[1].trim());
+            return n < total ? (n + 1) + " | " + total : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
     /** The word list was collected a second time (normal speed) because the first pass missed words. */
     private boolean collectionRetried;
     /** The test starts with a list that still misses words. */
