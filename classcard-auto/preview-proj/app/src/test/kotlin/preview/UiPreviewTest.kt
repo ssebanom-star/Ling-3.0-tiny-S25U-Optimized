@@ -409,4 +409,24 @@ class UiPreviewTest {
         p.render(false, "", true, false)
         paparazzi.snapshot(overBackdrop(p), "overlay_capsule")
     }
+
+    @Test
+    fun overlayDev() {
+        val p = FloatingPanel(paparazzi.context, MemoryPrefs(), host())
+        p.render(false, "", true, false)
+        p.setMinimized(false)
+        val footer = (p.getChildAt(0) as android.view.ViewGroup)
+        fun find(v: View, text: String): View? {
+            if (v is android.widget.TextView && v.text.toString().replace("\u2060", "").contains(text)) return v
+            if (v is android.view.ViewGroup) for (i in 0 until v.childCount) find(v.getChildAt(i), text)?.let { return it }
+            return null
+        }
+        fun dump(v: View) { if (v is android.widget.TextView) println("DEVTOGGLE tv=[" + v.text + "]"); if (v is android.view.ViewGroup) for (i in 0 until v.childCount) dump(v.getChildAt(i)) }
+        dump(p)
+        val t = find(p, "개발")
+        println("DEVTOGGLE found=" + (t != null) + " clickable=" + (t?.isClickable) + " listener=" + (t?.hasOnClickListeners()))
+        t?.performClick()
+        println("DEVTOGGLE after text=" + (t as? android.widget.TextView)?.text)
+        paparazzi.snapshot(overBackdrop(p), "overlay_dev")
+    }
 }

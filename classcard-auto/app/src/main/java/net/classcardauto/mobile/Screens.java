@@ -611,6 +611,58 @@ public final class Screens {
         desc.setText(current == ModePreset.CUSTOM ? "세부 설정으로 직접 맞춘 상태예요. 모드를 고르면 해당 조합으로 바뀝니다." : ModePreset.INFO[current][1]);
     }
 
+    private static LinearLayout panelSwitch(Context c, String title, boolean checked, final String key, final SharedPreferences p) {
+        AppStyle s = AppStyle.INSTANCE;
+        LinearLayout row = new LinearLayout(c);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(s.label(c, title, 12.5f, -1, true), new LinearLayout.LayoutParams(0, -2, 1.0f));
+        final android.widget.CompoundButton sw = s.toggle(c, checked, new android.widget.CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(android.widget.CompoundButton b, boolean on) {
+                p.edit().putBoolean(key, on).apply();
+            }
+        });
+        sw.setScaleX(0.8f);
+        sw.setScaleY(0.8f);
+        row.addView(sw, new LinearLayout.LayoutParams(-2, -2));
+        row.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                sw.toggle();
+            }
+        });
+        return row;
+    }
+
+    /** The experimental 개발 page of the floating panel: switches for the faster ways of solving, and where the time goes. */
+    public static void addPanelDev(final Context c, LinearLayout parent, final SharedPreferences p) {
+        AppStyle s = AppStyle.INSTANCE;
+        parent.addView(panelHeading(c, "실험 기능"), lp(c, 4));
+        parent.addView(panelNote(c, "불안정할 수 있어요. 다음 실행부터 적용되고, 이상하면 끄세요."), lp(c, 2));
+        parent.addView(panelSwitch(c, "빠른 제스처", p.getBoolean("dev_fast_gesture", false), "dev_fast_gesture", p), lp(c, 10));
+        parent.addView(panelNote(c, "터치 전후 대기를 줄이고, 누르기 직전 확인 읽기를 생략해요."), lp(c, 0));
+        parent.addView(panelSwitch(c, "이벤트로 즉시 반응", p.getBoolean("dev_event_tick", false), "dev_event_tick", p), lp(c, 8));
+        parent.addView(panelNote(c, "화면이 바뀌면 바로 확인해요. 일정 간격 확인은 보조로만 써요."), lp(c, 0));
+        parent.addView(panelSwitch(c, "탭+넘기기 한 번에", p.getBoolean("dev_batch", false), "dev_batch", p), lp(c, 8));
+        parent.addView(panelNote(c, "답 누르기와 카드 넘기기를 한 제스처로 보내요. 고급 설정 > 초고속 세부 항목의 ‘확인 없이 넘기기’가 켜져 있어야 해요."), lp(c, 0));
+        parent.addView(panelHeading(c, "시간이 어디서 쓰이나"), lp(c, 12));
+        final TextView stats = panelNote(c, DevStats.summary());
+        parent.addView(stats, lp(c, 2));
+        TextView refresh = s.label(c, "새로고침", 12.0f, -1, true);
+        refresh.setGravity(Gravity.CENTER);
+        refresh.setBackground(s.roundRect(c, android.graphics.Color.argb(34, 255, 255, 255), 999, 0));
+        refresh.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                stats.setText(DevStats.summary());
+            }
+        });
+        LinearLayout.LayoutParams rp = lp(c, 8);
+        rp.height = dp(c, 30);
+        parent.addView(refresh, rp);
+    }
+
     private static TextView panelHeading(Context c, String text) {
         TextView t = AppStyle.INSTANCE.label(c, text, 11.0f, -1, true);
         t.setAlpha(0.65f);

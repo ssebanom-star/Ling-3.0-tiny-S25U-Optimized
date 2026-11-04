@@ -59,7 +59,7 @@ public final class BotService$gesture$3$accepted$1 extends AccessibilityService.
         long j = this.$token;
         final int i = this.$epoch;
         final Function0<Unit> function0 = this.$after;
-        botService.finishGesture(j, 45L, new Function0() { // from class: net.classcardauto.mobile.BotService$gesture$3$accepted$1$$ExternalSyntheticLambda1
+        botService.finishGesture(j, botService.devFast() ? 20L : 45L, new Function0() { // from class: net.classcardauto.mobile.BotService$gesture$3$accepted$1$$ExternalSyntheticLambda1
             @Override // kotlin.jvm.functions.Function0
             public final Object invoke() {
                 Unit onCompleted$lambda$0;

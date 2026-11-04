@@ -1092,20 +1092,27 @@ public final class BotEngine {
             Solver solver = this.solver;
             Intrinsics.checkNotNull(solver);
             final ChoiceAnswer answer = decideAnswer(solver, prompt, choices, progress);
-            this.service.tap(answer.getTarget(), new Function0() { // from class: net.classcardauto.mobile.BotEngine$$ExternalSyntheticLambda20
+            Function0<Unit> done = new Function0() { // from class: net.classcardauto.mobile.BotEngine$$ExternalSyntheticLambda20
                 @Override // kotlin.jvm.functions.Function0
                 public final Object invoke() {
                     Unit inputAnswer$lambda$51;
                     inputAnswer$lambda$51 = BotEngine.inputAnswer$lambda$51(BotEngine.this, progress, prompt, answer, readAt, tries);
                     return inputAnswer$lambda$51;
                 }
-            }, tries > 1);
+            };
+            this.lastBatch = tries == 1 && skipConfirm() && this.storage.getPrefs().getBoolean("dev_batch", false);
+            if (this.lastBatch) {
+                this.service.tapThenAdvance(answer.getTarget(), cardBounds(ns), ns, done);
+            } else {
+                this.service.tap(answer.getTarget(), done, tries > 1);
+            }
         }
     }
 
     /* JADX INFO: Access modifiers changed from: private */
     public static final Unit inputAnswer$lambda$51(BotEngine botEngine, String str, String str2, ChoiceAnswer choiceAnswer, long j, int i) {
         long now = SystemClock.elapsedRealtime();
+        DevStats.tap(now);
         if (botEngine.skipConfirm()) {
             // 확인 없이 넘기기: count the answer as given right away; the next tick swipes without waiting for feedback
             botEngine.answered.add(str);
@@ -1113,6 +1120,11 @@ public final class BotEngine {
             botEngine.tapTimes.add(Double.valueOf(now - j));
             botEngine.lastTap = now;
             botEngine.log("tap", new QuietJson().put("progress", str).put("attempt", i).put("confirm", false));
+            if (botEngine.lastBatch) {
+                // the card was swiped in the same gesture: give the next question a moment to appear before looking again
+                botEngine.batchAt.put(str, Long.valueOf(now));
+                botEngine.service.hold(800L);
+            }
             botEngine.gate.resetObservation();
             return Unit.INSTANCE;
         }
@@ -1554,6 +1566,7 @@ public final class BotEngine {
                             z = contains$default;
                         } else {
                             if (contains$default) {
+                                DevStats.feedback(now);
                                 this.answered.add(str);
                                 this.pending = null;
                                 this.tapTimes.add(Double.valueOf(pending.getReadMs()));
@@ -1583,8 +1596,10 @@ public final class BotEngine {
                         this.service.setStatus(intValue + "/" + intValue2 + " · " + this.answered.size() + "개 입력");
                         if (!this.questionSeen.containsKey(str)) {
                             this.questionSeen.put(str, Long.valueOf(now));
+                            DevStats.seen(now);
                         }
                         if (Intrinsics.areEqual(text4, this.service.getProfile().getReadyMessage()) && !this.answered.contains(str)) {
+                            DevStats.choices(now);
                             if (humanReady(str, str2, sortedWith, now)) {
                                 inputAnswer(ns, sortedWith, str, str2, now, 1);
                             }
@@ -1607,6 +1622,10 @@ public final class BotEngine {
                         }
                         if ((!z && !skipConfirm()) || !this.answered.contains(str)) {
                             this.gate.resetObservation();
+                            return;
+                        }
+                        Long batchedAt = this.batchAt.get(str);
+                        if (batchedAt != null && now - batchedAt.longValue() < 1200) {
                             return;
                         }
                         if (this.natural || !humanAdvanceReady(str + ":feedback", now) || !this.gate.ready(str + ":feedback", cardBounds(ns), now, false, 1)) {
@@ -1861,6 +1880,8 @@ public final class BotEngine {
         this.inlineStability.reset();
         this.natural = this.storage.getPrefs().getBoolean("natural", false);
         this.turbo = this.storage.getPrefs().getBoolean("turbo", false);
+        DevStats.reset();
+        this.batchAt.clear();
         this.collectionRetried = false;
         this.collectionIncomplete = false;
         this.guessedAnswers = 0;
@@ -2492,6 +2513,10 @@ public final class BotEngine {
     }
 
     private boolean turbo;
+    /** The answer just tapped went out together with the card swipe (개발 > 탭+넘기기 한 번에). */
+    private boolean lastBatch;
+    /** When the answer to a question was sent together with its card swipe; the plain swipe waits for that to show. */
+    private final java.util.Map<String, Long> batchAt = new java.util.HashMap<>();
     /** The word list was collected a second time (normal speed) because the first pass missed words. */
     private boolean collectionRetried;
     /** The test starts with a list that still misses words. */

@@ -92,6 +92,9 @@ public final class FloatingPanel extends LinearLayout {
     // START / TAB
     private final LinearLayout startOnly;
     private View capsuleDot;
+    private TextView devToggle;
+    /** The experimental page is shown in place of the settings. */
+    private boolean devPage;
     private final LinearLayout edgeTab;
     private final ImageView edgeArrow;
     // MEASURE
@@ -209,6 +212,26 @@ public final class FloatingPanel extends LinearLayout {
         });
         footer.addView(off, new LayoutParams(-2, -1));
         footer.addView(new View(context), new LayoutParams(0, 1, 1.0f));
+        devToggle = tool(context, "개발");
+        devToggle.setContentDescription("실험 기능 보기");
+        devToggle.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                devPage = !devPage;
+                devToggle.setText(devPage ? "설정" : "개발");
+                if (canMorph()) {
+                    morph(new Runnable() {
+                        @Override
+                        public void run() {
+                            fillGroup();
+                        }
+                    });
+                } else {
+                    fillGroup();
+                }
+            }
+        });
+        footer.addView(devToggle, new LayoutParams(-2, -1));
         TextView advanced = tool(context, "고급 설정 ›");
         advanced.setContentDescription("앱의 고급 설정 열기");
         advanced.setOnClickListener(new OnClickListener() {
@@ -754,7 +777,11 @@ public final class FloatingPanel extends LinearLayout {
     /** Fills the settings area (read fresh from the preferences). */
     private void fillGroup() {
         groupBody.removeAllViews();
-        Screens.addPanelMain(getContext(), groupBody, prefs);
+        if (devPage) {
+            Screens.addPanelDev(getContext(), groupBody, prefs);
+        } else {
+            Screens.addPanelMain(getContext(), groupBody, prefs);
+        }
         groupScroll.scrollTo(0, 0);
     }
 

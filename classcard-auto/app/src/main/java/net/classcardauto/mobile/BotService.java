@@ -216,7 +216,7 @@ public final class BotService extends AccessibilityService {
             } finally {
                 BotService.this.getHandler().removeCallbacks(this);
                 // 초고속 모드는 화면을 더 자주 읽어 바뀐 화면에 바로 반응한다
-                BotService.this.getHandler().postDelayed(this, BotService.this.engine != null && BotService.this.getEngine().turboPart(TurboParts.REACT) ? 35L : 100L);
+                BotService.this.getHandler().postDelayed(this, BotService.this.nextTickDelay());
             }
         }
     };
@@ -687,7 +687,7 @@ public final class BotService extends AccessibilityService {
             public final void run() {
                 BotService.finishGesture$lambda$25(BotService.this, token, cooldown, after);
             }
-        }, 32L);
+        }, devFast() ? 16L : 32L);
     }
 
     /* JADX INFO: Access modifiers changed from: private */
@@ -733,6 +733,19 @@ public final class BotService extends AccessibilityService {
      * Same, but when {@code endHoldMs > 0} the finger stays still at the end point for that long before lifting, so the
      * list stops exactly where the swipe ended instead of flinging on.
      */
+    /** A second stroke added to the next gesture (tap + card swipe in one go); cleared when used. */
+    private Path extraPath;
+    private long extraStart;
+    private long extraDuration;
+    private float extraX1, extraY1, extraX2, extraY2;
+
+    /** 개발 > 빠른 제스처: shorter waits around a gesture and no second look at the target before tapping. */
+    final boolean devFast() {
+        return this.engine != null && getEngine().getActive() && getStorage().getPrefs().getBoolean("dev_fast_gesture", false);
+    }
+
+    private long lastEventTick;
+
     private final void gesture(float x1, float y1, float x2, float y2, long duration, long endHoldMs, final Function0<Unit> after) {
         if (!UsageConsent.INSTANCE.getAllowed()) {
             throw new IllegalStateException(UsageConsent.INSTANCE.getRequiredMessage().toString());
@@ -747,7 +760,12 @@ public final class BotService extends AccessibilityService {
             path.lineTo(x2, y2);
         }
         GestureDescription.StrokeDescription stroke = new GestureDescription.StrokeDescription(path, 0L, duration, endHoldMs > 0);
-        final GestureDescription build = new GestureDescription.Builder().addStroke(stroke).build();
+        GestureDescription.Builder builder = new GestureDescription.Builder().addStroke(stroke);
+        final boolean hasExtra = this.extraPath != null;
+        if (hasExtra) {
+            builder.addStroke(new GestureDescription.StrokeDescription(this.extraPath, this.extraStart, this.extraDuration));
+        }
+        final GestureDescription build = builder.build();
         this.holdStroke = endHoldMs > 0 ? stroke : null;
         this.holdX = x2;
         this.holdY = y2;
@@ -755,14 +773,15 @@ public final class BotService extends AccessibilityService {
         final long begin = this.overlayInputGuard.begin();
         this.busy = true;
         try {
-            this.panelPassThrough = pathHitsPanel(x1, y1, x2, y2);
+            this.panelPassThrough = pathHitsPanel(x1, y1, x2, y2) || (hasExtra && pathHitsPanel(this.extraX1, this.extraY1, this.extraX2, this.extraY2));
+            this.extraPath = null;
             setOverlayTouchable(false);
             this.handler.postDelayed(new Runnable() { // from class: net.classcardauto.mobile.BotService$$ExternalSyntheticLambda10
                 @Override // java.lang.Runnable
                 public final void run() {
                     BotService.gesture$lambda$24(BotService.this, begin, epoch, build, after);
                 }
-            }, (this.touchBlocker != null && this.touchBlocker.getVisibility() == View.VISIBLE) ? 90L : 32L); // the full-screen blocker needs a moment to become pass-through
+            }, devFast() ? ((this.touchBlocker != null && this.touchBlocker.getVisibility() == View.VISIBLE) ? 60L : 16L) : ((this.touchBlocker != null && this.touchBlocker.getVisibility() == View.VISIBLE) ? 90L : 32L)); // the full-screen blocker needs a moment to become pass-through
         } catch (Exception e) {
             this.overlayInputGuard.finish(begin);
             this.busy = false;
@@ -789,7 +808,7 @@ public final class BotService extends AccessibilityService {
         }
         UiNode verify = botService.verifyTarget;
         botService.verifyTarget = null;
-        if (verify != null && !botService.targetStillThere(verify) && ++botService.verifyAborts < 3) {
+        if (verify != null && !botService.devFast() && !botService.targetStillThere(verify) && ++botService.verifyAborts < 3) {
             // the screen moved under us: skip this tap, the engine looks again on its next pass
             botService.finishGesture(j, 60L, new Function0() {
                 @Override
@@ -1237,7 +1256,9 @@ public final class BotService extends AccessibilityService {
     }
 
     public final void hold(long ms) {
-        if (this.engine != null && getEngine().turboPart(TurboParts.REACT)) {
+        if (devFast()) {
+            ms = Math.max(20L, ms / 3);
+        } else if (this.engine != null && getEngine().turboPart(TurboParts.REACT)) {
             ms = Math.max(40L, ms / 2);
         }
         this.holdUntil = SystemClock.elapsedRealtime() + ms;
@@ -1307,6 +1328,27 @@ public final class BotService extends AccessibilityService {
 
     @Override // android.accessibilityservice.AccessibilityService
     public void onAccessibilityEvent(AccessibilityEvent event) {
+        // 개발 > 이벤트로 즉시 반응: a change on ClassCard's screen runs the next pass now instead of at the next poll
+        if (this.engine == null || this.destroyed || !getEngine().getActive() || !getStorage().getPrefs().getBoolean("dev_event_tick", false)) {
+            return;
+        }
+        long now = SystemClock.elapsedRealtime();
+        if (now - this.lastEventTick >= 20) {
+            this.lastEventTick = now;
+            this.handler.removeCallbacks(this.ticker);
+            this.handler.post(this.ticker);
+        }
+    }
+
+    /** Pause before the next screen pass: short in 초고속, long when screen events drive the passes (the poll is then a safety net). */
+    final long nextTickDelay() {
+        if (this.engine == null) {
+            return 100L;
+        }
+        if (getEngine().getActive() && getStorage().getPrefs().getBoolean("dev_event_tick", false)) {
+            return 150L;
+        }
+        return getEngine().turboPart(TurboParts.REACT) ? 35L : 100L;
     }
 
     @Override // android.app.Service
@@ -1542,6 +1584,30 @@ public final class BotService extends AccessibilityService {
                 return unit;
             }
         });
+    }
+
+    /**
+     * 개발 > 탭+넘기기 한 번에: the tap on the answer and the swipe that moves the card on go out as one gesture (two
+     * strokes, the swipe starting shortly after the tap), saving the round trip between them.
+     */
+    public final void tapThenAdvance(UiNode target, Bounds card, List<UiNode> ns, Function0<Unit> after) {
+        SwipePath sp = CoreKt.safeSwipePath(card, ns);
+        Path swipe = new Path();
+        swipe.moveTo(sp.getStartX(), sp.getY());
+        swipe.lineTo(sp.getEndX(), sp.getY());
+        this.extraPath = swipe;
+        this.extraStart = 170L;
+        this.extraDuration = getEngine().turboPart(TurboParts.TEST) ? 150L : 250L;
+        this.extraX1 = sp.getStartX();
+        this.extraY1 = sp.getY();
+        this.extraX2 = sp.getEndX();
+        this.extraY2 = sp.getY();
+        try {
+            tap(target, after, false);
+        } finally {
+            this.extraPath = null;
+        }
+        getEngine().log("batch_tap_advance", new QuietJson());
     }
 
     public final void tap(UiNode target, Function0<Unit> after) {
