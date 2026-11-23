@@ -4,7 +4,8 @@
 // 드라이버가 없거나 실패하면 시스템 libvulkan.so 로 폴백(동작 변화 없음).
 //
 // 환경변수 (앱의 "추가 환경변수"에 입력):
-//   HVM_VK_DRIVER      드라이버 폴더. 상대경로면 $HOME/drivers/<값>/ , 절대경로면 그대로. (미설정 = 시스템 드라이버)
+//   HVM_VK_DRIVER      "bundled" = APK 에 넣은 libvulkan_freedreno.so (nativeLibraryDir) 사용.
+//                      그 외: 드라이버 폴더. 상대경로면 $HOME/drivers/<값>/ , 절대경로면 그대로. (미설정 = 시스템 드라이버)
 //   HVM_VK_DRIVER_LIB  드라이버 .so 이름 (미설정 시 폴더의 meta.json "libraryName", 그것도 없으면 libvulkan_freedreno.so)
 //   HVM_VK_REDIRECT    (선택) 드라이버 파일 접근 리다이렉트 폴더 (ADRENOTOOLS_DRIVER_FILE_REDIRECT)
 #include <dlfcn.h>
@@ -53,7 +54,8 @@ static void *open_vk() {
     const char *drv = getenv("HVM_VK_DRIVER");
     if (drv && *drv) {
         std::string dir = drv;
-        if (dir[0] != '/') { const char *home = getenv("HOME"); dir = std::string(home ? home : "") + "/drivers/" + dir; }
+        if (dir == "bundled") dir = self_dir();
+        else if (dir[0] != '/') { const char *home = getenv("HOME"); dir = std::string(home ? home : "") + "/drivers/" + dir; }
         if (dir.back() != '/') dir += '/';
         const char *ln = getenv("HVM_VK_DRIVER_LIB");
         std::string lib = (ln && *ln) ? ln : read_lib_name(dir);

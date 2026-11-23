@@ -29,6 +29,7 @@ python3 scripts/sopatch.py bytes|nop|ret0|ret1 ...
 scripts/build.sh                  # → out/HorizonVM-patched.apk
 adb install -r out/HorizonVM-patched.apk   # 서명키가 원본(HVMDEBUG)과 달라 기존 앱은 먼저 uninstall (앱 데이터 삭제됨)
 ```
+- Turnip(커스텀 Vulkan 드라이버) 적용: docs/TURNIP.md  (scripts/build_turnip_zig.sh → apply_turnip.sh → build.sh)
 - 함수 찾기: `scripts/fn.sh "UserNet.on_tcp"` , 소스 보기: `scripts/fn.sh -d 009e67b4`
 - 내보내지 않은 함수(Global FUN_xxx 등): `scripts/ghidra_decomp.sh 00dd93ec`
 - 네임스페이스 추가 내보내기: `HVM_OUT=... HVM_NS=Shader,Settings analyzeHeadless ... -postScript export_ns.py`
