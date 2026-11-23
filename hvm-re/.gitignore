@@ -7,3 +7,5 @@ apk/
 turnip/driver/
 turnip/build/
 turnip/out/
+driverui/build/
+driverui/out/

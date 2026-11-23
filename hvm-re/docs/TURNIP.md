@@ -15,7 +15,11 @@
 - 검증(정적): 5개 .so 모두 aarch64 ELF, 16KB 페이지 정렬, TEXTREL 없음, 미정의 심볼 전부 bionic `libc.map.txt`/`libdl.map.txt` 에 존재(+liblog `__android_log_print`).
 - 산출: turnip/out/{libhvmvk,libhook_impl,libmain_hook,libfile_redirect_hook,libgsl_alloc_hook}.so → `scripts/apply_turnip.sh`(+ 번들 드라이버 turnip/driver/libvulkan_freedreno.so) → `scripts/build.sh` → out/HorizonVM-patched.apk (확인: 앱 .so 에서 "libvulkan.so" 1곳 → "libhvmvk.so", ".so.1" 은 그대로).
 
-## 사용
+## 사용 (UI)
+설정 화면 왼쪽 위 **"Vulkan 드라이버"** 섹션: 드롭다운(기본 시스템 / 내장 Turnip / 설치된 드라이버) + [드라이버 파일 선택 · 설치](zip(meta.json+.so) 또는 .so 단일 파일) + [삭제]. 설치하면 자동 선택되고 `files/drivers/<이름>/` 에 저장. 선택은 다음 VM 시작 때 `HVM_VK_DRIVER`(+`HVM_EDEN_NO_BCN_PATCH=1`)로 적용되며, 직접 쓴 '추가 환경변수' 값이 있으면 그쪽이 우선. Vulkan 은 프로세스당 1회 로드되므로 VM 을 한 번 띄운 뒤 바꾸면 '앱 종료' 후 재실행 필요(안내 팝업).
+구현: driverui/src/.../DriverManager.java → scripts/build_driverui.sh(javac+D8, tools/android.jar=robolectric android-all) → classes2.dex, scripts/patch_driverui.py 가 MainActivity.smali 3곳(attach/onResult/afterEnv)에 호출 삽입, build.sh 가 classes2.dex 를 APK 에 합침.
+
+## 사용 (환경변수 직접)
 앱 '추가 환경변수'에 (줄마다 K=V):
 ```
 HVM_VK_DRIVER=bundled
