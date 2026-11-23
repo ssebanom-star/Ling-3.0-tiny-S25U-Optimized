@@ -1,0 +1,7 @@
+# NDK 로 빌드:  scripts/build_turnip.sh  (NDK 경로 필요)
+cmake_minimum_required(VERSION 3.14)
+project(hvmvk LANGUAGES C CXX)
+set(ADRENOTOOLS_DIR "" CACHE PATH "libadrenotools 소스 (git clone --recurse-submodules https://github.com/bylaws/libadrenotools)")
+add_subdirectory(${ADRENOTOOLS_DIR} adrenotools)
+add_library(hvmvk SHARED hvmvk_shim.cpp)
+target_link_libraries(hvmvk adrenotools log dl)
