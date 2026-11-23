@@ -1,0 +1,1 @@
+GUI(Ghidra)로 보려면 로컬 PC에서: Ghidra 11.3.2 설치 후 hvm-re/ghidra/proj (hvm.gpr + hvm.rep) 를 열면 분석 완료 상태로 열림.
